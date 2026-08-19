@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Six Hitting Contest - Cricket Duel</title>
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Main Menu / Lobby Screen -->
+    <div id="screen-lobby" class="screen active">
+      <div class="card header-card">
+        <h1>Six Hitting Contest</h1>
+        <p>1 Over. 1 Wicket. Maximize your Biggest Six.</p>
+      </div>
+
+      <div class="card player-profile">
+        <h2>Your Profile</h2>
+        <div class="profile-details">
+          <div class="detail-row">
+            <span>Name:</span> <strong id="profile-name">Player</strong>
+          </div>
+          <div class="detail-row">
+            <span>Rank:</span> <span id="profile-rank" class="badge">Bronze</span>
+          </div>
+          <div class="detail-row">
+            <span>XP:</span> <span id="profile-xp">0</span>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-col">
+            <h3>Batting</h3>
+            <div>Power: <span id="stat-bat-power">50</span></div>
+            <div>Timing: <span id="stat-bat-timing">50</span></div>
+            <div>Technique: <span id="stat-bat-tech">50</span></div>
+          </div>
+          <div class="stat-col">
+            <h3>Bowling</h3>
+            <div>Accuracy: <span id="stat-bowl-acc">50</span></div>
+            <div>Variation: <span id="stat-bowl-var">50</span></div>
+            <div>Pace: <span id="stat-bowl-pace">50</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card setup-card">
+        <h2>Start a Match</h2>
+        <div class="form-group">
+          <label for="select-difficulty">Select Bot Difficulty:</label>
+          <select id="select-difficulty">
+            <option value="Easy">Easy (Rookie Bot)</option>
+            <option value="Medium" selected>Medium (Pro Bot)</option>
+            <option value="Hard">Hard (Legend Bot)</option>
+          </select>
+        </div>
+        <button id="btn-start-toss" class="btn primary-btn">Go to Toss</button>
+      </div>
+
+      <div class="card leaderboard-card">
+        <h2>Leaderboard (Personal Best)</h2>
+        <table id="leaderboard-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Opponent</th>
+              <th>Biggest Six</th>
+              <th>Outcome</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body">
+            <!-- Populated dynamically -->
+            <tr class="empty-row"><td colspan="4">No matches played yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Toss Screen -->
+    <div id="screen-toss" class="screen">
+      <div class="card">
+        <h2>The Coin Toss</h2>
+        <p>Pick Heads or Tails to decide who gets to choose first.</p>
+        
+        <div class="toss-buttons">
+          <button id="btn-toss-heads" class="btn secondary-btn">Heads</button>
+          <button id="btn-toss-tails" class="btn secondary-btn">Tails</button>
+        </div>
+
+        <div id="toss-animation-container" class="toss-anim">
+          <!-- Animation element -->
+          <div id="coin" class="coin">?</div>
+        </div>
+
+        <div id="toss-result-message" class="hidden">
+          <p id="toss-won-text"></p>
+          <div id="toss-choice-buttons" class="hidden">
+            <button id="btn-choice-bat" class="btn success-btn">Bat First</button>
+            <button id="btn-choice-bowl" class="btn warning-btn">Bowl First</button>
+          </div>
+          <button id="btn-start-match" class="btn primary-btn hidden">Start Innings</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gameplay Screen -->
+    <div id="screen-gameplay" class="screen">
+      <!-- HUD Overlay -->
+      <div class="game-hud">
+        <div class="hud-box batter-hud">
+          <div class="hud-label">BATTER</div>
+          <div class="hud-value" id="hud-batter-name">Player</div>
+          <div class="hud-sub" id="hud-batter-stats">PWR: 50 | TIM: 50</div>
+        </div>
+
+        <div class="hud-box scoreboard-hud">
+          <div class="hud-main-score">
+            <span id="hud-innings-title">Innings 1</span>
+          </div>
+          <div class="hud-balls-wickets">
+            Balls: <strong id="hud-balls-count">0/6</strong> | Wickets: <strong id="hud-wickets-count">0/1</strong>
+          </div>
+          <div class="hud-sixes">
+            Biggest Six: <strong id="hud-biggest-six">0.0m</strong>
+          </div>
+        </div>
+
+        <div class="hud-box bowler-hud">
+          <div class="hud-label">BOWLER</div>
+          <div class="hud-value" id="hud-bowler-name">Bot</div>
+          <div class="hud-sub" id="hud-bowler-stats">ACC: 50 | VAR: 50</div>
+        </div>
+      </div>
+
+      <!-- Canvas for game animations, ball delivery, timing widgets -->
+      <div class="canvas-container">
+        <canvas id="game-canvas" width="800" height="450"></canvas>
+
+        <!-- Dynamic timing widgets (can overlay canvas) -->
+        <div id="timing-widget" class="timing-overlay hidden">
+          <div class="timing-bar-container">
+            <div class="timing-bar-perfect"></div>
+            <div id="timing-bar-cursor" class="timing-cursor"></div>
+          </div>
+          <p id="timing-instruction">Release SPACE or Touch to swing!</p>
+        </div>
+      </div>
+
+      <!-- Controls Overlay depending on state -->
+      <div class="control-panel">
+        <!-- Bowling Inputs -->
+        <div id="control-bowling" class="control-section hidden">
+          <h3>Set Up Your Delivery</h3>
+          <div class="input-row">
+            <div class="input-col">
+              <label>Line:</label>
+              <div class="btn-group" id="bowl-line-group">
+                <button class="btn active" data-val="middle">Middle</button>
+                <button class="btn" data-val="off">Off Side</button>
+                <button class="btn" data-val="leg">Leg Side</button>
+              </div>
+            </div>
+
+            <div class="input-col">
+              <label>Length:</label>
+              <div class="btn-group" id="bowl-length-group">
+                <button class="btn active" data-val="good">Good</button>
+                <button class="btn" data-val="full">Full</button>
+                <button class="btn" data-val="yorker">Yorker</button>
+                <button class="btn" data-val="short">Short</button>
+                <button class="btn" data-val="bouncer">Bouncer</button>
+              </div>
+            </div>
+
+            <div class="input-col">
+              <label>Type:</label>
+              <div class="btn-group" id="bowl-type-group">
+                <button class="btn active" data-val="fast">Fast</button>
+                <button class="btn" data-val="medium">Medium</button>
+                <button class="btn" data-val="slow">Slow Ball</button>
+                <button class="btn" data-val="offspin">Off Spin</button>
+                <button class="btn" data-val="legspin">Leg Spin</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-btn-row">
+            <button id="btn-bowl-pitch" class="btn primary-btn size-large">Hold & Release SPACE/Touch to Pitch</button>
+          </div>
+        </div>
+
+        <!-- Batting Inputs -->
+        <div id="control-batting" class="control-section hidden">
+          <h3>Prepare Your Shot</h3>
+          <div class="input-row">
+            <div class="input-col">
+              <label>Shot Type:</label>
+              <div class="btn-group" id="bat-type-group">
+                <button class="btn active" data-val="lofted">Lofted (Medium Risk/Big distance)</button>
+                <button class="btn" data-val="power">Power Swing (High Risk/Max distance)</button>
+                <button class="btn" data-val="grounded">Grounded (Low Risk/No Six)</button>
+                <button class="btn" data-val="defensive">Defensive (Ultra-Low Risk/No distance)</button>
+              </div>
+            </div>
+
+            <div class="input-col">
+              <label>Aim Direction:</label>
+              <div class="aim-clock-container">
+                <div class="aim-clock" id="aim-clock">
+                  <!-- 8 clock buttons -->
+                  <button class="clock-btn pos-0 active" data-val="0">🡡</button>
+                  <button class="clock-btn pos-1" data-val="1">🡥</button>
+                  <button class="clock-btn pos-2" data-val="2">🡦</button>
+                  <button class="clock-btn pos-3" data-val="3">🡧</button>
+                  <button class="clock-btn pos-4" data-val="4">🡣</button>
+                  <button class="clock-btn pos-5" data-val="5">🡤</button>
+                  <button class="clock-btn pos-6" data-val="6">🡧</button>
+                  <button class="clock-btn pos-7" data-val="7">🡨</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-btn-row">
+            <button id="btn-bat-swing" class="btn primary-btn size-large">Hold & Release SPACE/Touch to Swing</button>
+          </div>
+        </div>
+
+        <!-- Transition Panel between balls -->
+        <div id="control-transition" class="control-section hidden">
+          <h2 id="ball-outcome-title">Six!</h2>
+          <p id="ball-outcome-desc">You hit it 85.4 meters!</p>
+          <button id="btn-next-ball" class="btn primary-btn">Next Delivery</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Match Game Over Screen -->
+    <div id="screen-gameover" class="screen">
+      <div class="card result-card">
+        <h1 id="gameover-title">Match Completed</h1>
+        <h2 id="gameover-result-msg">Winner: You!</h2>
+
+        <div class="innings-comparison">
+          <div class="comparison-col">
+            <h3>Your Innings</h3>
+            <div>Biggest Six: <strong id="gameover-player-six">0.0m</strong></div>
+            <div>Wickets: <strong id="gameover-player-wickets">0/1</strong></div>
+            <div>Total Distance: <span id="gameover-player-total">0m</span></div>
+          </div>
+          <div class="comparison-col">
+            <h3>Bot's Innings</h3>
+            <div>Biggest Six: <strong id="gameover-bot-six">0.0m</strong></div>
+            <div>Wickets: <strong id="gameover-bot-wickets">0/1</strong></div>
+            <div>Total Distance: <span id="gameover-bot-total">0m</span></div>
+          </div>
+        </div>
+
+        <div class="progression-box">
+          <h3>Progression & Stats Upgrades</h3>
+          <p id="progression-gains">+100 XP gained!</p>
+          <p id="progression-stats-upgrade">Power upgraded to 52!</p>
+        </div>
+
+        <button id="btn-return-lobby" class="btn primary-btn">Return to Lobby</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
