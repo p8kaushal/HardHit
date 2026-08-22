@@ -35,7 +35,7 @@ function clamp(val: number, min: number, max: number): number {
 /**
  * Bot generates its 3D delivery parameters.
  */
-export function botChooseDelivery(_botPlayer: Player, difficulty: 'Easy' | 'Medium' | 'Hard'): DeliveryChoice {
+export function botChooseDelivery(_botPlayer: Player, _difficulty: 'Easy' | 'Medium' | 'Hard'): DeliveryChoice {
   const line = LINES[Math.floor(Math.random() * LINES.length)];
   const length = LENGTHS[Math.floor(Math.random() * LENGTHS.length)];
   const type = TYPES[Math.floor(Math.random() * TYPES.length)];
@@ -44,18 +44,15 @@ export function botChooseDelivery(_botPlayer: Player, difficulty: 'Easy' | 'Medi
   let baseTargetX = LINE_X_MAP[line];
   let baseTargetZ = LENGTH_Z_MAP[length];
   
-  // Apply aiming inaccuracy deviation depending on difficulty
-  let inaccuracy = 0.5; // Easy deviation
-  if (difficulty === 'Medium') inaccuracy = 0.25;
-  else if (difficulty === 'Hard') inaccuracy = 0.08;
+  // Apply aiming inaccuracy deviation depending on bowler Accuracy stat
+  const accuracyStat = _botPlayer.stats.bowling.accuracy;
+  const inaccuracy = Math.max(0.05, 0.65 - (accuracyStat / 100) * 0.55);
   
   const targetX = clamp(baseTargetX + randomNormal(0, inaccuracy), -1.5, 1.5);
   const targetZ = clamp(baseTargetZ + randomNormal(0, inaccuracy * 1.5), 4.0, 19.5);
 
-  // Release timing accuracy
-  let timingStdDev = 0.12;
-  if (difficulty === 'Medium') timingStdDev = 0.06;
-  else if (difficulty === 'Hard') timingStdDev = 0.02;
+  // Release timing accuracy scales with Accuracy stat
+  const timingStdDev = Math.max(0.015, 0.15 - (accuracyStat / 100) * 0.13);
 
   const releaseTiming = clamp(randomNormal(0.5, timingStdDev), 0.05, 0.95);
 
@@ -72,7 +69,7 @@ export function botChooseDelivery(_botPlayer: Player, difficulty: 'Easy' | 'Medi
  * Bot generates its shot response.
  */
 export function botChooseShot(
-  _botPlayer: Player,
+  botPlayer: Player,
   bowler: Player,
   delivery: DeliveryChoice,
   difficulty: 'Easy' | 'Medium' | 'Hard'
@@ -109,17 +106,14 @@ export function botChooseShot(
     direction = [0, 4, 1, 7][Math.floor(Math.random() * 4)];
   }
 
-  // Timing execution
-  let timingStdDev = 0.12;
-  if (difficulty === 'Medium') timingStdDev = 0.06;
-  else if (difficulty === 'Hard') timingStdDev = 0.025;
+  // Timing execution scales dynamically with batter Timing stat
+  const timingStat = botPlayer.stats.batting.timing;
+  const timingStdDev = Math.max(0.015, 0.15 - (timingStat / 100) * 0.13);
   
   const timing = clamp(randomNormal(0.5, timingStdDev), 0.15, 0.85);
   
-  // Contact execution
-  let contactStdDev = 0.15;
-  if (difficulty === 'Medium') contactStdDev = 0.08;
-  else if (difficulty === 'Hard') contactStdDev = 0.03;
+  // Contact execution scales dynamically with batter Timing stat
+  const contactStdDev = Math.max(0.02, 0.18 - (timingStat / 100) * 0.15);
   const contactZone = clamp(randomNormal(0.5, contactStdDev), 0.15, 0.85);
 
   return {

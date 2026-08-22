@@ -3,10 +3,12 @@ import { GameScene } from './scene';
 import { DeliveryChoice, ShotChoice, ShotType } from './types';
 import { botChooseShot } from './bot';
 import { checkExtraBall } from './formula';
+import { KeyboardInputManager } from './input';
 
 export class UIManager {
   private controller: MatchController;
   private gameScene: GameScene;
+  private keyboardInputManager: KeyboardInputManager;
 
   // Gesture/Swipe Tracking
   private swipeStartX = 0;
@@ -35,6 +37,12 @@ export class UIManager {
   constructor(controller: MatchController) {
     this.controller = controller;
     this.gameScene = new GameScene('game-canvas');
+    this.keyboardInputManager = new KeyboardInputManager(
+      () => this.controller.getCurrentInnings().batter.id === this.controller.state.player.id,
+      () => this.startBowlingReleaseMeter(),
+      () => this.triggerReleaseMeter(),
+      (direction, type) => this.executeBattingSwingGesture(direction, type)
+    );
     this.initEventListeners();
     this.updateHUD();
   }
@@ -88,23 +96,7 @@ export class UIManager {
     window.addEventListener('mouseup', () => this.triggerReleaseMeter());
     window.addEventListener('touchend', () => this.triggerReleaseMeter());
 
-    // Keyboard fallbacks
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
-        const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
-        if (isPlayerBatting && this.gameScene.scene.activeCamera?.name === 'camBatter') {
-          this.executeKeyboardBatSwing();
-        } else if (!isPlayerBatting && this.gameScene.scene.activeCamera?.name === 'camBowler') {
-          this.startBowlingReleaseMeter();
-        }
-      }
-    });
 
-    window.addEventListener('keyup', (e) => {
-      if (e.code === 'Space') {
-        this.triggerReleaseMeter();
-      }
-    });
 
     // Next Ball transition
     document.getElementById('btn-next-ball')!.onclick = () => {
@@ -227,6 +219,11 @@ export class UIManager {
     document.getElementById('timing-widget')!.classList.add('hidden');
 
     const finalTiming = this.timingCursorVal;
+    
+    // Sync parameters with keyboard intent
+    this.selectedBowlType = this.keyboardInputManager.intent.deliveryType;
+    this.currentAimTargetX = this.keyboardInputManager.intent.aimX;
+    this.currentAimTargetZ = this.keyboardInputManager.intent.aimZ;
 
     // Pitch the ball
     this.activeDelivery = {
@@ -394,6 +391,7 @@ export class UIManager {
       document.getElementById('control-bowling')!.classList.remove('hidden');
       document.getElementById('control-batting')!.classList.add('hidden');
     }
+    this.keyboardInputManager.updateFeedbackOverlay();
   }
 
   private showGameOverScreen(): void {

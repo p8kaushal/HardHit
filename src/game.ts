@@ -118,6 +118,8 @@ export class MatchController {
       wicketsLost: 0,
       maxWickets: 1,
       biggestSix: 0,
+      score: 0,
+      isNextFreeHit: false,
       finished: false
     };
 
@@ -128,6 +130,8 @@ export class MatchController {
       wicketsLost: 0,
       maxWickets: 1,
       biggestSix: 0,
+      score: 0,
+      isNextFreeHit: false,
       finished: false
     };
 
@@ -145,10 +149,13 @@ export class MatchController {
 
   public recordBall(delivery: DeliveryChoice, shot: ShotChoice | null): BallOutcome {
     const innings = this.getCurrentInnings();
-    const ballNumber = innings.balls.filter(b => {
-      const extra = checkExtraBall(b.delivery);
-      return !extra.isExtra; // Count only legal balls
-    }).length + 1;
+    
+    // Save whether this ball is a Free Hit
+    const isFreeHit = innings.isNextFreeHit;
+    // Reset next ball's Free Hit state
+    innings.isNextFreeHit = false;
+
+    const ballNumber = innings.balls.filter(b => !b.isExtra).length + 1;
 
     // Check extra ball
     const extra = checkExtraBall(delivery);
@@ -158,19 +165,22 @@ export class MatchController {
     let distance = 0;
 
     if (extra.isExtra) {
+      innings.score += 1; // +1 run penalty
+      innings.isNextFreeHit = true; // next ball is free hit
+      
       if (extra.type === 'wide') {
         wicketReason = 'Penalty - Wide ball!';
       } else {
         wicketReason = 'Penalty - No ball! (Free Hit next)';
       }
       distance = 0;
+      console.log(`[GAME EVENT] Extra ball penalty: ${extra.type?.toUpperCase()}. Innings score: ${innings.score}. Next is Free Hit.`);
     } else if (shot === null) {
-      // Batter did not play a shot / missed completely
-      isWicket = false;
       wicketReason = 'Missed delivery!';
       distance = 0;
+      console.log(`[GAME EVENT] Missed delivery. Ball number ${ballNumber}`);
     } else {
-      // Regular delivery
+      // Regular ball
       const wicketResult = evaluateWicket(innings.batter, innings.bowler, delivery, shot);
       isWicket = wicketResult.isWicket;
       wicketReason = wicketResult.reason;
@@ -184,6 +194,24 @@ export class MatchController {
           distance = 0;
         }
       }
+
+      // Check Free Hit survival rules
+      if (isWicket && isFreeHit) {
+        isWicket = false;
+        wicketReason = `Free Hit Survival! Batter mistimed shot but is not out. Original reason: ${wicketReason}`;
+        console.log(`[GAME EVENT] Batter survived a dismissal due to active Free Hit!`);
+      }
+
+      if (!isWicket) {
+        if (distance >= 70) {
+          innings.biggestSix = Math.max(innings.biggestSix, distance);
+          innings.score += 6; // Six adds +6 runs
+          console.log(`[GAME EVENT] Massive SIX: ${distance}m! Innings score: ${innings.score}`);
+        } else {
+          // Under MVP, non-six hits are 0 runs, but we track distance
+          console.log(`[GAME EVENT] Hit: ${distance}m. Innings score: ${innings.score}`);
+        }
+      }
     }
 
     const outcome: BallOutcome = {
@@ -192,7 +220,10 @@ export class MatchController {
       shot,
       distance,
       isWicket,
-      wicketReason
+      wicketReason,
+      isFreeHit,
+      isExtra: extra.isExtra,
+      extraType: extra.type
     };
 
     innings.balls.push(outcome);
@@ -200,16 +231,14 @@ export class MatchController {
     if (isWicket) {
       innings.wicketsLost += 1;
       innings.finished = true;
-    }
-
-    if (distance >= 70) {
-      innings.biggestSix = Math.max(innings.biggestSix, distance);
+      console.log(`[GAME EVENT] WICKET! Batter dismissed: ${wicketReason}. Innings finished.`);
     }
 
     // Check if innings is finished (6 legal balls or 1 wicket)
-    const legalBallsCount = innings.balls.filter(b => !checkExtraBall(b.delivery).isExtra).length;
+    const legalBallsCount = innings.balls.filter(b => !b.isExtra).length;
     if (legalBallsCount >= 6 || innings.wicketsLost >= innings.maxWickets) {
       innings.finished = true;
+      console.log(`[GAME EVENT] Innings completed. Legal balls: ${legalBallsCount}. Wickets: ${innings.wicketsLost}. Biggest Six: ${innings.biggestSix}m.`);
     }
 
     this.checkInningsTransitions();
@@ -222,6 +251,7 @@ export class MatchController {
       if (this.state.currentInningsIndex === 0) {
         // Go to second innings
         this.state.currentInningsIndex = 1;
+        console.log(`[GAME EVENT] Transitioning to Innings 2. Swapping roles.`);
       } else {
         // End of match
         this.resolveMatch();
@@ -233,7 +263,8 @@ export class MatchController {
     const inn1 = this.state.innings[0];
     const inn2 = this.state.innings[1];
     
-    // Determine winner based on primary metric: highest single six
+    console.log(`[GAME EVENT] Resolving match. Innings 1 biggest six: ${inn1.biggestSix}m (wickets: ${inn1.wicketsLost}). Innings 2 biggest six: ${inn2.biggestSix}m (wickets: ${inn2.wicketsLost}).`);
+
     let winnerId: string | null = null;
     
     if (inn1.biggestSix > inn2.biggestSix) {
@@ -242,12 +273,14 @@ export class MatchController {
       winnerId = inn2.batter.id;
     } else {
       // Tie-break 1: Fewer wickets lost
+      console.log(`[GAME EVENT] Biggest sixes are tied. Applying Tie-break 1 (fewer wickets lost).`);
       if (inn1.wicketsLost < inn2.wicketsLost) {
         winnerId = inn1.batter.id;
       } else if (inn2.wicketsLost < inn1.wicketsLost) {
         winnerId = inn2.batter.id;
       } else {
-        // Tie-break 2: Second biggest hit / Total distance
+        // Tie-break 2: Total carry distance (accumulative distance of all hits)
+        console.log(`[GAME EVENT] Wickets lost are tied. Applying Tie-break 2 (total carry distance).`);
         const totalDist1 = inn1.balls.reduce((acc, b) => acc + b.distance, 0);
         const totalDist2 = inn2.balls.reduce((acc, b) => acc + b.distance, 0);
         
@@ -256,9 +289,22 @@ export class MatchController {
         } else if (totalDist2 > totalDist1) {
           winnerId = inn2.batter.id;
         } else {
-          // Tie-break 3: Sudden Death required
-          this.state.tieBreakerActive = true;
-          // Keep state playing or superover
+          // Tie-break 3: Second biggest six
+          console.log(`[GAME EVENT] Total carry distances are tied. Applying Tie-break 3 (second biggest six).`);
+          const sortedDist1 = inn1.balls.map(b => b.distance).sort((a, b) => b - a);
+          const sortedDist2 = inn2.balls.map(b => b.distance).sort((a, b) => b - a);
+          const secBiggest1 = sortedDist1[1] || 0;
+          const secBiggest2 = sortedDist2[1] || 0;
+          
+          if (secBiggest1 > secBiggest2) {
+            winnerId = inn1.batter.id;
+          } else if (secBiggest2 > secBiggest1) {
+            winnerId = inn2.batter.id;
+          } else {
+            // Sudden death
+            console.log(`[GAME EVENT] Match completely tied. Activating 1-ball sudden death decider!`);
+            this.state.tieBreakerActive = true;
+          }
         }
       }
     }
@@ -266,6 +312,7 @@ export class MatchController {
     if (!this.state.tieBreakerActive) {
       this.state.winnerId = winnerId;
       this.state.status = 'completed';
+      console.log(`[GAME EVENT] Match finished. Winner ID: ${winnerId}.`);
       this.applyProgression(winnerId === this.state.player.id);
     }
   }

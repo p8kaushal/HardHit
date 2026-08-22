@@ -142,3 +142,72 @@ export function checkExtraBall(delivery: DeliveryChoice): { isExtra: boolean; ty
   }
   return { isExtra: false, type: null };
 }
+
+export function verifyFormulas(): void {
+  console.log("=== [FORMULA VERIFIER START] ===");
+  
+  const mockBatter: Player = {
+    id: "test_bat",
+    name: "Test Batter",
+    isBot: false,
+    xp: 0,
+    rank: "Bronze",
+    stats: {
+      batting: { power: 50, timing: 50, placement: 50, technique: 50, stamina: 50 },
+      bowling: { pace: 50, swing: 50, spin: 50, accuracy: 50, stamina: 50, variation: 50 }
+    }
+  };
+
+  const mockBowler: Player = {
+    id: "test_bowl",
+    name: "Test Bowler",
+    isBot: true,
+    xp: 0,
+    rank: "Bronze",
+    stats: {
+      batting: { power: 50, timing: 50, placement: 50, technique: 50, stamina: 50 },
+      bowling: { pace: 50, swing: 50, spin: 50, accuracy: 50, stamina: 50, variation: 50 }
+    }
+  };
+
+  const delivery: DeliveryChoice = {
+    aimTarget: { x: 0, z: 12.0 },
+    line: "middle",
+    length: "good",
+    type: "fast",
+    releaseTiming: 0.5
+  };
+
+  const shotPerfect: ShotChoice = {
+    direction: 0,
+    type: "power",
+    timing: 0.5,
+    contactZone: 0.5
+  };
+
+  const w1 = evaluateWicket(mockBatter, mockBowler, delivery, shotPerfect);
+  const d1 = calculateDistance(mockBatter, mockBowler, delivery, shotPerfect, w1.safeWindowMs);
+  console.log(`[TEST 1] Perfect Power Swing: Wicket=${w1.isWicket} (Reason: ${w1.reason || 'None'}), Distance=${d1.distance}m`);
+
+  const shotEarly: ShotChoice = {
+    direction: 0,
+    type: "power",
+    timing: 0.2,
+    contactZone: 0.5
+  };
+  const w2 = evaluateWicket(mockBatter, mockBowler, delivery, shotEarly);
+  const d2 = calculateDistance(mockBatter, mockBowler, delivery, shotEarly, w2.safeWindowMs);
+  console.log(`[TEST 2] Early Power Swing: Wicket=${w2.isWicket} (Reason: ${w2.reason || 'None'}), Distance=${d2.distance}m`);
+
+  const badDelivery: DeliveryChoice = {
+    aimTarget: { x: 0, z: 12.0 },
+    line: "middle",
+    length: "good",
+    type: "fast",
+    releaseTiming: 0.02
+  };
+  const e3 = checkExtraBall(badDelivery);
+  console.log(`[TEST 3] Bad bowler release: isExtra=${e3.isExtra}, type=${e3.type}`);
+
+  console.log("=== [FORMULA VERIFIER END] ===");
+}

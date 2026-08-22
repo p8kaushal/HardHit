@@ -63,6 +63,9 @@ export interface BallOutcome {
   distance: number;
   isWicket: boolean;
   wicketReason: string;
+  isFreeHit: boolean;
+  isExtra: boolean;
+  extraType: 'wide' | 'noball' | null;
   ballTrajectory?: Vector3D[]; // Precomputed 3D path for rendering
 }
 
@@ -73,6 +76,8 @@ export interface Innings {
   wicketsLost: number;
   maxWickets: number; // MVP always 1
   biggestSix: number;
+  score: number;       // total runs (including +1 for extra balls)
+  isNextFreeHit: boolean;
   finished: boolean;
 }
 
@@ -90,3 +95,14 @@ export interface MatchState {
   tieBreakerActive: boolean;
   cameraMode: CameraMode;
 }
+
+export interface InputIntent {
+  aimX: number;          // For bowling: horizontal line coordinate (-1.5 to 1.5)
+  aimZ: number;          // For bowling: length coordinate (4.0 to 19.5)
+  aimDirection: number;  // For batting: radial direction (0 to 7)
+  deliveryType: DeliveryType;
+  shotType: ShotType;
+  releaseTiming: number;
+  swingTiming: number;
+}
+
