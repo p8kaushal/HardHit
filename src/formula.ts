@@ -143,22 +143,22 @@ export function checkExtraBall(delivery: DeliveryChoice, batterHand: 'RHB' | 'LH
 
   const x = delivery.aimTarget.x;
   if (batterHand === 'RHB') {
-    if (x > 0.89) return { isExtra: true, type: 'wide' };
-    if (x < -0.15) return { isExtra: true, type: 'wide' };
-  } else {
     if (x < -0.89) return { isExtra: true, type: 'wide' };
     if (x > 0.15) return { isExtra: true, type: 'wide' };
+  } else {
+    if (x > 0.89) return { isExtra: true, type: 'wide' };
+    if (x < -0.15) return { isExtra: true, type: 'wide' };
   }
 
   return { isExtra: false, type: null };
 }
 
 export function getLineTypeFromAimX(aimX: number, batterHand: 'RHB' | 'LHB' = 'RHB'): import('./types').LineType {
-  if (batterHand === 'LHB') {
+  if (batterHand === 'RHB') {
     if (aimX < -0.2) return 'off';
     if (aimX > 0.2) return 'leg';
     return 'middle';
-  } else {
+  } else { // LHB
     if (aimX > 0.2) return 'off';
     if (aimX < -0.2) return 'leg';
     return 'middle';
@@ -167,8 +167,8 @@ export function getLineTypeFromAimX(aimX: number, batterHand: 'RHB' | 'LHB' = 'R
 
 export function getAimXFromLineType(line: import('./types').LineType, batterHand: 'RHB' | 'LHB' = 'RHB'): number {
   let target = 0;
-  if (line === 'off') target = 0.6;
-  if (line === 'leg') target = -0.4;
+  if (line === 'off') target = -0.6;
+  if (line === 'leg') target = 0.4;
   return batterHand === 'LHB' ? -target : target;
 }
 

@@ -2,7 +2,7 @@ import { MatchController } from './game';
 import { GameScene } from './scene';
 import { DeliveryChoice, ShotChoice, ShotType } from './types';
 import { botChooseShot } from './bot';
-import { checkExtraBall } from './formula';
+import { checkExtraBall, getLineTypeFromAimX } from './formula';
 import { KeyboardInputManager } from './input';
 
 export class UIManager {
@@ -44,7 +44,8 @@ export class UIManager {
       () => this.controller.getCurrentInnings().batter.id === this.controller.state.player.id,
       () => this.startBowlingReleaseMeter(),
       () => this.triggerReleaseMeter(),
-      (direction, type) => this.executeBattingSwingGesture(direction, type)
+      (direction, type) => this.executeBattingSwingGesture(direction, type),
+      () => this.controller.getCurrentInnings().batter.batterHand || 'RHB'
     );
     this.initEventListeners();
     this.updateHUD();
@@ -92,9 +93,14 @@ export class UIManager {
         const target = e.currentTarget as HTMLButtonElement;
         target.classList.add('active');
         const lineVal = target.getAttribute('data-val');
-        if (lineVal === 'middle') this.keyboardInputManager.intent.aimX = 0.0;
-        else if (lineVal === 'off') this.keyboardInputManager.intent.aimX = 0.8;
-        else if (lineVal === 'leg') this.keyboardInputManager.intent.aimX = -0.8;
+        const hand = this.controller.getCurrentInnings().batter.batterHand || 'RHB';
+        let aimX = 0.0;
+        if (lineVal === 'off') {
+          aimX = hand === 'RHB' ? -0.8 : 0.8;
+        } else if (lineVal === 'leg') {
+          aimX = hand === 'RHB' ? 0.8 : -0.8;
+        }
+        this.keyboardInputManager.intent.aimX = aimX;
         this.currentAimTargetX = this.keyboardInputManager.intent.aimX;
         
         // Redraw landing shadow disc marker
@@ -310,7 +316,7 @@ export class UIManager {
     // Pitch the ball
     this.activeDelivery = {
       aimTarget: { x: this.currentAimTargetX, z: this.currentAimTargetZ },
-      line: this.currentAimTargetX > 0.4 ? 'off' : (this.currentAimTargetX < -0.4 ? 'leg' : 'middle'),
+      line: getLineTypeFromAimX(this.currentAimTargetX, this.controller.getCurrentInnings().batter.batterHand || 'RHB'),
       length: this.currentAimTargetZ > 16 ? 'yorker' : (this.currentAimTargetZ > 13.5 ? 'full' : (this.currentAimTargetZ > 11 ? 'good' : (this.currentAimTargetZ > 8 ? 'short' : 'bouncer'))),
       type: this.selectedBowlType,
       releaseTiming: finalTiming

@@ -439,8 +439,8 @@ export class GameScene {
     const carryDistance = Math.min(65, distance); // visual clamp to boundary
     
     let xOffset = Math.cos(angle) * carryDistance;
-    if (this.batterHand === 'LHB') {
-      xOffset = -xOffset; // LHB Off-side is negative X, Leg-side is positive X
+    if (this.batterHand === 'RHB') {
+      xOffset = -xOffset; // RHB Off-side is negative X, Leg-side is positive X
     }
     
     const endPoint = new BABYLON.Vector3(

@@ -3,6 +3,7 @@ import { InputIntent, ShotType } from './types';
 export class KeyboardInputManager {
   public intent: InputIntent;
   private isPlayerBatting: () => boolean;
+  private getBatterHandedness: () => 'RHB' | 'LHB';
   private onReleaseMeterStart: () => void;
   private onReleaseMeterEnd: (timing: number) => void;
   private onBatSwing: (direction: number, type: ShotType) => void;
@@ -11,8 +12,7 @@ export class KeyboardInputManager {
   private spacePressed = false;
 
   // Lists of options for arrow key cycling
-  private bowlingLines: number[] = [-0.9, 0.0, 0.9]; // Leg, Middle, Off
-  private bowlingLineLabels: string[] = ['Leg Side', 'Middle', 'Off Side'];
+  // We will dynamically compute the aimX based on handedness, so we just track line index 0,1,2 for Leg, Middle, Off
   private currentLineIdx = 1; // Start middle
 
   private bowlingLengths: number[] = [7.0, 9.5, 12.0, 15.0, 17.5]; // Bouncer, Short, Good, Full, Yorker
@@ -23,9 +23,11 @@ export class KeyboardInputManager {
     isPlayerBatting: () => boolean,
     onReleaseMeterStart: () => void,
     onReleaseMeterEnd: (timing: number) => void,
-    onBatSwing: (direction: number, type: ShotType) => void
+    onBatSwing: (direction: number, type: ShotType) => void,
+    getBatterHandedness: () => 'RHB' | 'LHB'
   ) {
     this.isPlayerBatting = isPlayerBatting;
+    this.getBatterHandedness = getBatterHandedness;
     this.onReleaseMeterStart = onReleaseMeterStart;
     this.onReleaseMeterEnd = onReleaseMeterEnd;
     this.onBatSwing = onBatSwing;
@@ -103,7 +105,7 @@ export class KeyboardInputManager {
     } else {
       modeBadge.innerText = 'BOWLING MODE';
       modeBadge.className = 'status-indicator-badge bowling';
-      modeDetails.innerHTML = `Line: <strong>${this.bowlingLineLabels[this.currentLineIdx]}</strong> | Len: <strong>${this.bowlingLengthLabels[this.currentLengthIdx]}</strong> | Type: <strong>${this.intent.deliveryType.toUpperCase()}</strong>`;
+      modeDetails.innerHTML = `Line: <strong>${this.getBowlingLineLabel(this.currentLineIdx)}</strong> | Len: <strong>${this.bowlingLengthLabels[this.currentLengthIdx]}</strong> | Type: <strong>${this.intent.deliveryType.toUpperCase()}</strong>`;
     }
   }
 
@@ -148,15 +150,26 @@ export class KeyboardInputManager {
     }
   }
 
+  public getAimXForIndex(idx: number): number {
+    return [-0.8, 0.0, 0.8][idx];
+  }
+
+  public getBowlingLineLabel(idx: number): string {
+    const hand = this.getBatterHandedness();
+    if (idx === 0) return hand === 'RHB' ? 'Off Side' : 'Leg Side';
+    if (idx === 2) return hand === 'RHB' ? 'Leg Side' : 'Off Side';
+    return 'Middle';
+  }
+
   private handleBowlingKeys(e: KeyboardEvent): void {
     // 1. Aim (Arrow Keys / WASD)
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
       this.currentLineIdx = Math.max(0, this.currentLineIdx - 1);
-      this.intent.aimX = this.bowlingLines[this.currentLineIdx];
+      this.intent.aimX = this.getAimXForIndex(this.currentLineIdx);
       this.triggerBowlingAimUpdate();
     } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-      this.currentLineIdx = Math.min(this.bowlingLines.length - 1, this.currentLineIdx + 1);
-      this.intent.aimX = this.bowlingLines[this.currentLineIdx];
+      this.currentLineIdx = Math.min(2, this.currentLineIdx + 1);
+      this.intent.aimX = this.getAimXForIndex(this.currentLineIdx);
       this.triggerBowlingAimUpdate();
     }
 
