@@ -59,7 +59,7 @@ export class KeyboardInputManager {
       overlay = document.createElement('div');
       overlay.id = 'keyboard-bindings-feedback';
       overlay.style.position = 'absolute';
-      overlay.style.top = '10px';
+      overlay.style.top = '95px';
       overlay.style.left = '50%';
       overlay.style.transform = 'translateX(-50%)';
       overlay.style.backgroundColor = 'rgba(26, 26, 36, 0.85)';

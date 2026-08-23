@@ -229,14 +229,15 @@ export class MatchController {
     innings.balls.push(outcome);
 
     if (isWicket) {
-      innings.wicketsLost += 1;
+      innings.wicketsLost = innings.maxWickets; // Forfeit remaining balls by maximizing wickets
       innings.finished = true;
       console.log(`[GAME EVENT] WICKET! Batter dismissed: ${wicketReason}. Innings finished.`);
     }
 
     // Check if innings is finished (6 legal balls or 1 wicket)
     const legalBallsCount = innings.balls.filter(b => !b.isExtra).length;
-    if (legalBallsCount >= 6 || innings.wicketsLost >= innings.maxWickets) {
+    const maxBalls = this.state.tieBreakerActive ? 1 : 6;
+    if (legalBallsCount >= maxBalls || innings.wicketsLost >= innings.maxWickets) {
       innings.finished = true;
       console.log(`[GAME EVENT] Innings completed. Legal balls: ${legalBallsCount}. Wickets: ${innings.wicketsLost}. Biggest Six: ${innings.biggestSix}m.`);
     }
@@ -248,22 +249,23 @@ export class MatchController {
   private checkInningsTransitions(): void {
     const currentInnings = this.getCurrentInnings();
     if (currentInnings.finished) {
-      if (this.state.currentInningsIndex === 0) {
-        // Go to second innings
-        this.state.currentInningsIndex = 1;
-        console.log(`[GAME EVENT] Transitioning to Innings 2. Swapping roles.`);
+      // If we are at an even index (0, 2, 4), move to the next innings
+      if (this.state.currentInningsIndex % 2 === 0) {
+        this.state.currentInningsIndex++;
+        console.log(`[GAME EVENT] Transitioning to Innings ${this.state.currentInningsIndex + 1}. Swapping roles.`);
       } else {
-        // End of match
+        // End of the pair, resolve match or tie-break
         this.resolveMatch();
       }
     }
   }
 
   private resolveMatch(): void {
-    const inn1 = this.state.innings[0];
-    const inn2 = this.state.innings[1];
+    const idx = this.state.currentInningsIndex;
+    const inn1 = this.state.innings[idx - 1];
+    const inn2 = this.state.innings[idx];
     
-    console.log(`[GAME EVENT] Resolving match. Innings 1 biggest six: ${inn1.biggestSix}m (wickets: ${inn1.wicketsLost}). Innings 2 biggest six: ${inn2.biggestSix}m (wickets: ${inn2.wicketsLost}).`);
+    console.log(`[GAME EVENT] Resolving match segment. Inn1 biggest six: ${inn1.biggestSix}m. Inn2 biggest six: ${inn2.biggestSix}m.`);
 
     let winnerId: string | null = null;
     
@@ -304,17 +306,49 @@ export class MatchController {
             // Sudden death
             console.log(`[GAME EVENT] Match completely tied. Activating 1-ball sudden death decider!`);
             this.state.tieBreakerActive = true;
+            this.setupSuddenDeath();
           }
         }
       }
     }
 
-    if (!this.state.tieBreakerActive) {
+    if (!this.state.tieBreakerActive || winnerId) {
       this.state.winnerId = winnerId;
       this.state.status = 'completed';
       console.log(`[GAME EVENT] Match finished. Winner ID: ${winnerId}.`);
       this.applyProgression(winnerId === this.state.player.id);
     }
+  }
+
+  private setupSuddenDeath(): void {
+    const playerBatsFirst = Math.random() > 0.5;
+    
+    const inn1: Innings = {
+      batter: playerBatsFirst ? this.state.player : this.state.bot,
+      bowler: playerBatsFirst ? this.state.bot : this.state.player,
+      balls: [],
+      wicketsLost: 0,
+      maxWickets: 1,
+      biggestSix: 0,
+      score: 0,
+      isNextFreeHit: false,
+      finished: false
+    };
+
+    const inn2: Innings = {
+      batter: playerBatsFirst ? this.state.bot : this.state.player,
+      bowler: playerBatsFirst ? this.state.player : this.state.bot,
+      balls: [],
+      wicketsLost: 0,
+      maxWickets: 1,
+      biggestSix: 0,
+      score: 0,
+      isNextFreeHit: false,
+      finished: false
+    };
+
+    this.state.innings.push(inn1, inn2);
+    this.state.currentInningsIndex++;
   }
 
   private applyProgression(playerWon: boolean): void {

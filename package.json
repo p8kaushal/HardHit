@@ -12,6 +12,7 @@
     "babylonjs": "^6.33.0"
   },
   "devDependencies": {
+    "puppeteer": "^25.8.0",
     "typescript": "^5.2.2",
     "vite": "^5.0.0"
   }

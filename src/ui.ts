@@ -63,6 +63,8 @@ export class UIManager {
         const target = e.currentTarget as HTMLButtonElement;
         target.classList.add('active');
         this.selectedShotType = target.getAttribute('data-val') as ShotType;
+        this.keyboardInputManager.intent.shotType = this.selectedShotType;
+        this.keyboardInputManager.updateFeedbackOverlay();
       });
     });
 
@@ -74,6 +76,61 @@ export class UIManager {
         const target = e.currentTarget as HTMLButtonElement;
         target.classList.add('active');
         this.selectedBowlType = target.getAttribute('data-val') as any;
+        this.keyboardInputManager.intent.deliveryType = this.selectedBowlType;
+        this.keyboardInputManager.updateFeedbackOverlay();
+      });
+    });
+
+    // Bowl Line selector sync
+    const bowlLineButtons = document.querySelectorAll('#bowl-line-group .btn');
+    bowlLineButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        bowlLineButtons.forEach(b => b.classList.remove('active'));
+        const target = e.currentTarget as HTMLButtonElement;
+        target.classList.add('active');
+        const lineVal = target.getAttribute('data-val');
+        if (lineVal === 'middle') this.keyboardInputManager.intent.aimX = 0.0;
+        else if (lineVal === 'off') this.keyboardInputManager.intent.aimX = 0.8;
+        else if (lineVal === 'leg') this.keyboardInputManager.intent.aimX = -0.8;
+        this.currentAimTargetX = this.keyboardInputManager.intent.aimX;
+        
+        // Redraw landing shadow disc marker
+        this.gameScene.updateBounceMarker({ x: this.currentAimTargetX, z: this.currentAimTargetZ });
+        this.keyboardInputManager.updateFeedbackOverlay();
+      });
+    });
+
+    // Bowl Length selector sync
+    const bowlLengthButtons = document.querySelectorAll('#bowl-length-group .btn');
+    bowlLengthButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        bowlLengthButtons.forEach(b => b.classList.remove('active'));
+        const target = e.currentTarget as HTMLButtonElement;
+        target.classList.add('active');
+        const lenVal = target.getAttribute('data-val');
+        if (lenVal === 'yorker') this.keyboardInputManager.intent.aimZ = 18.0;
+        else if (lenVal === 'full') this.keyboardInputManager.intent.aimZ = 15.0;
+        else if (lenVal === 'good') this.keyboardInputManager.intent.aimZ = 12.0;
+        else if (lenVal === 'short') this.keyboardInputManager.intent.aimZ = 9.0;
+        else if (lenVal === 'bouncer') this.keyboardInputManager.intent.aimZ = 6.0;
+        this.currentAimTargetZ = this.keyboardInputManager.intent.aimZ;
+
+        // Redraw landing shadow disc marker
+        this.gameScene.updateBounceMarker({ x: this.currentAimTargetX, z: this.currentAimTargetZ });
+        this.keyboardInputManager.updateFeedbackOverlay();
+      });
+    });
+
+    // Bat Clock direction selectors sync
+    const clockButtons = document.querySelectorAll('#aim-clock .clock-btn');
+    clockButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        clockButtons.forEach(b => b.classList.remove('active'));
+        const target = e.currentTarget as HTMLButtonElement;
+        target.classList.add('active');
+        const clockVal = parseInt(target.getAttribute('data-val') || '0');
+        this.keyboardInputManager.intent.aimDirection = clockVal;
+        this.keyboardInputManager.updateFeedbackOverlay();
       });
     });
 
@@ -95,8 +152,6 @@ export class UIManager {
     // Global listeners
     window.addEventListener('mouseup', () => this.triggerReleaseMeter());
     window.addEventListener('touchend', () => this.triggerReleaseMeter());
-
-
 
     // Next Ball transition
     document.getElementById('btn-next-ball')!.onclick = () => {
@@ -188,6 +243,12 @@ export class UIManager {
     this.timingCursorVal = 0;
     this.timingDirection = 1;
 
+    // Auto-hide panels to clear pitch view during timing release
+    const controlBowling = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
+    const controlBatting = document.getElementById('control-batting') || document.getElementById('setup-batting-panel');
+    if (controlBowling) controlBowling.classList.add('hidden', 'panel-hidden');
+    if (controlBatting) controlBatting.classList.add('hidden', 'panel-hidden');
+
     const widget = document.getElementById('timing-widget')!;
     widget.classList.remove('hidden');
     document.getElementById('timing-instruction')!.innerText = 'Release SPACE or Pointer on perfect zone!';
@@ -259,6 +320,10 @@ export class UIManager {
   private executeBattingSwingGesture(direction: number, type: ShotType): void {
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     if (!isPlayerBatting || !this.activeDelivery || this.activeShot) return;
+
+    // Auto-hide panels to clear view
+    const controlBatting = document.getElementById('control-batting') || document.getElementById('setup-batting-panel');
+    if (controlBatting) controlBatting.classList.add('hidden', 'panel-hidden');
 
     // Calculate relative timing of swing based on how far the ball has traveled.
     // Ball triggers arrived callback at frame 60.
@@ -367,11 +432,18 @@ export class UIManager {
 
     this.updateHUD();
 
+    const controlBowling = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
+    const controlBatting = document.getElementById('control-batting') || document.getElementById('setup-batting-panel');
+
     if (isPlayerBatting) {
       // Batter mode
       this.gameScene.setCameraMode('batter_eye');
-      document.getElementById('control-batting')!.classList.remove('hidden');
-      document.getElementById('control-bowling')!.classList.add('hidden');
+      if (controlBatting) {
+        controlBatting.classList.remove('hidden', 'panel-hidden');
+      }
+      if (controlBowling) {
+        controlBowling.classList.add('hidden', 'panel-hidden');
+      }
       
       // Auto trigger bot delivery
       this.activeDelivery = {
@@ -388,8 +460,12 @@ export class UIManager {
     } else {
       // Bowler mode
       this.gameScene.setCameraMode('bowler_eye');
-      document.getElementById('control-bowling')!.classList.remove('hidden');
-      document.getElementById('control-batting')!.classList.add('hidden');
+      if (controlBowling) {
+        controlBowling.classList.remove('hidden', 'panel-hidden');
+      }
+      if (controlBatting) {
+        controlBatting.classList.add('hidden', 'panel-hidden');
+      }
     }
     this.keyboardInputManager.updateFeedbackOverlay();
   }
