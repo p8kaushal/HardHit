@@ -34,6 +34,9 @@ export class UIManager {
   private selectedShotType: ShotType = 'lofted';
   private selectedBowlType: 'fast' | 'medium' | 'slow' | 'offspin' | 'legspin' = 'fast';
 
+  // Result Toast Auto-dismiss Timer
+  private toastDismissTimer: any = null;
+
   constructor(controller: MatchController) {
     this.controller = controller;
     this.gameScene = new GameScene('game-canvas');
@@ -149,15 +152,33 @@ export class UIManager {
       this.executeKeyboardBatSwing();
     });
 
+    // Help button and modal listeners
+    const btnHelpToggle = document.getElementById('btn-help-toggle');
+    if (btnHelpToggle) {
+      btnHelpToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.keyboardInputManager.toggleHelpModal();
+      });
+    }
+
+    const btnHelpClose = document.getElementById('btn-help-close');
+    if (btnHelpClose) {
+      btnHelpClose.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.keyboardInputManager.closeHelpModal();
+      });
+    }
+
+    const helpBackdrop = document.getElementById('help-modal-backdrop');
+    if (helpBackdrop) {
+      helpBackdrop.addEventListener('click', () => {
+        this.keyboardInputManager.closeHelpModal();
+      });
+    }
+
     // Global listeners
     window.addEventListener('mouseup', () => this.triggerReleaseMeter());
     window.addEventListener('touchend', () => this.triggerReleaseMeter());
-
-    // Next Ball transition
-    document.getElementById('btn-next-ball')!.onclick = () => {
-      document.getElementById('control-transition')!.classList.add('hidden');
-      this.setupActiveTurn();
-    };
   }
 
   // --- Pointer & Aim Gesture Recognition ---
@@ -351,6 +372,7 @@ export class UIManager {
   private deliverBall3D(): void {
     if (!this.activeDelivery) return;
 
+    this.hideResultToast();
     this.deliveryStartFrame = Date.now();
     this.gameScene.setCameraMode('follow_shot');
 
@@ -374,29 +396,63 @@ export class UIManager {
     this.activeDelivery = null;
     this.activeShot = null;
 
-    // Triggers overlay outcome text
-    const titleEl = document.getElementById('ball-outcome-title')!;
-    const descEl = document.getElementById('ball-outcome-desc')!;
-    
+    let title = '';
+    let desc = '';
+
     if (checkExtraBall(outcome.delivery).isExtra) {
-      titleEl.innerText = outcome.wicketReason;
-      descEl.innerText = 'Bowler committed an illegal delivery. Extra ball!';
+      title = outcome.wicketReason || 'Extra Ball!';
+      desc = 'Bowler committed an illegal delivery. Extra ball!';
       this.gameScene.animateMissWicket(false);
     } else if (outcome.isWicket) {
-      titleEl.innerText = 'WICKET!';
-      descEl.innerText = outcome.wicketReason;
+      title = 'WICKET!';
+      desc = outcome.wicketReason;
       this.gameScene.animateMissWicket(true);
     } else if (outcome.distance > 0) {
-      titleEl.innerText = outcome.distance >= 70 ? `SIX HITTED! (${outcome.distance}m)` : `Hit: ${outcome.distance}m`;
-      descEl.innerText = `Cleared the boundary at Aim Direction ${outcome.shot?.direction}!`;
+      title = outcome.distance >= 70 ? `SIX HITTED! (${outcome.distance.toFixed(1)}m)` : `Hit: ${outcome.distance.toFixed(1)}m`;
+      desc = `Cleared the boundary at Aim Direction ${outcome.shot?.direction}!`;
       this.gameScene.animateHitPath(outcome.distance, outcome.shot?.direction || 0);
     } else {
-      titleEl.innerText = 'Dot Ball';
-      descEl.innerText = outcome.wicketReason || 'A swing and a miss!';
+      title = 'Dot Ball';
+      desc = outcome.wicketReason || 'A swing and a miss!';
       this.gameScene.animateMissWicket(false);
     }
 
-    document.getElementById('control-transition')!.classList.remove('hidden');
+    this.showResultToast(title, desc);
+  }
+
+  // --- Result Toast Management ---
+
+  private showResultToast(title: string, desc: string): void {
+    const toast = document.getElementById('result-toast');
+    const titleEl = document.getElementById('ball-outcome-title');
+    const descEl = document.getElementById('ball-outcome-desc');
+
+    if (titleEl) titleEl.innerText = title;
+    if (descEl) descEl.innerText = desc;
+
+    if (toast) {
+      toast.classList.remove('hidden');
+    }
+
+    if (this.toastDismissTimer) {
+      clearTimeout(this.toastDismissTimer);
+    }
+
+    // Auto-dismiss after 4 seconds
+    this.toastDismissTimer = setTimeout(() => {
+      this.hideResultToast();
+    }, 4000);
+  }
+
+  private hideResultToast(): void {
+    if (this.toastDismissTimer) {
+      clearTimeout(this.toastDismissTimer);
+      this.toastDismissTimer = null;
+    }
+    const toast = document.getElementById('result-toast');
+    if (toast) {
+      toast.classList.add('hidden');
+    }
   }
 
   // --- Scoreboard and HUD updating ---
@@ -417,6 +473,16 @@ export class UIManager {
     document.getElementById('hud-balls-count')!.innerText = `${legalCount}/6`;
     document.getElementById('hud-wickets-count')!.innerText = `${currentInn.wicketsLost}/${currentInn.maxWickets}`;
     document.getElementById('hud-biggest-six')!.innerText = `${currentInn.biggestSix.toFixed(1)}m`;
+
+    const opponentBadge = document.getElementById('opponent-badge');
+    if (opponentBadge) {
+      const isPlayerBatting = currentInn.batter.id === state.player.id;
+      if (isPlayerBatting) {
+        opponentBadge.innerText = `Opponent: ${currentInn.bowler.name} | Right-Arm Fast`;
+      } else {
+        opponentBadge.innerText = `Opponent: ${currentInn.batter.name} | RHB`;
+      }
+    }
   }
 
   public setupActiveTurn(): void {
@@ -431,6 +497,15 @@ export class UIManager {
     const isPlayerBatting = innings.batter.id === state.player.id;
 
     this.updateHUD();
+
+    const opponentBadge = document.getElementById('opponent-badge');
+    if (opponentBadge) {
+      if (isPlayerBatting) {
+        opponentBadge.innerText = `Opponent: ${innings.bowler.name} | Right-Arm Fast`;
+      } else {
+        opponentBadge.innerText = `Opponent: ${innings.batter.name} | RHB`;
+      }
+    }
 
     const controlBowling = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
     const controlBatting = document.getElementById('control-batting') || document.getElementById('setup-batting-panel');
@@ -471,6 +546,8 @@ export class UIManager {
   }
 
   private showGameOverScreen(): void {
+    this.hideResultToast();
+    this.keyboardInputManager.closeHelpModal();
     document.getElementById('screen-gameplay')!.classList.remove('active');
     const gameOverScreen = document.getElementById('screen-gameover')!;
     gameOverScreen.classList.add('active');

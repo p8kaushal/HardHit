@@ -143,6 +143,25 @@ export function checkExtraBall(delivery: DeliveryChoice): { isExtra: boolean; ty
   return { isExtra: false, type: null };
 }
 
+export function getLineTypeFromAimX(aimX: number, batterHand: 'RHB' | 'LHB' = 'RHB'): import('./types').LineType {
+  if (batterHand === 'LHB') {
+    if (aimX > 0.2) return 'off';
+    if (aimX < -0.2) return 'leg';
+    return 'middle';
+  } else {
+    if (aimX < -0.2) return 'off';
+    if (aimX > 0.2) return 'leg';
+    return 'middle';
+  }
+}
+
+export function getAimXFromLineType(line: import('./types').LineType, batterHand: 'RHB' | 'LHB' = 'RHB'): number {
+  let target = 0;
+  if (line === 'off') target = -0.6;
+  if (line === 'leg') target = 0.4;
+  return batterHand === 'LHB' ? -target : target;
+}
+
 export function verifyFormulas(): void {
   console.log("=== [FORMULA VERIFIER START] ===");
   

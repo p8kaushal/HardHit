@@ -27,6 +27,7 @@ export interface Player {
   xp: number;
   rank: 'Bronze' | 'Silver' | 'Gold' | 'Elite' | 'Legend';
   stats: PlayerStats;
+  batterHand?: 'RHB' | 'LHB';
 }
 
 export type LineType = 'off' | 'middle' | 'leg';
@@ -45,6 +46,7 @@ export interface DeliveryChoice {
   length: LengthType;
   type: DeliveryType;
   releaseTiming: number; // 0.0 to 1.0 (0.5 is perfect)
+  overTheWicket?: boolean;
 }
 
 export type ShotType = 'defensive' | 'grounded' | 'lofted' | 'power';

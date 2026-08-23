@@ -130,6 +130,90 @@
           <div class="hud-value" id="hud-bowler-name">Bot</div>
           <div class="hud-sub" id="hud-bowler-stats">ACC: 50 | VAR: 50</div>
         </div>
+
+        <!-- Help Button -->
+        <button id="btn-help-toggle" class="btn-help-toggle" title="Keyboard Controls &amp; Shortcuts (H)" aria-label="Keyboard Shortcuts">?</button>
+      </div>
+
+      <!-- Keyboard Shortcuts Help Modal -->
+      <div id="keyboard-help-modal" class="help-modal hidden">
+        <div class="help-modal-backdrop" id="help-modal-backdrop"></div>
+        <div class="help-modal-card">
+          <div class="help-modal-header">
+            <div class="help-modal-title">
+              <span class="help-modal-icon">🎮</span>
+              <h3>Controls &amp; Shortcuts</h3>
+            </div>
+            <button id="btn-help-close" class="btn-close-modal" aria-label="Close Help">&times;</button>
+          </div>
+          <div class="help-modal-body">
+            <div id="help-active-status" class="help-active-status">
+              <div class="status-indicator-badge batting" id="help-mode-badge">BATTING MODE</div>
+              <div class="status-indicator-details" id="help-mode-details">Aim: Straight | Shot: LOFTED</div>
+            </div>
+
+            <div class="help-grid">
+              <div class="help-section">
+                <div class="help-section-title">
+                  <span class="badge-role batting">Batting Controls</span>
+                </div>
+                <div class="help-row">
+                  <span class="help-key-combo"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd></span>
+                  <span class="help-action">Cycle Aim Direction</span>
+                </div>
+                <div class="help-row">
+                  <span class="help-key-combo"><kbd>Numpad 1-8</kbd></span>
+                  <span class="help-action">Direct Aim Direction</span>
+                </div>
+                <div class="help-row">
+                  <span class="help-key-combo"><kbd>1</kbd> - <kbd>4</kbd></span>
+                  <span class="help-action">Lofted / Power / Grounded / Defense</span>
+                </div>
+                <div class="help-row">
+                  <span class="help-key-combo"><kbd>Space</kbd> / Swipe</span>
+                  <span class="help-action">Timed Bat Swing</span>
+                </div>
+              </div>
+
+              <div class="help-section">
+                <div class="help-section-title">
+                  <span class="badge-role bowling">Bowling Controls</span>
+                </div>
+                <div class="help-row">
+                  <span class="help-key-combo"><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd></span>
+                  <span class="help-action">Pitch Line (Leg / Mid / Off)</span>
+                </div>
+                <div class="help-row">
+                  <span class="help-key-combo"><kbd>W</kbd><kbd>S</kbd> / <kbd>↑</kbd><kbd>↓</kbd></span>
+                  <span class="help-action">Pitch Length (Bouncer to Yorker)</span>
+                </div>
+                <div class="help-row">
+                  <span class="help-key-combo"><kbd>1</kbd> - <kbd>5</kbd></span>
+                  <span class="help-action">Fast / Med / Slow / Off / Leg Spin</span>
+                </div>
+                <div class="help-row">
+                  <span class="help-key-combo"><kbd>Space</kbd> (Hold &amp; Release)</span>
+                  <span class="help-action">Charge &amp; Deliver Ball</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="help-modal-footer">
+              <div class="help-tip">
+                <span>Tip: Press <kbd>H</kbd> anytime or click <kbd>?</kbd> to toggle this panel</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2D Opponent Detail Badge -->
+      <div id="opponent-badge" class="opponent-badge">Opponent: Bot | RHB</div>
+
+      <!-- Floating Result Toast (Non-blocking top banner) -->
+      <div id="result-toast" class="result-toast hidden">
+        <div id="ball-outcome-title" class="toast-title">Six!</div>
+        <div id="ball-outcome-desc" class="toast-desc">You hit it 85.4 meters!</div>
       </div>
 
       <!-- Canvas for game animations, ball delivery, timing widgets -->
@@ -150,17 +234,26 @@
       <div class="control-panel">
         <!-- Bowling Inputs -->
         <div id="control-bowling" class="control-section hidden">
-          <h3>Set Up Your Delivery</h3>
-          <div class="input-row">
+          <!-- Left Dock: Line Selection -->
+          <div class="side-dock left-dock">
+            <div class="dock-header">
+              <h3>Delivery Line</h3>
+            </div>
             <div class="input-col">
               <label>Line:</label>
-              <div class="btn-group" id="bowl-line-group">
+              <div class="btn-group vertical-group" id="bowl-line-group">
                 <button class="btn active" data-val="middle">Middle</button>
                 <button class="btn" data-val="off">Off Side</button>
                 <button class="btn" data-val="leg">Leg Side</button>
               </div>
             </div>
+          </div>
 
+          <!-- Right Dock: Length & Type Selectors + Action Button -->
+          <div class="side-dock right-dock">
+            <div class="dock-header">
+              <h3>Delivery Setup</h3>
+            </div>
             <div class="input-col">
               <label>Length:</label>
               <div class="btn-group" id="bowl-length-group">
@@ -172,7 +265,7 @@
               </div>
             </div>
 
-            <div class="input-col">
+            <div class="input-col" style="margin-top: 0.6rem;">
               <label>Type:</label>
               <div class="btn-group" id="bowl-type-group">
                 <button class="btn active" data-val="fast">Fast</button>
@@ -182,55 +275,57 @@
                 <button class="btn" data-val="legspin">Leg Spin</button>
               </div>
             </div>
-          </div>
 
-          <div class="action-btn-row">
-            <button id="btn-bowl-pitch" class="btn primary-btn size-large">Hold & Release SPACE/Touch to Pitch</button>
+            <div class="action-btn-row">
+              <button id="btn-bowl-pitch" class="btn primary-btn size-large">Hold & Release SPACE / Touch</button>
+            </div>
           </div>
         </div>
 
         <!-- Batting Inputs -->
         <div id="control-batting" class="control-section hidden">
-          <h3>Prepare Your Shot</h3>
-          <div class="input-row">
-            <div class="input-col">
-              <label>Shot Type:</label>
-              <div class="btn-group" id="bat-type-group">
-                <button class="btn active" data-val="lofted">Lofted (Medium Risk/Big distance)</button>
-                <button class="btn" data-val="power">Power Swing (High Risk/Max distance)</button>
-                <button class="btn" data-val="grounded">Grounded (Low Risk/No Six)</button>
-                <button class="btn" data-val="defensive">Defensive (Ultra-Low Risk/No distance)</button>
-              </div>
+          <!-- Left Dock: Aim Direction Clock Selector -->
+          <div class="side-dock left-dock">
+            <div class="dock-header">
+              <h3>Aim Direction</h3>
             </div>
-
             <div class="input-col">
-              <label>Aim Direction:</label>
+              <label>Clock Selector:</label>
               <div class="aim-clock-container">
                 <div class="aim-clock" id="aim-clock">
                   <!-- 8 clock buttons -->
-                  <button class="clock-btn pos-0 active" data-val="0">🡡</button>
-                  <button class="clock-btn pos-1" data-val="1">🡥</button>
-                  <button class="clock-btn pos-2" data-val="2">🡦</button>
-                  <button class="clock-btn pos-3" data-val="3">🡧</button>
-                  <button class="clock-btn pos-4" data-val="4">🡣</button>
-                  <button class="clock-btn pos-5" data-val="5">🡤</button>
-                  <button class="clock-btn pos-6" data-val="6">🡧</button>
-                  <button class="clock-btn pos-7" data-val="7">🡨</button>
+                  <button class="clock-btn pos-0 active" data-val="0" title="Straight">↑</button>
+                  <button class="clock-btn pos-1" data-val="1" title="Off-Side High">↗</button>
+                  <button class="clock-btn pos-2" data-val="2" title="Off-Side Flat">→</button>
+                  <button class="clock-btn pos-3" data-val="3" title="Behind Off">↘</button>
+                  <button class="clock-btn pos-4" data-val="4" title="Behind Leg">↓</button>
+                  <button class="clock-btn pos-5" data-val="5" title="Behind Leg High">↙</button>
+                  <button class="clock-btn pos-6" data-val="6" title="Leg-Side Flat">←</button>
+                  <button class="clock-btn pos-7" data-val="7" title="Leg-Side High">↖</button>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="action-btn-row">
-            <button id="btn-bat-swing" class="btn primary-btn size-large">Hold & Release SPACE/Touch to Swing</button>
-          </div>
-        </div>
+          <!-- Right Dock: Shot Type Selector + Action Button -->
+          <div class="side-dock right-dock">
+            <div class="dock-header">
+              <h3>Shot Setup</h3>
+            </div>
+            <div class="input-col">
+              <label>Shot Type:</label>
+              <div class="btn-group vertical-group" id="bat-type-group">
+                <button class="btn active" data-val="lofted">Lofted (Medium Risk)</button>
+                <button class="btn" data-val="power">Power Swing (High Risk)</button>
+                <button class="btn" data-val="grounded">Grounded (Low Risk)</button>
+                <button class="btn" data-val="defensive">Defensive (Ultra Safe)</button>
+              </div>
+            </div>
 
-        <!-- Transition Panel between balls -->
-        <div id="control-transition" class="control-section hidden">
-          <h2 id="ball-outcome-title">Six!</h2>
-          <p id="ball-outcome-desc">You hit it 85.4 meters!</p>
-          <button id="btn-next-ball" class="btn primary-btn">Next Delivery</button>
+            <div class="action-btn-row">
+              <button id="btn-bat-swing" class="btn primary-btn size-large">Hold & Release SPACE / Touch</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

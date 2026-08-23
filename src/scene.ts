@@ -19,7 +19,8 @@ export class GameScene {
   private bowlerMesh: BABYLON.TransformNode | null = null;
   private batterMesh: BABYLON.TransformNode | null = null;
   private batMesh: BABYLON.Mesh | null = null;
-  
+
+
   // Animation state
   private isAnimatingBall = false;
   private ballAnimationTime = 0;
@@ -37,6 +38,7 @@ export class GameScene {
     this.setupCameras();
     this.buildCharacters();
     this.buildBall();
+
 
     // Start render loop
     this.engine.runRenderLoop(() => {
@@ -182,10 +184,21 @@ export class GameScene {
     bat.material = batMat;
     this.batMesh = bat;
 
-    // Guard stance orientation
-    batterContainer.position.set(0, 0, 9.4);
+    // Guard stance orientation (default RHB)
+    batterContainer.position.set(0.45, 0, 9.4);
     batterContainer.rotation.y = -Math.PI / 2; // Sideways stance
     this.batterMesh = batterContainer;
+  }
+
+  public setBatterHandedness(hand: 'RHB' | 'LHB'): void {
+    if (!this.batterMesh) return;
+    if (hand === 'RHB') {
+      this.batterMesh.position.set(0.45, 0, 9.4);
+      this.batterMesh.rotation.y = -Math.PI / 2;
+    } else {
+      this.batterMesh.position.set(-0.45, 0, 9.4);
+      this.batterMesh.rotation.y = Math.PI / 2;
+    }
   }
 
   private buildBall(): void {
@@ -204,12 +217,14 @@ export class GameScene {
    */
   public generateTrajectoryPoints(
     aimTarget: { x: number; z: number },
-    type: string
+    type: string,
+    overTheWicket: boolean = true
   ): BABYLON.Vector3[] {
     const points: BABYLON.Vector3[] = [];
     const steps = 60;
     
-    const start = new BABYLON.Vector3(0, 1.8, -10.5); // Bowler release point
+    const startX = overTheWicket ? -0.6 : 0.6;
+    const start = new BABYLON.Vector3(startX, 1.8, -10.5); // Bowler release point
     const bounceZ = -10 + aimTarget.z; // Target Z from bowling crease
     const bounceX = aimTarget.x;
     const bounce = new BABYLON.Vector3(bounceX, 0.075, bounceZ);
@@ -264,7 +279,8 @@ export class GameScene {
     type: string,
     releaseSpeed: number, // 0.0 to 1.0 (faster/slower)
     onArrived: () => void,
-    onResolved: () => void
+    onResolved: () => void,
+    overTheWicket: boolean = true
   ): void {
     this.onBallArrivedCallback = onArrived;
     this.onBallResolvedCallback = onResolved;
@@ -273,12 +289,17 @@ export class GameScene {
     this.bounceMarker?.setEnabled(true);
     this.bounceMarker!.position.set(aimTarget.x, 0.04, -10 + aimTarget.z);
 
-    this.ballTrajectoryPoints = this.generateTrajectoryPoints(aimTarget, type);
+    this.ballTrajectoryPoints = this.generateTrajectoryPoints(aimTarget, type, overTheWicket);
     this.ballAnimationTime = 0;
     this.isAnimatingBall = true;
     
     this.ballMesh?.setEnabled(true);
     this.ballMesh?.position.copyFrom(this.ballTrajectoryPoints[0]);
+
+    // Set bowler initial X based on overTheWicket
+    if (this.bowlerMesh) {
+      this.bowlerMesh.position.x = overTheWicket ? -0.6 : 0.6;
+    }
 
     // Animate bowler release arm rotation
     if (this.bowlerMesh) {
@@ -392,7 +413,7 @@ export class GameScene {
       10 + Math.sin(angle) * carryDistance
     );
 
-    const startPoint = new BABYLON.Vector3(0, 0.4, 9.4);
+    const startPoint = new BABYLON.Vector3(this.batterMesh?.position.x || 0, 0.4, 9.4);
     const midpoint = BABYLON.Vector3.Center(startPoint, endPoint);
     midpoint.y = Math.max(3, distance * 0.15); // visual height scales with distance
 

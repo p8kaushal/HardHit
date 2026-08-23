@@ -6,7 +6,6 @@ export class KeyboardInputManager {
   private onReleaseMeterStart: () => void;
   private onReleaseMeterEnd: (timing: number) => void;
   private onBatSwing: (direction: number, type: ShotType) => void;
-  private feedbackElement: HTMLElement | null = null;
 
   // Track key hold state
   private spacePressed = false;
@@ -19,8 +18,6 @@ export class KeyboardInputManager {
   private bowlingLengths: number[] = [7.0, 9.5, 12.0, 15.0, 17.5]; // Bouncer, Short, Good, Full, Yorker
   private bowlingLengthLabels: string[] = ['Bouncer', 'Short', 'Good Length', 'Full', 'Yorker'];
   private currentLengthIdx = 2; // Start Good Length
-
-
 
   constructor(
     isPlayerBatting: () => boolean,
@@ -44,7 +41,6 @@ export class KeyboardInputManager {
     };
 
     this.setupListeners();
-    this.createFeedbackOverlay();
     this.updateFeedbackOverlay();
   }
 
@@ -53,61 +49,61 @@ export class KeyboardInputManager {
     window.addEventListener('keyup', (e) => this.handleKeyUp(e));
   }
 
-  private createFeedbackOverlay(): void {
-    let overlay = document.getElementById('keyboard-bindings-feedback');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'keyboard-bindings-feedback';
-      overlay.style.position = 'absolute';
-      overlay.style.top = '95px';
-      overlay.style.left = '50%';
-      overlay.style.transform = 'translateX(-50%)';
-      overlay.style.backgroundColor = 'rgba(26, 26, 36, 0.85)';
-      overlay.style.color = '#ffffff';
-      overlay.style.padding = '8px 16px';
-      overlay.style.borderRadius = '8px';
-      overlay.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-      overlay.style.fontSize = '0.85rem';
-      overlay.style.zIndex = '1000';
-      overlay.style.pointerEvents = 'none';
-      overlay.style.fontFamily = 'monospace';
-      overlay.style.textAlign = 'center';
-      
-      const appContainer = document.getElementById('screen-gameplay');
-      if (appContainer) {
-        appContainer.appendChild(overlay);
+  public toggleHelpModal(): void {
+    const modal = document.getElementById('keyboard-help-modal');
+    if (modal) {
+      if (modal.classList.contains('hidden')) {
+        this.openHelpModal();
+      } else {
+        this.closeHelpModal();
       }
     }
-    this.feedbackElement = overlay;
+  }
+
+  public openHelpModal(): void {
+    const modal = document.getElementById('keyboard-help-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      this.updateFeedbackOverlay();
+    }
+  }
+
+  public closeHelpModal(): void {
+    const modal = document.getElementById('keyboard-help-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+  }
+
+  public isHelpModalOpen(): boolean {
+    const modal = document.getElementById('keyboard-help-modal');
+    return modal ? !modal.classList.contains('hidden') : false;
   }
 
   public updateFeedbackOverlay(): void {
-    if (!this.feedbackElement) return;
-
-    // Check screen visibility
-    const gameplayScreen = document.getElementById('screen-gameplay');
-    if (!gameplayScreen || !gameplayScreen.classList.contains('active')) {
-      this.feedbackElement.style.display = 'none';
-      return;
-    }
-    this.feedbackElement.style.display = 'block';
+    const modeBadge = document.getElementById('help-mode-badge');
+    const modeDetails = document.getElementById('help-mode-details');
+    if (!modeBadge || !modeDetails) return;
 
     const batting = this.isPlayerBatting();
     if (batting) {
-      const directions = ['Straight (1)', 'Off-Side High (2)', 'Off-Side Flat (3)', 'Behind Off (4)', 'Behind Leg (5)', 'Behind Leg High (6)', 'Leg-Side Flat (7)', 'Leg-Side High (8)'];
-      this.feedbackElement.innerHTML = `
-        <span style="color: #ff3e6c; font-weight: bold;">[BATTING CONTROLS]</span><br>
-        Aim Direction: <strong>${directions[this.intent.aimDirection]}</strong> (WASD/Arrows)<br>
-        Shot Selected: <strong>${this.intent.shotType.toUpperCase()}</strong> (Keys 1-4)<br>
-        <span style="font-size: 0.75rem; color: #9ca3af;">Press SPACEBAR to Swing</span>
-      `;
+      const directions = [
+        'Straight (↑)',
+        'Off-Side High (↗)',
+        'Off-Side Flat (→)',
+        'Behind Off (↘)',
+        'Behind Leg (↓)',
+        'Behind Leg High (↙)',
+        'Leg-Side Flat (←)',
+        'Leg-Side High (↖)'
+      ];
+      modeBadge.innerText = 'BATTING MODE';
+      modeBadge.className = 'status-indicator-badge batting';
+      modeDetails.innerHTML = `Aim: <strong>${directions[this.intent.aimDirection]}</strong> | Shot: <strong>${this.intent.shotType.toUpperCase()}</strong>`;
     } else {
-      this.feedbackElement.innerHTML = `
-        <span style="color: #4a4afb; font-weight: bold;">[BOWLING CONTROLS]</span><br>
-        Aim Target: <strong>Line: ${this.bowlingLineLabels[this.currentLineIdx]} | Length: ${this.bowlingLengthLabels[this.currentLengthIdx]}</strong> (WASD/Arrows)<br>
-        Delivery Type: <strong>${this.intent.deliveryType.toUpperCase()}</strong> (Keys 1-5)<br>
-        <span style="font-size: 0.75rem; color: #9ca3af;">Hold SPACEBAR to charge, release to deliver</span>
-      `;
+      modeBadge.innerText = 'BOWLING MODE';
+      modeBadge.className = 'status-indicator-badge bowling';
+      modeDetails.innerHTML = `Line: <strong>${this.bowlingLineLabels[this.currentLineIdx]}</strong> | Len: <strong>${this.bowlingLengthLabels[this.currentLengthIdx]}</strong> | Type: <strong>${this.intent.deliveryType.toUpperCase()}</strong>`;
     }
   }
 
@@ -115,6 +111,20 @@ export class KeyboardInputManager {
     // Only capture when playing screen is active
     const gameplayScreen = document.getElementById('screen-gameplay');
     if (!gameplayScreen || !gameplayScreen.classList.contains('active')) return;
+
+    // Toggle Help Modal on 'H' / 'h'
+    if (e.key === 'h' || e.key === 'H') {
+      this.toggleHelpModal();
+      return;
+    }
+
+    // Close Help Modal on Escape
+    if (e.key === 'Escape') {
+      if (this.isHelpModalOpen()) {
+        this.closeHelpModal();
+        return;
+      }
+    }
 
     const batting = this.isPlayerBatting();
 
