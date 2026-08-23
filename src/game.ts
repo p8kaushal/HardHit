@@ -157,8 +157,7 @@ export class MatchController {
 
     const ballNumber = innings.balls.filter(b => !b.isExtra).length + 1;
 
-    // Check extra ball
-    const extra = checkExtraBall(delivery);
+    const extra = checkExtraBall(delivery, innings.batter.batterHand || 'RHB');
     
     let isWicket = false;
     let wicketReason = '';

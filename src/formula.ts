@@ -134,31 +134,41 @@ export function calculateDistance(
 /**
  * Check for wide/no-ball based on release timing.
  */
-export function checkExtraBall(delivery: DeliveryChoice): { isExtra: boolean; type: 'wide' | 'noball' | null } {
-  if (delivery.releaseTiming < 0.08) {
+export function checkExtraBall(delivery: DeliveryChoice, batterHand: 'RHB' | 'LHB' = 'RHB'): { isExtra: boolean; type: 'wide' | 'noball' | null } {
+  if (delivery.releaseTiming < 0.05) {
     return { isExtra: true, type: 'wide' };
-  } else if (delivery.releaseTiming > 0.92) {
+  } else if (delivery.releaseTiming > 0.95) {
     return { isExtra: true, type: 'noball' };
   }
+
+  const x = delivery.aimTarget.x;
+  if (batterHand === 'RHB') {
+    if (x > 0.89) return { isExtra: true, type: 'wide' };
+    if (x < -0.15) return { isExtra: true, type: 'wide' };
+  } else {
+    if (x < -0.89) return { isExtra: true, type: 'wide' };
+    if (x > 0.15) return { isExtra: true, type: 'wide' };
+  }
+
   return { isExtra: false, type: null };
 }
 
 export function getLineTypeFromAimX(aimX: number, batterHand: 'RHB' | 'LHB' = 'RHB'): import('./types').LineType {
   if (batterHand === 'LHB') {
-    if (aimX > 0.2) return 'off';
-    if (aimX < -0.2) return 'leg';
-    return 'middle';
-  } else {
     if (aimX < -0.2) return 'off';
     if (aimX > 0.2) return 'leg';
+    return 'middle';
+  } else {
+    if (aimX > 0.2) return 'off';
+    if (aimX < -0.2) return 'leg';
     return 'middle';
   }
 }
 
 export function getAimXFromLineType(line: import('./types').LineType, batterHand: 'RHB' | 'LHB' = 'RHB'): number {
   let target = 0;
-  if (line === 'off') target = -0.6;
-  if (line === 'leg') target = 0.4;
+  if (line === 'off') target = 0.6;
+  if (line === 'leg') target = -0.4;
   return batterHand === 'LHB' ? -target : target;
 }
 

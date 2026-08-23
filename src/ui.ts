@@ -399,7 +399,7 @@ export class UIManager {
     let title = '';
     let desc = '';
 
-    if (checkExtraBall(outcome.delivery).isExtra) {
+    if (checkExtraBall(outcome.delivery, this.controller.getCurrentInnings().batter.batterHand || 'RHB').isExtra) {
       title = outcome.wicketReason || 'Extra Ball!';
       desc = 'Bowler committed an illegal delivery. Extra ball!';
       this.gameScene.animateMissWicket(false);
@@ -469,7 +469,7 @@ export class UIManager {
     
     document.getElementById('hud-innings-title')!.innerText = `Innings ${state.currentInningsIndex + 1}`;
     
-    const legalCount = currentInn.balls.filter(b => !checkExtraBall(b.delivery).isExtra).length;
+    const legalCount = currentInn.balls.filter(b => !checkExtraBall(b.delivery, currentInn.batter.batterHand || 'RHB').isExtra).length;
     document.getElementById('hud-balls-count')!.innerText = `${legalCount}/6`;
     document.getElementById('hud-wickets-count')!.innerText = `${currentInn.wicketsLost}/${currentInn.maxWickets}`;
     document.getElementById('hud-biggest-six')!.innerText = `${currentInn.biggestSix.toFixed(1)}m`;

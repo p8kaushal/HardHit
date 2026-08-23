@@ -28,6 +28,8 @@ export class GameScene {
   private onBallArrivedCallback: (() => void) | null = null;
   private onBallResolvedCallback: (() => void) | null = null;
   
+  private batterHand: 'RHB' | 'LHB' = 'RHB';
+  
   constructor(canvasElementId: string) {
     this.canvas = document.getElementById(canvasElementId) as unknown as HTMLCanvasElement;
     this.engine = new BABYLON.Engine(this.canvas, true);
@@ -77,7 +79,7 @@ export class GameScene {
 
     // Pitch
     const pitchMat = new BABYLON.StandardMaterial('pitchMat', this.scene);
-    pitchMat.diffuseColor = new BABYLON.Color3(0.82, 0.72, 0.54); // sandy pitch
+    pitchMat.diffuseColor = BABYLON.Color3.FromHexString('#967140'); // earthy brown/tan turf tone
     pitchMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
     
     // Pitch dimensions: 3m wide, 22m long
@@ -85,6 +87,33 @@ export class GameScene {
     pitch.rotation.x = Math.PI / 2;
     pitch.position.y = 0.02;
     pitch.material = pitchMat;
+
+    // Pitch Markings
+    const createLine = (name: string, points: BABYLON.Vector3[]) => {
+      const line = BABYLON.MeshBuilder.CreateLines(name, { points }, this.scene);
+      line.color = new BABYLON.Color3(1, 1, 1);
+      line.position.y = 0.021; // slightly above pitch
+    };
+
+    // Popping Creases
+    createLine('poppingCreaseBat', [new BABYLON.Vector3(-1.32, 0, 8.2), new BABYLON.Vector3(1.32, 0, 8.2)]);
+    createLine('poppingCreaseBowl', [new BABYLON.Vector3(-1.32, 0, -8.2), new BABYLON.Vector3(1.32, 0, -8.2)]);
+
+    // Bowling Creases
+    createLine('bowlingCreaseBat', [new BABYLON.Vector3(-1.32, 0, 10), new BABYLON.Vector3(1.32, 0, 10)]);
+    createLine('bowlingCreaseBowl', [new BABYLON.Vector3(-1.32, 0, -10), new BABYLON.Vector3(1.32, 0, -10)]);
+
+    // Return Creases
+    createLine('returnCreaseLeftBat', [new BABYLON.Vector3(-1.32, 0, 8.2), new BABYLON.Vector3(-1.32, 0, 10)]);
+    createLine('returnCreaseRightBat', [new BABYLON.Vector3(1.32, 0, 8.2), new BABYLON.Vector3(1.32, 0, 10)]);
+    createLine('returnCreaseLeftBowl', [new BABYLON.Vector3(-1.32, 0, -8.2), new BABYLON.Vector3(-1.32, 0, -10)]);
+    createLine('returnCreaseRightBowl', [new BABYLON.Vector3(1.32, 0, -8.2), new BABYLON.Vector3(1.32, 0, -10)]);
+
+    // Wide Lines
+    createLine('wideLineLeftBat', [new BABYLON.Vector3(-0.89, 0, 8.2), new BABYLON.Vector3(-0.89, 0, 10)]);
+    createLine('wideLineRightBat', [new BABYLON.Vector3(0.89, 0, 8.2), new BABYLON.Vector3(0.89, 0, 10)]);
+    createLine('wideLineLeftBowl', [new BABYLON.Vector3(-0.89, 0, -8.2), new BABYLON.Vector3(-0.89, 0, -10)]);
+    createLine('wideLineRightBowl', [new BABYLON.Vector3(0.89, 0, -8.2), new BABYLON.Vector3(0.89, 0, -10)]);
 
     // Stumps (Bowling crease: Z = -10, Batting crease: Z = 10)
     this.buildStumps(new BABYLON.Vector3(0, 0, -10));
@@ -191,6 +220,7 @@ export class GameScene {
   }
 
   public setBatterHandedness(hand: 'RHB' | 'LHB'): void {
+    this.batterHand = hand;
     if (!this.batterMesh) return;
     if (hand === 'RHB') {
       this.batterMesh.position.set(0.45, 0, 9.4);
@@ -407,8 +437,14 @@ export class GameScene {
     // Calculate 3D end coordinates based on direction (0-7 clock slices)
     const angle = (direction * Math.PI) / 4 - Math.PI / 2;
     const carryDistance = Math.min(65, distance); // visual clamp to boundary
+    
+    let xOffset = Math.cos(angle) * carryDistance;
+    if (this.batterHand === 'LHB') {
+      xOffset = -xOffset; // LHB Off-side is negative X, Leg-side is positive X
+    }
+    
     const endPoint = new BABYLON.Vector3(
-      Math.cos(angle) * carryDistance,
+      xOffset,
       0.15,
       10 + Math.sin(angle) * carryDistance
     );
