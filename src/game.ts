@@ -171,6 +171,11 @@ export class MatchController {
 
     const ballNumber = innings.balls.filter(b => !b.isExtra).length + 1;
 
+    // Clamp the bot's delivery target coordinate aimTarget.x strictly between -0.7 and 0.7
+    if (innings.bowler.isBot) {
+      delivery.aimTarget.x = Math.max(-0.7, Math.min(0.7, delivery.aimTarget.x));
+    }
+
     const extra = checkExtraBall(delivery, innings.batter.batterHand || 'RHB');
     
     let isWicket = false;

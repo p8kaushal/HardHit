@@ -49,6 +49,23 @@ export class UIManager {
     );
     this.initEventListeners();
     this.updateHUD();
+
+    this.gameScene.botBattingTriggerCallback = () => {
+      const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
+      if (!isPlayerBatting && this.pendingBotShot && !this.activeShot) {
+        const difficulty = this.controller.state.bot.rank === 'Legend' ? 'Hard' : (this.controller.state.bot.rank === 'Gold' ? 'Medium' : 'Easy');
+        let offset = 0;
+        if (difficulty === 'Easy') {
+          offset = (Math.random() - 0.5) * 0.16;
+        } else if (difficulty === 'Medium') {
+          offset = (Math.random() - 0.5) * 0.08;
+        } else if (difficulty === 'Hard') {
+          offset = (Math.random() - 0.5) * 0.02;
+        }
+        const simulatedTiming = 0.5 + offset;
+        this.executeBattingSwingGesture(this.pendingBotShot.direction, this.pendingBotShot.type, Math.max(0.0, Math.min(1.0, simulatedTiming)));
+      }
+    };
   }
 
   private initEventListeners(): void {
@@ -340,7 +357,7 @@ export class UIManager {
     document.getElementById('control-bowling')!.classList.add('hidden');
 
     // Bot decides batting response
-    this.activeShot = botChooseShot(
+    this.pendingBotShot = botChooseShot(
       this.controller.state.bot,
       this.controller.state.player,
       this.activeDelivery,
@@ -358,22 +375,27 @@ export class UIManager {
     this.executeBattingSwingGesture(clockDirection, this.selectedShotType);
   }
 
-  private executeBattingSwingGesture(direction: number, type: ShotType): void {
+  public executeBattingSwingGesture(direction: number, type: ShotType, simulatedTiming?: number): void {
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
-    if (!isPlayerBatting || !this.activeDelivery || this.activeShot) return;
+    if ((!isPlayerBatting && simulatedTiming === undefined) || !this.activeDelivery || this.activeShot) return;
 
     // Auto-hide panels to clear view
     const controlBatting = document.getElementById('control-batting') || document.getElementById('setup-batting-panel');
     if (controlBatting) controlBatting.classList.add('hidden', 'panel-hidden');
 
-    // Calculate relative timing of swing based on how far the ball has traveled.
-    // Ball triggers arrived callback at frame 60.
-    const currentFrame = (Date.now() - this.deliveryStartFrame) / (1000 / 60);
-    const arrivalFrame = 50; // Sweet spot of ball crossing the crease
-    
-    // Convert to relative ratio centered at 0.5
-    const diff = currentFrame - arrivalFrame;
-    const timing = 0.5 + (diff / 40); // bounds mapped
+    let timing = 0.5;
+    if (simulatedTiming !== undefined) {
+      timing = simulatedTiming;
+    } else {
+      // Calculate relative timing of swing based on how far the ball has traveled.
+      // Ball triggers arrived callback at frame 60.
+      const currentFrame = (Date.now() - this.deliveryStartFrame) / (1000 / 60);
+      const arrivalFrame = 50; // Sweet spot of ball crossing the crease
+      
+      // Convert to relative ratio centered at 0.5
+      const diff = currentFrame - arrivalFrame;
+      timing = 0.5 + (diff / 40); // bounds mapped
+    }
 
     this.activeShot = {
       direction,
@@ -389,6 +411,10 @@ export class UIManager {
 
   // --- Ball Trajectory Animation Trigger ---
 
+  private pendingBotShot: ShotChoice | null = null;
+
+  // --- Ball Trajectory Animation Trigger ---
+
   private deliverBall3D(): void {
     if (!this.activeDelivery) return;
 
@@ -401,7 +427,8 @@ export class UIManager {
       this.activeDelivery.length,
       this.activeDelivery.releaseTiming,
       () => this.handleBallArrivalAtStumps(),
-      () => this.setupActiveTurn()
+      () => this.setupActiveTurn(),
+      true
     );
   }
 
@@ -596,6 +623,8 @@ export class UIManager {
 
     const innings = this.controller.getCurrentInnings();
     const isPlayerBatting = innings.batter.id === state.player.id;
+    
+    this.gameScene.isBotBatting = !isPlayerBatting;
 
     this.updateHUD();
 

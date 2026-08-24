@@ -27,8 +27,14 @@ export class GameScene {
   private ballTrajectoryPoints: BABYLON.Vector3[] = [];
   private onBallArrivedCallback: (() => void) | null = null;
   private onBallResolvedCallback: (() => void) | null = null;
+  private onBallCreaseCrossedCallback: (() => void) | null = null;
+  private creaseCrossedFired = false;
   
   private batterHand: 'RHB' | 'LHB' = 'RHB';
+  
+  public isBotBatting: boolean = false;
+  public hasBotSwung: boolean = false;
+  public botBattingTriggerCallback: (() => void) | null = null;
   
   constructor(canvasElementId: string) {
     this.canvas = document.getElementById(canvasElementId) as unknown as HTMLCanvasElement;
@@ -41,6 +47,16 @@ export class GameScene {
     this.buildCharacters();
     this.buildBall();
 
+    this.scene.onBeforeRenderObservable.add(() => {
+      if (this.isAnimatingBall && this.isBotBatting) {
+        if (this.ballMesh && this.ballMesh.position.z >= 6.9 && !this.hasBotSwung) {
+          this.hasBotSwung = true;
+          if (this.botBattingTriggerCallback) {
+            this.botBattingTriggerCallback();
+          }
+        }
+      }
+    });
 
     // Start render loop
     this.engine.runRenderLoop(() => {
@@ -285,7 +301,7 @@ export class GameScene {
     }
 
     // Post-bounce arc
-    const postBounceSteps = steps - preBounceSteps;
+      const postBounceSteps = steps - preBounceSteps;
     for (let i = 1; i <= postBounceSteps; i++) {
       const t = i / postBounceSteps;
       const x = BABYLON.Scalar.Lerp(bounce.x, end.x, t);
@@ -308,16 +324,21 @@ export class GameScene {
     this.bounceMarker?.setEnabled(false);
   }
 
+
   public animateDelivery(
     aimTarget: { x: number; z: number },
     type: string,
     releaseSpeed: number, // 0.0 to 1.0 (faster/slower)
     onArrived: () => void,
     onResolved: () => void,
-    overTheWicket: boolean = true
+    overTheWicket: boolean = true,
+    onCreaseCrossed?: () => void
   ): void {
     this.onBallArrivedCallback = onArrived;
     this.onBallResolvedCallback = onResolved;
+    this.onBallCreaseCrossedCallback = onCreaseCrossed || null;
+    this.creaseCrossedFired = false;
+    this.hasBotSwung = false;
     
     // Position bounce marker indicator on pitch
     this.bounceMarker?.setEnabled(true);
@@ -367,6 +388,14 @@ export class GameScene {
       }
 
       this.ballMesh?.position.copyFrom(this.ballTrajectoryPoints[index]);
+      
+      // Check if ball crossed the crease (z = 8.2 approx)
+      if (!this.creaseCrossedFired && this.ballMesh && this.ballMesh.position.z >= 8.2) {
+        this.creaseCrossedFired = true;
+        if (this.onBallCreaseCrossedCallback) {
+          this.onBallCreaseCrossedCallback();
+        }
+      }
       
       // Update follow camera
       if (this.activeCameraMode === 'follow_shot') {
