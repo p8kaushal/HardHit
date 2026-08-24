@@ -380,7 +380,6 @@ export class UIManager {
 
     this.hideResultToast();
     this.deliveryStartFrame = Date.now();
-    this.gameScene.setCameraMode('follow_shot');
 
     // Start delivery trajectory
     this.gameScene.animateDelivery(

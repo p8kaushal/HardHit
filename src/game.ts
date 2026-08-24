@@ -1,4 +1,4 @@
-import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats } from './types';
+import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode } from './types';
 import { evaluateWicket, calculateDistance, checkExtraBall } from './formula';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
@@ -141,6 +141,20 @@ export class MatchController {
   public startMatch(): void {
     this.state.status = 'playing';
     this.state.currentInningsIndex = 0;
+    this.updateActiveCameraMode();
+  }
+
+  public getActiveCameraMode(): CameraMode {
+    if (this.state.status !== 'playing') {
+      return 'stadium_wide';
+    }
+    const innings = this.getCurrentInnings();
+    if (!innings) return 'stadium_wide';
+    return innings.batter.id === this.state.player.id ? 'batter_eye' : 'bowler_eye';
+  }
+
+  public updateActiveCameraMode(): void {
+    this.state.cameraMode = this.getActiveCameraMode();
   }
 
   public getCurrentInnings(): Innings {
@@ -252,6 +266,7 @@ export class MatchController {
       if (this.state.currentInningsIndex % 2 === 0) {
         this.state.currentInningsIndex++;
         console.log(`[GAME EVENT] Transitioning to Innings ${this.state.currentInningsIndex + 1}. Swapping roles.`);
+        this.updateActiveCameraMode();
       } else {
         // End of the pair, resolve match or tie-break
         this.resolveMatch();
@@ -314,6 +329,7 @@ export class MatchController {
     if (!this.state.tieBreakerActive || winnerId) {
       this.state.winnerId = winnerId;
       this.state.status = 'completed';
+      this.state.cameraMode = 'stadium_wide';
       console.log(`[GAME EVENT] Match finished. Winner ID: ${winnerId}.`);
       this.applyProgression(winnerId === this.state.player.id);
     }
@@ -348,6 +364,7 @@ export class MatchController {
 
     this.state.innings.push(inn1, inn2);
     this.state.currentInningsIndex++;
+    this.updateActiveCameraMode();
   }
 
   private applyProgression(playerWon: boolean): void {

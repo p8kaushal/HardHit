@@ -169,6 +169,10 @@ export class GameScene {
     this.scene.activeCamera = this.cameras[mode];
   }
 
+  public getCameraMode(): CameraMode {
+    return this.activeCameraMode;
+  }
+
   private buildCharacters(): void {
     // Bowler placeholder shape (Blue)
     const bowlerContainer = new BABYLON.TransformNode('bowlerContainer', this.scene);
@@ -467,7 +471,6 @@ export class GameScene {
 
     // Run animation frames
     let animIdx = 0;
-    this.setCameraMode('follow_shot');
 
     const animateHit = () => {
       if (animIdx >= points.length) {
@@ -478,12 +481,14 @@ export class GameScene {
       }
 
       this.ballMesh?.position.copyFrom(points[animIdx]);
-      this.cameras.follow_shot.position.set(
-        this.ballMesh!.position.x + 4,
-        this.ballMesh!.position.y + 3,
-        this.ballMesh!.position.z - 6
-      );
-      this.cameras.follow_shot.setTarget(this.ballMesh!.position);
+      if (this.activeCameraMode === 'follow_shot') {
+        this.cameras.follow_shot.position.set(
+          this.ballMesh!.position.x + 4,
+          this.ballMesh!.position.y + 3,
+          this.ballMesh!.position.z - 6
+        );
+        this.cameras.follow_shot.setTarget(this.ballMesh!.position);
+      }
 
       animIdx++;
       requestAnimationFrame(animateHit);
