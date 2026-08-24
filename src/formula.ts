@@ -1,5 +1,7 @@
 import { Player, DeliveryChoice, ShotChoice, ShotType } from './types';
 
+export const SIX_THRESHOLD = 70;
+
 const DELIVERY_DIFFICULTIES: Record<string, number> = {
   yorker: 0.8,
   full: 0.5,

@@ -2,7 +2,7 @@ import { MatchController } from './game';
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseShot } from './bot';
-import { checkExtraBall, getLineTypeFromAimX } from './formula';
+import { checkExtraBall, getLineTypeFromAimX, SIX_THRESHOLD } from './formula';
 import { KeyboardInputManager } from './input';
 
 export class UIManager {
@@ -426,13 +426,13 @@ export class UIManager {
       title = 'WICKET!';
       desc = outcome.wicketReason;
       this.gameScene.animateMissWicket(true);
-    } else if (outcome.distance > 0) {
-      title = outcome.distance >= 70 ? `SIX HITTED! (${outcome.distance.toFixed(1)}m)` : `Hit: ${outcome.distance.toFixed(1)}m`;
+    } else if (outcome.distance >= SIX_THRESHOLD) {
+      title = `SIX! ${outcome.distance.toFixed(1)}m`;
       desc = `Cleared the boundary at Aim Direction ${outcome.shot?.direction}!`;
       this.gameScene.animateHitPath(outcome.distance, outcome.shot?.direction || 0);
     } else {
       title = 'Dot Ball';
-      desc = outcome.wicketReason || 'A swing and a miss!';
+      desc = outcome.shot ? 'Shot failed to clear the boundary. 0 runs scored.' : (outcome.wicketReason || 'A swing and a miss!');
       this.gameScene.animateMissWicket(false);
     }
 
@@ -550,21 +550,21 @@ export class UIManager {
             dot.className = 'over-dot blue extra';
             dot.textContent = outcome.extraType === 'wide' ? 'WD' : (outcome.extraType === 'noball' ? 'NB' : 'EX');
             dot.title = `Ball ${i + 1}: Extra Delivery (${outcome.extraType ? outcome.extraType.toUpperCase() : 'Extra'} +1 Run)`;
-          } else if (outcome.isFreeHit && outcome.distance < 70) {
+          } else if (outcome.isFreeHit && outcome.distance < SIX_THRESHOLD) {
             // Blue dot: Free hit delivery
             dot.className = 'over-dot blue extra free-hit';
             dot.textContent = 'FH';
-            dot.title = `Ball ${i + 1}: Free Hit Delivery (${outcome.distance > 0 ? outcome.distance.toFixed(1) + 'm' : '0 runs'})`;
-          } else if (outcome.distance >= 70) {
+            dot.title = `Ball ${i + 1}: Free Hit Delivery (Dot Ball - 0 runs)`;
+          } else if (outcome.distance >= SIX_THRESHOLD) {
             // Gold dot: SIX scored (6 runs)
             dot.className = 'over-dot gold six';
             dot.textContent = '6';
             dot.title = `Ball ${i + 1}: SIX! (${outcome.distance.toFixed(1)}m)`;
           } else {
-            // Green dot: Legal delivery (0-5 runs)
+            // Green dot: Dot Ball (0 runs)
             dot.className = 'over-dot green legal';
-            dot.textContent = outcome.distance > 0 ? `${Math.round(outcome.distance)}m` : '•';
-            dot.title = `Ball ${i + 1}: Legal Delivery (${outcome.distance > 0 ? outcome.distance.toFixed(1) + 'm' : 'Dot ball'})`;
+            dot.textContent = '•';
+            dot.title = `Ball ${i + 1}: Dot Ball (0 runs)`;
           }
         } else {
           // Gray/Empty outline: Upcoming/unbowled
@@ -654,8 +654,8 @@ export class UIManager {
     const playerInnings = state.innings.find(i => i.batter.id === state.player.id);
     const botInnings = state.innings.find(i => i.batter.id === state.bot.id);
 
-    const playerSixes = playerInnings ? playerInnings.balls.filter(b => b.distance >= 70).length : 0;
-    const botSixes = botInnings ? botInnings.balls.filter(b => b.distance >= 70).length : 0;
+    const playerSixes = playerInnings ? playerInnings.balls.filter(b => b.distance >= SIX_THRESHOLD).length : 0;
+    const botSixes = botInnings ? botInnings.balls.filter(b => b.distance >= SIX_THRESHOLD).length : 0;
     const playerCarry = playerInnings ? playerInnings.balls.reduce((acc, b) => acc + b.distance, 0) : 0;
     const botCarry = botInnings ? botInnings.balls.reduce((acc, b) => acc + b.distance, 0) : 0;
 
@@ -860,18 +860,14 @@ export class UIManager {
         dot.className = 'mini-dot extra';
         dot.textContent = ball.extraType === 'wide' ? 'WD' : 'NB';
         dot.title = `Ball ${idx + 1}: Extra Delivery (+1 Run)`;
-      } else if (ball.distance >= 70) {
+      } else if (ball.distance >= SIX_THRESHOLD) {
         dot.className = 'mini-dot six';
         dot.textContent = `${Math.round(ball.distance)}m`;
         dot.title = `Ball ${idx + 1}: SIX! (${ball.distance.toFixed(1)}m)`;
-      } else if (ball.distance > 0) {
-        dot.className = 'mini-dot legal';
-        dot.textContent = `${Math.round(ball.distance)}m`;
-        dot.title = `Ball ${idx + 1}: Hit (${ball.distance.toFixed(1)}m)`;
       } else {
         dot.className = 'mini-dot dot';
         dot.textContent = '•';
-        dot.title = `Ball ${idx + 1}: Dot ball`;
+        dot.title = `Ball ${idx + 1}: Dot Ball (0 runs)`;
       }
       container.appendChild(dot);
     });

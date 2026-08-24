@@ -1,5 +1,5 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { evaluateWicket, calculateDistance, checkExtraBall } from './formula';
+import { evaluateWicket, calculateDistance, checkExtraBall, SIX_THRESHOLD } from './formula';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
 
@@ -216,13 +216,14 @@ export class MatchController {
       }
 
       if (!isWicket) {
-        if (distance >= 70) {
+        if (distance >= SIX_THRESHOLD) {
           innings.biggestSix = Math.max(innings.biggestSix, distance);
           innings.score += 6; // Six adds +6 runs
           console.log(`[GAME EVENT] Massive SIX: ${distance}m! Innings score: ${innings.score}`);
         } else {
-          // Under MVP, non-six hits are 0 runs, but we track distance
-          console.log(`[GAME EVENT] Hit: ${distance}m. Innings score: ${innings.score}`);
+          // Hits below six-hitting threshold (70m) are scored as 0 runs (Dot Ball) and distance is set to 0 in delivery record
+          distance = 0;
+          console.log(`[GAME EVENT] Hit did not clear ${SIX_THRESHOLD}m threshold - Dot Ball (0 runs). Innings score: ${innings.score}`);
         }
       }
     }
@@ -440,7 +441,7 @@ export class MatchController {
     
     // Calculate player's total sixes across all batting innings
     const playerInnings = this.state.innings.filter(i => i.batter.id === player.id);
-    const sixesHit = playerInnings.reduce((acc, inn) => acc + inn.balls.filter(b => b.distance >= 70).length, 0);
+    const sixesHit = playerInnings.reduce((acc, inn) => acc + inn.balls.filter(b => b.distance >= SIX_THRESHOLD).length, 0);
     
     const isTie = this.state.winnerId === null;
     const baseXP = playerWon ? 100 : (isTie ? 50 : 30);
