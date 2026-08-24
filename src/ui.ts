@@ -26,6 +26,7 @@ export class UIManager {
   private timingDirection = 1;
   
   // Active deliveries / shots
+  public isBallActive = false;
   private activeDelivery: DeliveryChoice | null = null;
   private activeShot: ShotChoice | null = null;
   private deliveryStartFrame = 0;
@@ -36,6 +37,11 @@ export class UIManager {
 
   // Result Toast Auto-dismiss Timer
   private toastDismissTimer: any = null;
+  private botDeliveryTimer: any = null;
+
+  public setController(controller: MatchController) {
+    this.controller = controller;
+  }
 
   constructor(controller: MatchController) {
     this.controller = controller;
@@ -295,8 +301,9 @@ export class UIManager {
 
   private startBowlingReleaseMeter(): void {
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
-    if (isPlayerBatting || this.isTimingBarActive) return;
+    if (isPlayerBatting || this.isTimingBarActive || this.isBallActive) return;
 
+    this.isBallActive = true;
     this.isTimingBarActive = true;
     this.timingCursorVal = 0;
     this.timingDirection = 1;
@@ -416,10 +423,17 @@ export class UIManager {
   // --- Ball Trajectory Animation Trigger ---
 
   private deliverBall3D(): void {
-    if (!this.activeDelivery) return;
+    if (!this.activeDelivery || this.deliveryStartFrame > Date.now() - 100) return; // Prevent double trigger in same frame
 
+    this.isBallActive = true;
     this.hideResultToast();
     this.deliveryStartFrame = Date.now();
+
+    // Lock camera in pre-contact player perspective before delivery commences
+    const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
+    const preContactCam = isPlayerBatting ? 'batter_eye' : 'bowler_eye';
+    this.gameScene.setCameraMode(preContactCam);
+    this.controller.setCameraMode(preContactCam);
 
     // Start delivery trajectory
     this.gameScene.animateDelivery(
@@ -457,6 +471,7 @@ export class UIManager {
       title = `SIX! ${outcome.distance.toFixed(1)}m`;
       desc = `Cleared the boundary at Aim Direction ${outcome.shot?.direction}!`;
       this.gameScene.animateHitPath(outcome.distance, outcome.shot?.direction || 0);
+      this.controller.setCameraMode('follow_shot');
     } else {
       title = 'Dot Ball';
       desc = outcome.shot ? 'Shot failed to clear the boundary. 0 runs scored.' : (outcome.wicketReason || 'A swing and a miss!');
@@ -498,6 +513,13 @@ export class UIManager {
     const toast = document.getElementById('result-toast');
     if (toast) {
       toast.classList.add('hidden');
+    }
+
+    // Reset camera to player perspective when toast dismisses
+    if (this.controller.state.status === 'playing') {
+      const playerCam = this.controller.getActiveCameraMode();
+      this.gameScene.setCameraMode(playerCam);
+      this.controller.updateActiveCameraMode();
     }
   }
 
@@ -614,6 +636,7 @@ export class UIManager {
   }
 
   public setupActiveTurn(): void {
+    this.isBallActive = false;
     const state = this.controller.state;
     
     if (state.status === 'completed') {
@@ -643,6 +666,7 @@ export class UIManager {
     if (isPlayerBatting) {
       // Batter mode
       this.gameScene.setCameraMode('batter_eye');
+      this.controller.setCameraMode('batter_eye');
       if (controlBatting) {
         controlBatting.classList.remove('hidden', 'panel-hidden');
       }
@@ -659,12 +683,14 @@ export class UIManager {
         releaseTiming: 0.5
       };
 
-      setTimeout(() => {
+      if (this.botDeliveryTimer) clearTimeout(this.botDeliveryTimer);
+      this.botDeliveryTimer = setTimeout(() => {
         this.deliverBall3D();
       }, 1500);
     } else {
       // Bowler mode
       this.gameScene.setCameraMode('bowler_eye');
+      this.controller.setCameraMode('bowler_eye');
       if (controlBowling) {
         controlBowling.classList.remove('hidden', 'panel-hidden');
       }
@@ -910,13 +936,19 @@ export class UIManager {
       modal.classList.remove('active');
     }
 
-    // 2. Reset controller match state
+    // 2. Reset controller match state and camera
     this.controller.reset();
+    this.gameScene.setCameraMode('stadium_wide');
 
     // 3. Clear active in-flight balls and timing meter
     this.activeDelivery = null;
     this.activeShot = null;
     this.isTimingBarActive = false;
+    this.isBallActive = false;
+    if (this.botDeliveryTimer) {
+      clearTimeout(this.botDeliveryTimer);
+      this.botDeliveryTimer = null;
+    }
     this.hideResultToast();
 
     // 4. Reset HUD & 6-Ball Over Tracker to 6 unbowled gray dots
@@ -972,6 +1004,8 @@ export class UIManager {
       modal.classList.add('hidden');
       modal.classList.remove('active');
     }
+
+    this.gameScene.setCameraMode('stadium_wide');
 
     // 2. Switch to lobby screen
     const screens = document.querySelectorAll('.screen');

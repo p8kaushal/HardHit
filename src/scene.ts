@@ -189,6 +189,11 @@ export class GameScene {
     return this.activeCameraMode;
   }
 
+  public resetCameraToPlayerView(isPlayerBatting: boolean): void {
+    const targetMode: CameraMode = isPlayerBatting ? 'batter_eye' : 'bowler_eye';
+    this.setCameraMode(targetMode);
+  }
+
   private buildCharacters(): void {
     // Bowler placeholder shape (Blue)
     const bowlerContainer = new BABYLON.TransformNode('bowlerContainer', this.scene);
@@ -340,6 +345,10 @@ export class GameScene {
     this.creaseCrossedFired = false;
     this.hasBotSwung = false;
     
+    // Ensure active camera remains strictly locked in player's perspective during delivery
+    const preContactCam: CameraMode = this.isBotBatting ? 'bowler_eye' : 'batter_eye';
+    this.setCameraMode(preContactCam);
+
     // Position bounce marker indicator on pitch
     this.bounceMarker?.setEnabled(true);
     this.bounceMarker!.position.set(aimTarget.x, 0.04, -10 + aimTarget.z);
@@ -396,16 +405,6 @@ export class GameScene {
           this.onBallCreaseCrossedCallback();
         }
       }
-      
-      // Update follow camera
-      if (this.activeCameraMode === 'follow_shot') {
-        this.cameras.follow_shot.position.set(
-          this.ballMesh!.position.x + 3,
-          this.ballMesh!.position.y + 2,
-          this.ballMesh!.position.z - 4
-        );
-        this.cameras.follow_shot.setTarget(this.ballMesh!.position);
-      }
 
       // Draw custom line trail
       this.drawBallTrail();
@@ -461,11 +460,14 @@ export class GameScene {
   }
 
   /**
-   * Animates a hit ball carrying towards the boundary.
+   * Animates a hit ball carrying towards the boundary and dynamically follows with the trajectory camera.
    */
   public animateHitPath(distance: number, direction: number): void {
     this.isAnimatingBall = false;
     this.ballMesh?.setEnabled(true);
+    
+    // Transition active camera to follow_shot trajectory view immediately upon bat contact
+    this.setCameraMode('follow_shot');
     
     // Calculate 3D end coordinates based on direction (0-7 clock slices)
     const angle = (direction * Math.PI) / 4 - Math.PI / 2;
@@ -485,6 +487,13 @@ export class GameScene {
     const startPoint = new BABYLON.Vector3(this.batterMesh?.position.x || 0, 0.4, 9.4);
     const midpoint = BABYLON.Vector3.Center(startPoint, endPoint);
     midpoint.y = Math.max(3, distance * 0.15); // visual height scales with distance
+
+    // Compute flight direction vectors for dynamic camera framing behind and to the side of the arc
+    const flightDir = endPoint.subtract(startPoint);
+    flightDir.y = 0;
+    const horizDist = flightDir.length();
+    const unitDir = horizDist > 0.001 ? flightDir.scale(1 / horizDist) : new BABYLON.Vector3(0, 0, -1);
+    const sideDir = new BABYLON.Vector3(-unitDir.z, 0, unitDir.x);
 
     const points: BABYLON.Vector3[] = [];
     const steps = 80;
@@ -509,14 +518,34 @@ export class GameScene {
         return;
       }
 
-      this.ballMesh?.position.copyFrom(points[animIdx]);
-      if (this.activeCameraMode === 'follow_shot') {
-        this.cameras.follow_shot.position.set(
-          this.ballMesh!.position.x + 4,
-          this.ballMesh!.position.y + 3,
-          this.ballMesh!.position.z - 6
+      const currentBallPos = points[animIdx];
+      this.ballMesh?.position.copyFrom(currentBallPos);
+
+      // Dynamically track the ball mesh and its high trajectory arc
+      if (this.activeCameraMode === 'follow_shot' && this.ballMesh) {
+        const camDistBehind = 7.0;
+        const camSideOffset = 3.2;
+        const camHeight = Math.max(3.5, currentBallPos.y * 0.55 + 2.5);
+
+        const camPos = new BABYLON.Vector3(
+          currentBallPos.x - unitDir.x * camDistBehind + sideDir.x * camSideOffset,
+          camHeight,
+          currentBallPos.z - unitDir.z * camDistBehind + sideDir.z * camSideOffset
         );
-        this.cameras.follow_shot.setTarget(this.ballMesh!.position);
+
+        this.cameras.follow_shot.position.copyFrom(camPos);
+        this.cameras.follow_shot.setTarget(this.ballMesh.position);
+      }
+
+      // Draw custom line trail for hit path
+      const trailPoints = points.slice(Math.max(0, animIdx - 10), animIdx + 1);
+      if (trailPoints.length > 1) {
+        if (this.ballTrail) this.ballTrail.dispose();
+        this.ballTrail = BABYLON.MeshBuilder.CreateLines('ballTrail', {
+          points: trailPoints,
+          updatable: true
+        }, this.scene);
+        this.ballTrail.color = new BABYLON.Color3(1, 0.85, 0.2);
       }
 
       animIdx++;

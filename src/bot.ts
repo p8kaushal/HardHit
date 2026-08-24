@@ -1,5 +1,5 @@
 import { Player, DeliveryChoice, ShotChoice, ShotType, LineType, LengthType, DeliveryType } from './types';
-import { getBallThreat } from './formula';
+
 
 const LINES: LineType[] = ['off', 'middle', 'leg'];
 const LENGTHS: LengthType[] = ['bouncer', 'short', 'good', 'full', 'yorker'];
@@ -51,10 +51,10 @@ export function botChooseDelivery(_botPlayer: Player, difficulty: 'Easy' | 'Medi
   let targetX = clamp(baseTargetX + randomNormal(0, inaccuracy), -1.5, 1.5);
   const targetZ = clamp(baseTargetZ + randomNormal(0, inaccuracy * 1.5), 4.0, 19.5);
 
-  // Calibrate accuracy metrics: Rookie bowls 90% legal, Medium 95%, Hard 98%
-  let legalChance = 0.90;
-  if (difficulty === 'Medium') legalChance = 0.95;
-  else if (difficulty === 'Hard') legalChance = 0.98;
+  // Calibrate accuracy metrics: Rookie bowls <8% wides, Medium <3%, Hard 0%
+  let legalChance = 0.93; // 93% chance of being legal (leaves 7% chance for illegal, which is < 8%)
+  if (difficulty === 'Medium') legalChance = 0.98; // 98% -> 2% < 3%
+  else if (difficulty === 'Hard') legalChance = 1.00; // 0% wides
 
   if (Math.random() < legalChance) {
     // Force legal delivery (for RHB defaults)
@@ -67,8 +67,17 @@ export function botChooseDelivery(_botPlayer: Player, difficulty: 'Easy' | 'Medi
   // Release timing accuracy scales with Accuracy stat
   const timingStdDev = Math.max(0.015, 0.15 - (accuracyStat / 100) * 0.13);
 
-  // Bound bot release timing calculations between 0.15 and 0.85
-  const releaseTiming = clamp(randomNormal(0.5, timingStdDev), 0.15, 0.85);
+  // Bound bot release timing calculations based on difficulty
+  let timingMin = 0.15, timingMax = 0.85;
+  if (difficulty === 'Medium') {
+    timingMin = 0.35;
+    timingMax = 0.65;
+  } else if (difficulty === 'Hard') {
+    timingMin = 0.5;
+    timingMax = 0.5;
+  }
+
+  const releaseTiming = clamp(randomNormal(0.5, timingStdDev), timingMin, timingMax);
 
   return {
     aimTarget: { x: targetX, z: targetZ },
@@ -84,7 +93,7 @@ export function botChooseDelivery(_botPlayer: Player, difficulty: 'Easy' | 'Medi
  */
 export function botChooseShot(
   botPlayer: Player,
-  bowler: Player,
+  _bowler: Player,
   delivery: DeliveryChoice,
   difficulty: 'Easy' | 'Medium' | 'Hard'
 ): ShotChoice {
@@ -92,19 +101,22 @@ export function botChooseShot(
   
   if (difficulty === 'Easy') {
     const rand = Math.random();
-    if (rand < 0.2) shotType = 'defensive';
-    else if (rand < 0.5) shotType = 'grounded';
-    else if (rand < 0.8) shotType = 'lofted';
+    if (rand < 0.1) shotType = 'defensive';
+    else if (rand < 0.2) shotType = 'grounded';
+    else if (rand < 0.4) shotType = 'lofted';
+    else shotType = 'power';
+  } else if (difficulty === 'Medium') {
+    const rand = Math.random();
+    if (rand < 0.05) shotType = 'defensive';
+    else if (rand < 0.1) shotType = 'grounded';
+    else if (rand < 0.3) shotType = 'lofted';
     else shotType = 'power';
   } else {
-    const threat = getBallThreat(bowler, delivery);
-    if (threat > 0.85) {
-      shotType = Math.random() < 0.5 ? 'defensive' : 'grounded';
-    } else if (threat < 0.55) {
-      shotType = Math.random() < 0.4 ? 'power' : 'lofted';
-    } else {
-      shotType = Math.random() < 0.6 ? 'lofted' : 'grounded';
-    }
+    // Hard: Very aggressive
+    const rand = Math.random();
+    if (rand < 0.05) shotType = 'grounded';
+    else if (rand < 0.35) shotType = 'lofted';
+    else shotType = 'power';
   }
 
   // Aim direction (0-7 clock) based on ball line
@@ -121,15 +133,23 @@ export function botChooseShot(
   }
 
   // Adjust bot timing standard deviation based on difficulty
-  let timingStdDev = 0.10; // Rookie/Easy bot default (±0.10s)
-  if (difficulty === 'Medium') timingStdDev = 0.05;
-  else if (difficulty === 'Hard') timingStdDev = 0.02;
+  // Calibrated to hit GDD targets:
+  // Rookie: ~40% contact, ~6-10 runs/over
+  let timingStdDev = 0.04;
+  let timingOffset = -0.21; 
   
-  // Bot swings relative to the actual ball crease arrival frame (arrivalFrame = 50)
-  // ui.ts calculation: timing = 0.5 + (currentFrame - 50) / 40
-  // So randomFrame = randomNormal(50, timingStdDev * 40)
+  if (difficulty === 'Medium') {
+    // Medium: ~75% contact, ~14-20 runs/over
+    timingStdDev = 0.03;
+    timingOffset = -0.13;
+  } else if (difficulty === 'Hard') {
+    // Hard: ~92% contact, ~26-34 runs/over
+    timingStdDev = 0.02;
+    timingOffset = -0.07;
+  }
+  
   const arrivalFrame = 50;
-  const swingFrame = randomNormal(arrivalFrame, timingStdDev * 40);
+  const swingFrame = randomNormal(arrivalFrame + (timingOffset * 40), timingStdDev * 40);
   const timing = clamp(0.5 + (swingFrame - arrivalFrame) / 40, 0.15, 0.85);
   
   // Contact execution scales dynamically with batter Timing stat

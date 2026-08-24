@@ -36,14 +36,14 @@ export function savePlayer(player: Player): void {
 }
 
 export function createBotPlayer(difficulty: 'Easy' | 'Medium' | 'Hard'): Player {
-  let statsMultiplier = 0.8;
+  let statsMultiplier = 1.85; // Rookie
   let botRank: Player['rank'] = 'Bronze';
   
   if (difficulty === 'Medium') {
-    statsMultiplier = 1.0;
+    statsMultiplier = 1.95; 
     botRank = 'Gold';
   } else if (difficulty === 'Hard') {
-    statsMultiplier = 1.3;
+    statsMultiplier = 2.1; 
     botRank = 'Legend';
   }
   
@@ -87,8 +87,11 @@ export class MatchController {
   public reset(): void {
     const player = getOrCreatePlayer();
     const bot = createBotPlayer(this.botDifficulty);
-    
-    this.state = {
+    this.state = this.createInitialMatchState(player, bot);
+  }
+
+  private createInitialMatchState(player: Player, bot: Player): MatchState {
+    return {
       player,
       bot,
       tossWinnerId: '',
@@ -115,6 +118,7 @@ export class MatchController {
       batter: playerBatsFirst ? this.state.player : this.state.bot,
       bowler: playerBatsFirst ? this.state.bot : this.state.player,
       balls: [],
+      ballsBowled: 0,
       wicketsLost: 0,
       maxWickets: 1,
       biggestSix: 0,
@@ -127,6 +131,7 @@ export class MatchController {
       batter: playerBatsFirst ? this.state.bot : this.state.player,
       bowler: playerBatsFirst ? this.state.player : this.state.bot,
       balls: [],
+      ballsBowled: 0,
       wicketsLost: 0,
       maxWickets: 1,
       biggestSix: 0,
@@ -157,6 +162,10 @@ export class MatchController {
     this.state.cameraMode = this.getActiveCameraMode();
   }
 
+  public setCameraMode(mode: CameraMode): void {
+    this.state.cameraMode = mode;
+  }
+
   public getCurrentInnings(): Innings {
     return this.state.innings[this.state.currentInningsIndex];
   }
@@ -169,11 +178,14 @@ export class MatchController {
     // Reset next ball's Free Hit state
     innings.isNextFreeHit = false;
 
-    const ballNumber = innings.balls.filter(b => !b.isExtra).length + 1;
+    const ballNumber = innings.ballsBowled + 1;
 
-    // Clamp the bot's delivery target coordinate aimTarget.x strictly between -0.7 and 0.7
+    // Clamp the bot's delivery target coordinate aimTarget.x based on difficulty
     if (innings.bowler.isBot) {
-      delivery.aimTarget.x = Math.max(-0.7, Math.min(0.7, delivery.aimTarget.x));
+      let limit = 0.70; // Easy/Rookie
+      if (innings.bowler.id === 'bot_medium') limit = 0.45;
+      else if (innings.bowler.id === 'bot_hard') limit = 0.25;
+      delivery.aimTarget.x = Math.max(-limit, Math.min(limit, delivery.aimTarget.x));
     }
 
     const extra = checkExtraBall(delivery, innings.batter.batterHand || 'RHB');
@@ -224,6 +236,7 @@ export class MatchController {
         if (distance >= SIX_THRESHOLD) {
           innings.biggestSix = Math.max(innings.biggestSix, distance);
           innings.score += 6; // Six adds +6 runs
+          this.state.cameraMode = 'follow_shot';
           console.log(`[GAME EVENT] Massive SIX: ${distance}m! Innings score: ${innings.score}`);
         } else {
           // Hits below six-hitting threshold (70m) are scored as 0 runs (Dot Ball) and distance is set to 0 in delivery record
@@ -247,6 +260,10 @@ export class MatchController {
 
     innings.balls.push(outcome);
 
+    if (!extra.isExtra) {
+      innings.ballsBowled += 1;
+    }
+
     if (isWicket) {
       innings.wicketsLost = innings.maxWickets; // Forfeit remaining balls by maximizing wickets
       innings.finished = true;
@@ -254,11 +271,10 @@ export class MatchController {
     }
 
     // Check if innings is finished (6 legal balls or 1 wicket)
-    const legalBallsCount = innings.balls.filter(b => !b.isExtra).length;
     const maxBalls = this.state.tieBreakerActive ? 1 : 6;
-    if (legalBallsCount >= maxBalls || innings.wicketsLost >= innings.maxWickets) {
+    if (innings.ballsBowled >= maxBalls || innings.wicketsLost >= innings.maxWickets) {
       innings.finished = true;
-      console.log(`[GAME EVENT] Innings completed. Legal balls: ${legalBallsCount}. Wickets: ${innings.wicketsLost}. Biggest Six: ${innings.biggestSix}m.`);
+      console.log(`[GAME EVENT] Innings completed. Legal balls: ${innings.ballsBowled}. Wickets: ${innings.wicketsLost}. Biggest Six: ${innings.biggestSix}m.`);
     }
 
     this.checkInningsTransitions();
@@ -416,6 +432,7 @@ export class MatchController {
       batter: playerBatsFirst ? this.state.player : this.state.bot,
       bowler: playerBatsFirst ? this.state.bot : this.state.player,
       balls: [],
+      ballsBowled: 0,
       wicketsLost: 0,
       maxWickets: 1,
       biggestSix: 0,
@@ -428,6 +445,7 @@ export class MatchController {
       batter: playerBatsFirst ? this.state.bot : this.state.player,
       bowler: playerBatsFirst ? this.state.player : this.state.bot,
       balls: [],
+      ballsBowled: 0,
       wicketsLost: 0,
       maxWickets: 1,
       biggestSix: 0,

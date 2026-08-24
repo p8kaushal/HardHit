@@ -75,6 +75,7 @@ export interface Innings {
   batter: Player;
   bowler: Player;
   balls: BallOutcome[];
+  ballsBowled: number;
   wicketsLost: number;
   maxWickets: number; // MVP always 1
   biggestSix: number;

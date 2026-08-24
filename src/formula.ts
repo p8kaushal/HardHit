@@ -116,7 +116,11 @@ export function calculateDistance(
   const bowlingResistance = ((acc + varStat) / 2 / 100) * diff * 30;
   
   let distance = (baseDistance * timingModifier * contactModifier) - bowlingResistance;
-  distance = Math.max(0, parseFloat(distance.toFixed(1)));
+  if (deviationMs > safeWindowMs / 2) {
+    distance = 0;
+  } else {
+    distance = Math.max(0, parseFloat(distance.toFixed(1)));
+  }
   
   // Miscue check: Lofted or Power shots falling below 12 meters are resolved as caught
   let isMiscueWicket = false;
@@ -241,4 +245,18 @@ export function verifyFormulas(): void {
   console.log(`[TEST 3] Bad bowler release: isExtra=${e3.isExtra}, type=${e3.type}`);
 
   console.log("=== [FORMULA VERIFIER END] ===");
+}
+
+/**
+ * Restrict lateral spin/seam velocity impulse (Vx) for all bot difficulties
+ * so spin breaks do not push deliveries outside the wide lines (|X| > 0.89m)
+ */
+export function clampLateralVelocity(vx: number, difficulty: string): number {
+  let maxVx = 0.19; // Easy/Rookie: aim up to 0.70 (0.89 - 0.70 = 0.19)
+  if (difficulty === 'Medium') {
+    maxVx = 0.44; // Medium: aim up to 0.45 (0.89 - 0.45 = 0.44)
+  } else if (difficulty === 'Hard') {
+    maxVx = 0.64; // Hard: aim up to 0.25 (0.89 - 0.25 = 0.64)
+  }
+  return Math.max(-maxVx, Math.min(maxVx, vx));
 }

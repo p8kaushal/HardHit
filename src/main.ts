@@ -1,6 +1,7 @@
 import { getOrCreatePlayer, MatchController } from './game';
 import { UIManager, renderProfile, renderLeaderboard } from './ui';
 import { verifyFormulas } from './formula';
+import { runBotSimulation } from './simulate';
 
 let controller: MatchController | null = null;
 let ui: UIManager | null = null;
@@ -108,7 +109,11 @@ function runToss(playerChoice: 'heads' | 'tails'): void {
 
 function proceedToMatchStart(): void {
   controller!.startMatch();
-  ui = new UIManager(controller!);
+  if (!ui) {
+    ui = new UIManager(controller!);
+  } else {
+    ui.setController(controller!);
+  }
   showScreen('screen-gameplay');
   ui!.setupActiveTurn();
 }
@@ -122,3 +127,11 @@ window.addEventListener('DOMContentLoaded', () => {
   verifyFormulas();
   initLobby();
 });
+
+declare global {
+  interface Window {
+    runBotSimulation: typeof runBotSimulation;
+  }
+}
+
+window.runBotSimulation = runBotSimulation;

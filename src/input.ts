@@ -46,9 +46,17 @@ export class KeyboardInputManager {
     this.updateFeedbackOverlay();
   }
 
+  private boundHandleKeyDown = (e: KeyboardEvent) => this.handleKeyDown(e);
+  private boundHandleKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
+
   private setupListeners(): void {
-    window.addEventListener('keydown', (e) => this.handleKeyDown(e));
-    window.addEventListener('keyup', (e) => this.handleKeyUp(e));
+    window.addEventListener('keydown', this.boundHandleKeyDown);
+    window.addEventListener('keyup', this.boundHandleKeyUp);
+  }
+
+  public destroy(): void {
+    window.removeEventListener('keydown', this.boundHandleKeyDown);
+    window.removeEventListener('keyup', this.boundHandleKeyUp);
   }
 
   public toggleHelpModal(): void {
