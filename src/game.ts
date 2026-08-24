@@ -1,4 +1,4 @@
-import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode } from './types';
+import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
 import { evaluateWicket, calculateDistance, checkExtraBall } from './formula';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
@@ -275,64 +275,132 @@ export class MatchController {
   }
 
   private resolveMatch(): void {
-    const idx = this.state.currentInningsIndex;
-    const inn1 = this.state.innings[idx - 1];
-    const inn2 = this.state.innings[idx];
+    const isSuddenDeath = this.state.tieBreakerActive && this.state.innings.length >= 4;
     
-    console.log(`[GAME EVENT] Resolving match segment. Inn1 biggest six: ${inn1.biggestSix}m. Inn2 biggest six: ${inn2.biggestSix}m.`);
+    // If sudden death, compare sudden death innings (indexes 2 & 3), else standard innings (indexes 0 & 1)
+    const inn1 = isSuddenDeath ? this.state.innings[2] : this.state.innings[0];
+    const inn2 = isSuddenDeath ? this.state.innings[3] : this.state.innings[1];
+    
+    console.log(`[GAME EVENT] Resolving match segment. Inn1 (${inn1.batter.name}) biggest six: ${inn1.biggestSix}m. Inn2 (${inn2.batter.name}) biggest six: ${inn2.biggestSix}m.`);
 
     let winnerId: string | null = null;
-    
-    if (inn1.biggestSix > inn2.biggestSix) {
-      winnerId = inn1.batter.id;
-    } else if (inn2.biggestSix > inn1.biggestSix) {
-      winnerId = inn2.batter.id;
-    } else {
-      // Tie-break 1: Fewer wickets lost
-      console.log(`[GAME EVENT] Biggest sixes are tied. Applying Tie-break 1 (fewer wickets lost).`);
-      if (inn1.wicketsLost < inn2.wicketsLost) {
+    let tieBreakDetails: TieBreakDetails | undefined;
+
+    if (isSuddenDeath) {
+      const dist1 = inn1.balls[0]?.distance || 0;
+      const dist2 = inn2.balls[0]?.distance || 0;
+      const wicket1 = inn1.wicketsLost > 0;
+      const wicket2 = inn2.wicketsLost > 0;
+
+      if (!wicket1 && wicket2) {
         winnerId = inn1.batter.id;
-      } else if (inn2.wicketsLost < inn1.wicketsLost) {
+      } else if (!wicket2 && wicket1) {
+        winnerId = inn2.batter.id;
+      } else if (dist1 > dist2) {
+        winnerId = inn1.batter.id;
+      } else if (dist2 > dist1) {
         winnerId = inn2.batter.id;
       } else {
-        // Tie-break 2: Total carry distance (accumulative distance of all hits)
-        console.log(`[GAME EVENT] Wickets lost are tied. Applying Tie-break 2 (total carry distance).`);
-        const totalDist1 = inn1.balls.reduce((acc, b) => acc + b.distance, 0);
-        const totalDist2 = inn2.balls.reduce((acc, b) => acc + b.distance, 0);
-        
-        if (totalDist1 > totalDist2) {
-          winnerId = inn1.batter.id;
-        } else if (totalDist2 > totalDist1) {
-          winnerId = inn2.batter.id;
+        winnerId = null; // Absolute draw
+      }
+
+      const winnerInn = winnerId === inn1.batter.id ? inn1 : (winnerId === inn2.batter.id ? inn2 : null);
+      const loserInn = winnerId === inn1.batter.id ? inn2 : (winnerId === inn2.batter.id ? inn1 : null);
+
+      if (winnerInn && loserInn) {
+        const winDist = winnerInn.balls[0]?.distance || 0;
+        const loseDist = loserInn.balls[0]?.distance || 0;
+        tieBreakDetails = {
+          deciderTier: 'sudden_death',
+          tierLabel: '1-Ball Sudden Death Decider',
+          description: 'Decided in Sudden Death Extra Delivery',
+          marginText: `Won via Sudden Death Decider: ${winDist.toFixed(1)}m vs ${loseDist.toFixed(1)}m`
+        };
+      } else {
+        tieBreakDetails = {
+          deciderTier: 'draw',
+          tierLabel: 'Sudden Death Draw',
+          description: 'Scores and hit distances level after Sudden Death decider',
+          marginText: 'Draw: All tie-break ladder metrics equal'
+        };
+      }
+    } else {
+      // Standard match evaluation
+      if (Math.abs(inn1.biggestSix - inn2.biggestSix) > 0.01) {
+        winnerId = inn1.biggestSix > inn2.biggestSix ? inn1.batter.id : inn2.batter.id;
+        const winSix = Math.max(inn1.biggestSix, inn2.biggestSix);
+        const loseSix = Math.min(inn1.biggestSix, inn2.biggestSix);
+        tieBreakDetails = {
+          deciderTier: 'biggest_six',
+          tierLabel: 'Single Biggest Six',
+          description: 'Decided via Primary Objective: Single Biggest Six Distance',
+          marginText: `Won via Single Biggest Six: ${winSix.toFixed(1)}m vs ${loseSix.toFixed(1)}m`
+        };
+      } else {
+        // Tie-break Tier 1: Fewer wickets lost
+        console.log(`[GAME EVENT] Biggest sixes are tied (${inn1.biggestSix.toFixed(1)}m). Applying Tie-break Tier 1 (fewer wickets lost).`);
+        if (inn1.wicketsLost !== inn2.wicketsLost) {
+          winnerId = inn1.wicketsLost < inn2.wicketsLost ? inn1.batter.id : inn2.batter.id;
+          const winWickets = Math.min(inn1.wicketsLost, inn2.wicketsLost);
+          const loseWickets = Math.max(inn1.wicketsLost, inn2.wicketsLost);
+          tieBreakDetails = {
+            deciderTier: 'wickets',
+            tierLabel: 'Fewer Wickets Lost Decider',
+            description: 'Decided via Tie-Break Ladder Tier 1 (Wicket Preservation)',
+            marginText: `Won via Fewer Wickets Lost: ${winWickets} vs ${loseWickets} wickets lost`
+          };
         } else {
-          // Tie-break 3: Second biggest six
-          console.log(`[GAME EVENT] Total carry distances are tied. Applying Tie-break 3 (second biggest six).`);
-          const sortedDist1 = inn1.balls.map(b => b.distance).sort((a, b) => b - a);
-          const sortedDist2 = inn2.balls.map(b => b.distance).sort((a, b) => b - a);
-          const secBiggest1 = sortedDist1[1] || 0;
-          const secBiggest2 = sortedDist2[1] || 0;
+          // Tie-break Tier 2: Total carry distance
+          console.log(`[GAME EVENT] Wickets lost are tied. Applying Tie-break Tier 2 (total carry distance).`);
+          const totalDist1 = inn1.balls.reduce((acc, b) => acc + b.distance, 0);
+          const totalDist2 = inn2.balls.reduce((acc, b) => acc + b.distance, 0);
           
-          if (secBiggest1 > secBiggest2) {
-            winnerId = inn1.batter.id;
-          } else if (secBiggest2 > secBiggest1) {
-            winnerId = inn2.batter.id;
+          if (Math.abs(totalDist1 - totalDist2) > 0.01) {
+            winnerId = totalDist1 > totalDist2 ? inn1.batter.id : inn2.batter.id;
+            const winDist = Math.max(totalDist1, totalDist2);
+            const loseDist = Math.min(totalDist1, totalDist2);
+            tieBreakDetails = {
+              deciderTier: 'total_carry',
+              tierLabel: 'Total Carry Distance Decider',
+              description: 'Decided via Tie-Break Ladder Tier 2 (Aggregate Distance of All Hits)',
+              marginText: `Won via Total Carry Distance: ${winDist.toFixed(1)}m vs ${loseDist.toFixed(1)}m`
+            };
           } else {
-            // Sudden death
-            console.log(`[GAME EVENT] Match completely tied. Activating 1-ball sudden death decider!`);
-            this.state.tieBreakerActive = true;
-            this.setupSuddenDeath();
+            // Tie-break Tier 3: Second biggest six
+            console.log(`[GAME EVENT] Total carry distances are tied. Applying Tie-break Tier 3 (second biggest six).`);
+            const sortedDist1 = inn1.balls.map(b => b.distance).sort((a, b) => b - a);
+            const sortedDist2 = inn2.balls.map(b => b.distance).sort((a, b) => b - a);
+            const secBiggest1 = sortedDist1[1] || 0;
+            const secBiggest2 = sortedDist2[1] || 0;
+            
+            if (Math.abs(secBiggest1 - secBiggest2) > 0.01) {
+              winnerId = secBiggest1 > secBiggest2 ? inn1.batter.id : inn2.batter.id;
+              const winSec = Math.max(secBiggest1, secBiggest2);
+              const loseSec = Math.min(secBiggest1, secBiggest2);
+              tieBreakDetails = {
+                deciderTier: 'second_biggest_six',
+                tierLabel: '2nd Biggest Six Decider',
+                description: 'Decided via Tie-Break Ladder Tier 3 (Second Furthest Hit)',
+                marginText: `Won via 2nd Biggest Six: ${winSec.toFixed(1)}m vs ${loseSec.toFixed(1)}m`
+              };
+            } else {
+              // Trigger 1-ball Sudden Death Decider
+              console.log(`[GAME EVENT] Match completely tied across all tiers. Activating 1-ball sudden death decider!`);
+              this.state.tieBreakerActive = true;
+              this.setupSuddenDeath();
+              return;
+            }
           }
         }
       }
     }
 
-    if (!this.state.tieBreakerActive || winnerId) {
-      this.state.winnerId = winnerId;
-      this.state.status = 'completed';
-      this.state.cameraMode = 'stadium_wide';
-      console.log(`[GAME EVENT] Match finished. Winner ID: ${winnerId}.`);
-      this.applyProgression(winnerId === this.state.player.id);
-    }
+    this.state.winnerId = winnerId;
+    this.state.tieBreakDetails = tieBreakDetails;
+    this.state.status = 'completed';
+    this.state.cameraMode = 'stadium_wide';
+    console.log(`[GAME EVENT] Match finished. Winner ID: ${winnerId}. Decider: ${tieBreakDetails?.marginText}`);
+    this.applyProgression(winnerId === this.state.player.id);
   }
 
   private setupSuddenDeath(): void {
@@ -369,8 +437,17 @@ export class MatchController {
 
   private applyProgression(playerWon: boolean): void {
     const player = this.state.player;
-    const xpGained = playerWon ? 100 : 30;
-    player.xp += xpGained;
+    
+    // Calculate player's total sixes across all batting innings
+    const playerInnings = this.state.innings.filter(i => i.batter.id === player.id);
+    const sixesHit = playerInnings.reduce((acc, inn) => acc + inn.balls.filter(b => b.distance >= 70).length, 0);
+    
+    const isTie = this.state.winnerId === null;
+    const baseXP = playerWon ? 100 : (isTie ? 50 : 30);
+    const sixBonusXP = sixesHit * 10;
+    const totalXPGained = baseXP + sixBonusXP;
+    
+    player.xp += totalXPGained;
 
     // Progression Tier limits
     if (player.xp >= 1000) player.rank = 'Legend';
@@ -380,19 +457,30 @@ export class MatchController {
 
     // Increment stats slightly on win or match play
     const statInc = playerWon ? 2 : 1;
-    
-    // Distribute stats
     const stats = player.stats;
-    const list = [
-      () => stats.batting.power = Math.min(100, stats.batting.power + statInc),
-      () => stats.batting.timing = Math.min(100, stats.batting.timing + statInc),
-      () => stats.batting.technique = Math.min(100, stats.batting.technique + statInc),
-      () => stats.bowling.accuracy = Math.min(100, stats.bowling.accuracy + statInc),
-      () => stats.bowling.variation = Math.min(100, stats.bowling.variation + statInc)
+    
+    const upgradeOptions: { name: string; apply: () => number }[] = [
+      { name: 'Power', apply: () => stats.batting.power = Math.min(100, stats.batting.power + statInc) },
+      { name: 'Timing', apply: () => stats.batting.timing = Math.min(100, stats.batting.timing + statInc) },
+      { name: 'Technique', apply: () => stats.batting.technique = Math.min(100, stats.batting.technique + statInc) },
+      { name: 'Accuracy', apply: () => stats.bowling.accuracy = Math.min(100, stats.bowling.accuracy + statInc) },
+      { name: 'Variation', apply: () => stats.bowling.variation = Math.min(100, stats.bowling.variation + statInc) }
     ];
-    // Randomly upgrade one stat
-    const randomUpgrade = list[Math.floor(Math.random() * list.length)];
-    randomUpgrade();
+    
+    const choice = upgradeOptions[Math.floor(Math.random() * upgradeOptions.length)];
+    const newVal = choice.apply();
+
+    this.state.progression = {
+      xpGained: totalXPGained,
+      baseXP,
+      sixBonusXP,
+      sixesCount: sixesHit,
+      statUpgraded: {
+        statName: choice.name,
+        increase: statInc,
+        newValue: newVal
+      }
+    };
 
     savePlayer(player);
   }

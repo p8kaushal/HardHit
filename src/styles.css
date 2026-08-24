@@ -967,48 +967,612 @@ body {
 .clock-btn.pos-6 { top: 50%; left: 12%; }
 .clock-btn.pos-7 { top: 23%; left: 23%; }
 
-/* Gameover Results styling */
-.result-card {
-  text-align: center;
-  padding: 2.5rem;
-}
-.result-card h1 {
-  font-size: 2.2rem;
-  margin-bottom: 0.5rem;
-  color: var(--color-primary);
-}
-.result-card h2 {
-  font-size: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-.innings-comparison {
+/* =========================================================
+   Post-Match Scorecard Overlay Modal (#match-summary-modal)
+   ========================================================= */
+
+.summary-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   display: flex;
-  justify-content: space-around;
-  margin: 1.5rem 0;
-  background-color: #151520;
-  padding: 1.2rem;
-  border-radius: var(--border-radius);
+  align-items: center;
+  justify-content: center;
+  z-index: 2500;
+  pointer-events: auto;
+  animation: modalFadeIn 0.25s ease-out;
 }
-.comparison-col {
+
+.summary-modal-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, rgba(12, 16, 30, 0.88) 0%, rgba(6, 8, 16, 0.96) 100%);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+}
+
+.summary-modal-card {
+  position: relative;
+  width: min(94vw, 760px);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, rgba(24, 30, 52, 0.96) 0%, rgba(13, 16, 28, 0.99) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 1.4rem 1.6rem;
+  color: var(--color-text);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(255, 62, 108, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  z-index: 2501;
+  animation: modalScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Winner Banner */
+.winner-banner-wrapper {
+  width: 100%;
+}
+
+.winner-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.4rem;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.winner-banner.won {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(245, 158, 11, 0.24) 100%);
+  border: 1.5px solid rgba(251, 191, 36, 0.65);
+  box-shadow: 0 0 25px rgba(251, 191, 36, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.winner-banner.won h1 {
+  color: #fbbf24;
+  text-shadow: 0 0 14px rgba(251, 191, 36, 0.6);
+}
+
+.winner-banner.lost {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(139, 92, 246, 0.2) 100%);
+  border: 1.5px solid rgba(239, 68, 68, 0.65);
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.winner-banner.lost h1 {
+  color: #ef4444;
+  text-shadow: 0 0 14px rgba(239, 68, 68, 0.5);
+}
+
+.winner-banner.tied {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.22) 0%, rgba(245, 158, 11, 0.22) 100%);
+  border: 1.5px solid rgba(245, 158, 11, 0.6);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.25);
+}
+
+.winner-banner.tied h1 {
+  color: #f59e0b;
+}
+
+.winner-trophy-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
+  flex-shrink: 0;
+}
+
+.winner-banner-text {
   flex: 1;
+  min-width: 0;
 }
-.comparison-col h3 {
-  margin-bottom: 0.6rem;
-  color: var(--color-secondary);
+
+.winner-banner-text h1 {
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  line-height: 1.1;
+  margin-bottom: 0.15rem;
 }
-.comparison-col div {
-  margin-bottom: 0.3rem;
+
+.winner-banner-text p {
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
 }
-.progression-box {
-  margin: 1.5rem 0;
+
+/* Dynamic XP Pill */
+.summary-xp-pill {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #111827;
+  font-weight: 900;
+  font-size: 1.05rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  flex-shrink: 0;
+  animation: pulseGold 2s infinite;
+}
+
+.xp-star {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Tie-Break Explanation Box */
+.summary-tiebreak-box {
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.32);
+  border-left: 4px solid #00e5ff;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tiebreak-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.tiebreak-pill {
+  background: #00e5ff;
+  color: #0b1329;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.tiebreak-tier-name {
+  color: #38bdf8;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.tiebreak-desc {
+  color: #f1f5f9;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Match Scorecards Comparison Grid */
+.scorecard-comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.scorecard-card {
+  background: rgba(18, 23, 40, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
   padding: 1rem;
-  background-color: rgba(255, 62, 108, 0.15);
-  border: 1px solid var(--color-primary);
-  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: relative;
+  backdrop-filter: blur(8px);
 }
-.progression-box h3 {
+
+.player-card {
+  border-top: 3.5px solid #00e5ff;
+}
+
+.bot-card {
+  border-top: 3.5px solid #ff3e6c;
+}
+
+.scorecard-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.card-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.role-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  display: inline-block;
+  width: fit-content;
+}
+
+.batter-badge {
+  background: rgba(0, 229, 255, 0.2);
+  color: #00e5ff;
+  border: 1px solid rgba(0, 229, 255, 0.4);
+}
+
+.bowler-badge {
+  background: rgba(255, 62, 108, 0.2);
+  color: #ff3e6c;
+  border: 1px solid rgba(255, 62, 108, 0.4);
+}
+
+.card-identity h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+}
+
+.card-opponent {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.scorecard-status-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.scorecard-status-badge.winner {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.scorecard-status-badge.runner-up {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.scorecard-status-badge.tied {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+/* Highlight Metric Box: Single Biggest Six */
+.highlight-metric-box {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.08) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.2rem;
+}
+
+.metric-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #fbbf24;
+  letter-spacing: 0.8px;
+}
+
+.metric-value-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.metric-fire {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.metric-value {
+  font-size: 1.7rem;
+  font-weight: 900;
+  color: #fbbf24;
+  text-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
+  line-height: 1.1;
+}
+
+/* Stats Rows */
+.scorecard-stats-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.84rem;
+}
+
+.stat-row:last-child {
+  border-bottom: none;
+}
+
+.stat-label {
+  color: var(--color-text-muted);
+}
+
+.stat-value {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Over Sequence Breakdown */
+.over-breakdown-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.over-breakdown-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: var(--color-text-muted);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.mini-over-tracker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.mini-dot {
+  min-width: 28px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.mini-dot.six {
+  background: linear-gradient(135deg, #d97706 0%, #fbbf24 100%);
+  border: 1px solid #fde68a;
+  color: #111827;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+  font-weight: 900;
+}
+
+.mini-dot.wicket {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  border: 1px solid #fca5a5;
+  color: #ffffff;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+}
+
+.mini-dot.extra {
+  background: linear-gradient(135deg, #0284c7 0%, #06b6d4 100%);
+  border: 1px solid #67e8f9;
+  color: #ffffff;
+  font-size: 0.6rem;
+}
+
+.mini-dot.legal {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  border: 1px solid #34d399;
+  color: #ffffff;
+}
+
+.mini-dot.dot {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.mini-dot.empty {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Progression & Rewards Box */
+.summary-progression-box {
+  background: rgba(255, 62, 108, 0.08);
+  border: 1px solid rgba(255, 62, 108, 0.28);
+  border-radius: 12px;
+  padding: 0.85rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.progression-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.progression-title-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.progression-header h4 {
+  font-size: 0.88rem;
+  font-weight: 800;
   color: var(--color-primary);
-  margin-bottom: 0.5rem;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.progression-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+}
+
+.progression-chip {
+  background: rgba(14, 18, 32, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.chip-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.chip-val {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.chip-sub {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 600;
+}
+
+.rank-badge {
+  color: #00e5ff !important;
+}
+
+.stat-boost {
+  color: var(--color-success) !important;
+}
+
+/* Action Rematch & Lobby Buttons */
+.summary-modal-actions {
+  display: flex;
+  gap: 0.85rem;
+  justify-content: center;
+  margin-top: 0.4rem;
+}
+
+.summary-action-btn {
+  padding: 0.85rem 1.4rem;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.summary-action-btn.primary-action {
+  flex: 2;
+  background: linear-gradient(135deg, #ff3e6c 0%, #e11d48 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(255, 62, 108, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.summary-action-btn.primary-action:hover {
+  background: linear-gradient(135deg, #ff5c84 0%, #f43f5e 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(255, 62, 108, 0.6);
+}
+
+.summary-action-btn.secondary-action {
+  flex: 1;
+  background: rgba(38, 44, 70, 0.85);
+  color: var(--color-text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.summary-action-btn.secondary-action:hover {
+  background: rgba(48, 56, 90, 0.95);
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
+.btn-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* Modal Responsive Adaptations */
+@media (max-width: 768px) {
+  .summary-modal-card {
+    padding: 1.1rem 1rem;
+    gap: 0.8rem;
+  }
+
+  .winner-banner {
+    padding: 0.8rem 1rem;
+  }
+
+  .winner-banner-text h1 {
+    font-size: 1.4rem;
+  }
+
+  .winner-banner-text p {
+    font-size: 0.78rem;
+  }
+
+  .summary-xp-pill {
+    font-size: 0.88rem;
+    padding: 0.35rem 0.75rem;
+  }
+
+  .scorecard-comparison-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .progression-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .summary-modal-actions {
+    flex-direction: column;
+  }
+
+  .summary-action-btn.primary-action,
+  .summary-action-btn.secondary-action {
+    flex: none;
+    width: 100%;
+  }
 }
 
 /* Collapsible Keyboard Shortcuts Help Modal */

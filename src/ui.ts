@@ -182,6 +182,17 @@ export class UIManager {
       });
     }
 
+    // Match Summary Modal Action Buttons
+    const btnRematch = document.getElementById('btn-rematch');
+    if (btnRematch) {
+      btnRematch.addEventListener('click', () => this.handleRematch());
+    }
+
+    const btnReturnLobby = document.getElementById('btn-return-lobby');
+    if (btnReturnLobby) {
+      btnReturnLobby.addEventListener('click', () => this.handleReturnToLobby());
+    }
+
     // Global listeners
     window.addEventListener('mouseup', () => this.triggerReleaseMeter());
     window.addEventListener('touchend', () => this.triggerReleaseMeter());
@@ -635,51 +646,352 @@ export class UIManager {
   private showGameOverScreen(): void {
     this.hideResultToast();
     this.keyboardInputManager.closeHelpModal();
-    document.getElementById('screen-gameplay')!.classList.remove('active');
-    const gameOverScreen = document.getElementById('screen-gameover')!;
-    gameOverScreen.classList.add('active');
 
     const state = this.controller.state;
-    const playerInnings = state.innings.find(i => i.batter.id === state.player.id)!;
-    const botInnings = state.innings.find(i => i.batter.id === state.bot.id)!;
+    const playerInnings = state.innings.find(i => i.batter.id === state.player.id);
+    const botInnings = state.innings.find(i => i.batter.id === state.bot.id);
 
-    const titleEl = document.getElementById('gameover-title')!;
-    const resultMsgEl = document.getElementById('gameover-result-msg')!;
-    
+    const playerSixes = playerInnings ? playerInnings.balls.filter(b => b.distance >= 70).length : 0;
+    const botSixes = botInnings ? botInnings.balls.filter(b => b.distance >= 70).length : 0;
+    const playerCarry = playerInnings ? playerInnings.balls.reduce((acc, b) => acc + b.distance, 0) : 0;
+    const botCarry = botInnings ? botInnings.balls.reduce((acc, b) => acc + b.distance, 0) : 0;
+
+    // 1. Winner Banner & Banner Styling
+    const bannerEl = document.getElementById('summary-winner-banner');
+    const iconEl = document.getElementById('summary-winner-icon');
+    const titleEl = document.getElementById('summary-winner-title');
+    const subtitleEl = document.getElementById('summary-winner-subtitle');
+    const playerStatusBadge = document.getElementById('summary-player-status-badge');
+    const botStatusBadge = document.getElementById('summary-bot-status-badge');
+
     if (state.winnerId === state.player.id) {
-      titleEl.innerText = 'CONGRATULATIONS!';
-      resultMsgEl.innerText = 'You won the match!';
-      resultMsgEl.className = 'badge success-btn';
+      if (bannerEl) bannerEl.className = 'winner-banner won';
+      if (iconEl) iconEl.innerText = '🏆';
+      if (titleEl) titleEl.innerText = 'YOU WON!';
+      if (subtitleEl) subtitleEl.innerText = 'Dominant Six-Hitting Performance!';
+      if (playerStatusBadge) {
+        playerStatusBadge.innerText = 'WINNER';
+        playerStatusBadge.className = 'scorecard-status-badge winner';
+      }
+      if (botStatusBadge) {
+        botStatusBadge.innerText = 'RUNNER-UP';
+        botStatusBadge.className = 'scorecard-status-badge runner-up';
+      }
     } else if (state.winnerId === state.bot.id) {
-      titleEl.innerText = 'DEFEAT!';
-      resultMsgEl.innerText = `${state.bot.name} won the match!`;
-      resultMsgEl.className = 'badge warning-btn';
+      if (bannerEl) bannerEl.className = 'winner-banner lost';
+      if (iconEl) iconEl.innerText = '⚡';
+      if (titleEl) titleEl.innerText = 'BOT WON!';
+      if (subtitleEl) subtitleEl.innerText = `${state.bot.name} took the crown this time!`;
+      if (playerStatusBadge) {
+        playerStatusBadge.innerText = 'RUNNER-UP';
+        playerStatusBadge.className = 'scorecard-status-badge runner-up';
+      }
+      if (botStatusBadge) {
+        botStatusBadge.innerText = 'WINNER';
+        botStatusBadge.className = 'scorecard-status-badge winner';
+      }
     } else {
-      titleEl.innerText = 'TIE GAME!';
-      resultMsgEl.innerText = 'Sudden death draw!';
-      resultMsgEl.className = 'badge secondary-btn';
+      if (bannerEl) bannerEl.className = 'winner-banner tied';
+      if (iconEl) iconEl.innerText = '🤝';
+      if (titleEl) titleEl.innerText = "IT'S A TIE!";
+      if (subtitleEl) subtitleEl.innerText = 'Dead heat across all decider tiers!';
+      if (playerStatusBadge) {
+        playerStatusBadge.innerText = 'TIED';
+        playerStatusBadge.className = 'scorecard-status-badge tied';
+      }
+      if (botStatusBadge) {
+        botStatusBadge.innerText = 'TIED';
+        botStatusBadge.className = 'scorecard-status-badge tied';
+      }
     }
 
-    document.getElementById('gameover-player-six')!.innerText = `${playerInnings.biggestSix.toFixed(1)}m`;
-    document.getElementById('gameover-player-wickets')!.innerText = `${playerInnings.wicketsLost}/${playerInnings.maxWickets}`;
-    document.getElementById('gameover-player-total')!.innerText = `${playerInnings.balls.reduce((acc, b) => acc + b.distance, 0).toFixed(1)}m`;
+    // 2. XP Badge & Dynamic Calculation Display
+    const prog = state.progression || {
+      xpGained: state.winnerId === state.player.id ? 100 : (state.winnerId === null ? 50 : 30),
+      baseXP: state.winnerId === state.player.id ? 100 : (state.winnerId === null ? 50 : 30),
+      sixBonusXP: playerSixes * 10,
+      sixesCount: playerSixes,
+      statUpgraded: undefined
+    };
 
-    document.getElementById('gameover-bot-six')!.innerText = `${botInnings.biggestSix.toFixed(1)}m`;
-    document.getElementById('gameover-bot-wickets')!.innerText = `${botInnings.wicketsLost}/${botInnings.maxWickets}`;
-    document.getElementById('gameover-bot-total')!.innerText = `${botInnings.balls.reduce((acc, b) => acc + b.distance, 0).toFixed(1)}m`;
+    const xpValEl = document.getElementById('summary-xp-val');
+    if (xpValEl) xpValEl.innerText = `+${prog.xpGained} XP`;
 
-    const xpGained = state.winnerId === state.player.id ? 100 : 30;
-    document.getElementById('progression-gains')!.innerText = `+${xpGained} XP Gained!`;
+    const progXpEl = document.getElementById('summary-progression-xp');
+    if (progXpEl) progXpEl.innerText = `+${prog.xpGained} XP`;
 
-    // Save personal best
+    const progBreakdownEl = document.getElementById('summary-progression-breakdown');
+    if (progBreakdownEl) {
+      const outcomeText = state.winnerId === state.player.id ? 'Win' : (state.winnerId === null ? 'Draw' : 'Match');
+      progBreakdownEl.innerText = `+${prog.baseXP} ${outcomeText} + ${prog.sixBonusXP} (${prog.sixesCount} 6s)`;
+    }
+
+    const progRankEl = document.getElementById('summary-progression-rank');
+    if (progRankEl) progRankEl.innerText = `${state.player.rank} (${state.player.xp} XP)`;
+
+    const progStatEl = document.getElementById('summary-progression-stat');
+    if (progStatEl) {
+      if (prog.statUpgraded) {
+        progStatEl.innerText = `${prog.statUpgraded.statName} +${prog.statUpgraded.increase} (Now ${prog.statUpgraded.newValue})`;
+      } else {
+        progStatEl.innerText = 'Attributes Maxed';
+      }
+    }
+
+    // 3. Tie-Break Ladder Explanation
+    const tiebreakBox = document.getElementById('summary-tiebreak-box');
+    const deciderTierEl = document.getElementById('summary-decider-tier');
+    const deciderDescEl = document.getElementById('summary-decider-desc');
+
+    if (state.tieBreakDetails) {
+      if (deciderTierEl) deciderTierEl.innerText = state.tieBreakDetails.tierLabel;
+      if (deciderDescEl) deciderDescEl.innerText = state.tieBreakDetails.marginText;
+      if (tiebreakBox) tiebreakBox.classList.remove('hidden');
+    } else {
+      const winSix = Math.max(playerInnings?.biggestSix || 0, botInnings?.biggestSix || 0);
+      const loseSix = Math.min(playerInnings?.biggestSix || 0, botInnings?.biggestSix || 0);
+      if (deciderTierEl) deciderTierEl.innerText = 'Single Biggest Six';
+      if (deciderDescEl) deciderDescEl.innerText = `Won via Single Biggest Six: ${winSix.toFixed(1)}m vs ${loseSix.toFixed(1)}m`;
+      if (tiebreakBox) tiebreakBox.classList.remove('hidden');
+    }
+
+    // 4. Match Scorecards Stats Breakdown
+    // Player Scorecard
+    const playerNameEl = document.getElementById('summary-player-name');
+    if (playerNameEl) playerNameEl.innerText = `${state.player.name} (${state.player.batterHand || 'RHB'})`;
+
+    const playerBowlerEl = document.getElementById('summary-player-bowler');
+    if (playerBowlerEl) playerBowlerEl.innerText = `vs ${botInnings ? botInnings.batter.name : state.bot.name}`;
+
+    const playerSixEl = document.getElementById('summary-player-six');
+    if (playerSixEl) playerSixEl.innerText = `${playerInnings ? playerInnings.biggestSix.toFixed(1) : '0.0'}m`;
+
+    const playerRunsEl = document.getElementById('summary-player-runs');
+    if (playerRunsEl) playerRunsEl.innerText = `${playerInnings ? playerInnings.score : 0}`;
+
+    const playerWicketsEl = document.getElementById('summary-player-wickets');
+    if (playerWicketsEl) playerWicketsEl.innerText = `${playerInnings ? playerInnings.wicketsLost : 0}/${playerInnings ? playerInnings.maxWickets : 1}`;
+
+    const playerTotalEl = document.getElementById('summary-player-total');
+    if (playerTotalEl) playerTotalEl.innerText = `${playerCarry.toFixed(1)}m`;
+
+    const playerSixCountEl = document.getElementById('summary-player-six-count');
+    if (playerSixCountEl) playerSixCountEl.innerText = `${playerSixes}`;
+
+    this.renderMiniTracker('summary-player-tracker', playerInnings?.balls || []);
+
+    // Bot Scorecard
+    const botNameEl = document.getElementById('summary-bot-name');
+    if (botNameEl) botNameEl.innerText = `${state.bot.name}`;
+
+    const botBowlerEl = document.getElementById('summary-bot-bowler');
+    if (botBowlerEl) botBowlerEl.innerText = `vs ${playerInnings ? playerInnings.batter.name : state.player.name}`;
+
+    const botSixEl = document.getElementById('summary-bot-six');
+    if (botSixEl) botSixEl.innerText = `${botInnings ? botInnings.biggestSix.toFixed(1) : '0.0'}m`;
+
+    const botRunsEl = document.getElementById('summary-bot-runs');
+    if (botRunsEl) botRunsEl.innerText = `${botInnings ? botInnings.score : 0}`;
+
+    const botWicketsEl = document.getElementById('summary-bot-wickets');
+    if (botWicketsEl) botWicketsEl.innerText = `${botInnings ? botInnings.wicketsLost : 0}/${botInnings ? botInnings.maxWickets : 1}`;
+
+    const botTotalEl = document.getElementById('summary-bot-total');
+    if (botTotalEl) botTotalEl.innerText = `${botCarry.toFixed(1)}m`;
+
+    const botSixCountEl = document.getElementById('summary-bot-six-count');
+    if (botSixCountEl) botSixCountEl.innerText = `${botSixes}`;
+
+    this.renderMiniTracker('summary-bot-tracker', botInnings?.balls || []);
+
+    // 5. Save personal best to Leaderboard
     const entries = JSON.parse(localStorage.getItem('six_hitting_contest_leaderboard') || '[]');
     entries.push({
       date: new Date().toLocaleDateString(),
       opponent: state.bot.name,
-      biggestSix: playerInnings.biggestSix.toFixed(1),
-      outcome: state.winnerId === state.player.id ? 'WON' : 'LOST'
+      biggestSix: playerInnings ? playerInnings.biggestSix.toFixed(1) : '0.0',
+      outcome: state.winnerId === state.player.id ? 'WON' : (state.winnerId === state.bot.id ? 'LOST' : 'TIED')
     });
     entries.sort((a: any, b: any) => parseFloat(b.biggestSix) - parseFloat(a.biggestSix));
     localStorage.setItem('six_hitting_contest_leaderboard', JSON.stringify(entries.slice(0, 10)));
+
+    // 6. Show the modal overlay
+    const modal = document.getElementById('match-summary-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('active');
+    }
+  }
+
+  private renderMiniTracker(containerId: string, balls: any[]): void {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (balls.length === 0) {
+      const emptySpan = document.createElement('span');
+      emptySpan.className = 'mini-dot empty';
+      emptySpan.textContent = 'No deliveries';
+      container.appendChild(emptySpan);
+      return;
+    }
+
+    balls.forEach((ball, idx) => {
+      const dot = document.createElement('span');
+      if (ball.isWicket) {
+        dot.className = 'mini-dot wicket';
+        dot.textContent = 'W';
+        dot.title = `Ball ${idx + 1}: Wicket - ${ball.wicketReason || 'Out'}`;
+      } else if (ball.isExtra || ball.extraType) {
+        dot.className = 'mini-dot extra';
+        dot.textContent = ball.extraType === 'wide' ? 'WD' : 'NB';
+        dot.title = `Ball ${idx + 1}: Extra Delivery (+1 Run)`;
+      } else if (ball.distance >= 70) {
+        dot.className = 'mini-dot six';
+        dot.textContent = `${Math.round(ball.distance)}m`;
+        dot.title = `Ball ${idx + 1}: SIX! (${ball.distance.toFixed(1)}m)`;
+      } else if (ball.distance > 0) {
+        dot.className = 'mini-dot legal';
+        dot.textContent = `${Math.round(ball.distance)}m`;
+        dot.title = `Ball ${idx + 1}: Hit (${ball.distance.toFixed(1)}m)`;
+      } else {
+        dot.className = 'mini-dot dot';
+        dot.textContent = '•';
+        dot.title = `Ball ${idx + 1}: Dot ball`;
+      }
+      container.appendChild(dot);
+    });
+  }
+
+  public handleRematch(): void {
+    // 1. Hide summary modal
+    const modal = document.getElementById('match-summary-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('active');
+    }
+
+    // 2. Reset controller match state
+    this.controller.reset();
+
+    // 3. Clear active in-flight balls and timing meter
+    this.activeDelivery = null;
+    this.activeShot = null;
+    this.isTimingBarActive = false;
+    this.hideResultToast();
+
+    // 4. Reset HUD & 6-Ball Over Tracker to 6 unbowled gray dots
+    const tracker = document.getElementById('over-tracker');
+    if (tracker) {
+      tracker.innerHTML = '';
+      for (let i = 1; i <= 6; i++) {
+        const dot = document.createElement('span');
+        dot.className = 'over-dot gray empty upcoming';
+        dot.textContent = `${i}`;
+        dot.title = `Ball ${i}: Upcoming`;
+        tracker.appendChild(dot);
+      }
+    }
+
+    const scoreCountEl = document.getElementById('hud-score-count');
+    if (scoreCountEl) scoreCountEl.innerText = '0';
+
+    const wicketsCountEl = document.getElementById('hud-wickets-count');
+    if (wicketsCountEl) wicketsCountEl.innerText = '0/1';
+
+    const ballsCountEl = document.getElementById('hud-balls-count');
+    if (ballsCountEl) ballsCountEl.innerText = '0/6';
+
+    const biggestSixEl = document.getElementById('hud-biggest-six');
+    if (biggestSixEl) biggestSixEl.innerText = '0.0m';
+
+    // 5. Reset Toss Screen UI and switch directly to Toss screen
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-toss')?.classList.add('active');
+
+    const coin = document.getElementById('coin');
+    if (coin) {
+      coin.innerText = '?';
+      coin.className = 'coin';
+    }
+
+    document.getElementById('toss-result-message')?.classList.add('hidden');
+    document.getElementById('toss-choice-buttons')?.classList.add('hidden');
+    document.getElementById('btn-start-match')?.classList.add('hidden');
+
+    const headsBtn = document.getElementById('btn-toss-heads') as HTMLButtonElement;
+    const tailsBtn = document.getElementById('btn-toss-tails') as HTMLButtonElement;
+    if (headsBtn) headsBtn.disabled = false;
+    if (tailsBtn) tailsBtn.disabled = false;
+  }
+
+  public handleReturnToLobby(): void {
+    // 1. Hide summary modal
+    const modal = document.getElementById('match-summary-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('active');
+    }
+
+    // 2. Switch to lobby screen
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-lobby')?.classList.add('active');
+
+    // 3. Refresh lobby profile and leaderboard
+    this.refreshLobbyView();
+  }
+
+  private refreshLobbyView(): void {
+    const player = this.controller.state.player;
+
+    const nameEl = document.getElementById('profile-name');
+    if (nameEl) nameEl.innerText = player.name;
+
+    const rankEl = document.getElementById('profile-rank');
+    if (rankEl) rankEl.innerText = player.rank;
+
+    const xpEl = document.getElementById('profile-xp');
+    if (xpEl) xpEl.innerText = player.xp.toString();
+
+    const batPower = document.getElementById('stat-bat-power');
+    if (batPower) batPower.innerText = player.stats.batting.power.toString();
+
+    const batTiming = document.getElementById('stat-bat-timing');
+    if (batTiming) batTiming.innerText = player.stats.batting.timing.toString();
+
+    const batTech = document.getElementById('stat-bat-tech');
+    if (batTech) batTech.innerText = player.stats.batting.technique.toString();
+
+    const bowlAcc = document.getElementById('stat-bowl-acc');
+    if (bowlAcc) bowlAcc.innerText = player.stats.bowling.accuracy.toString();
+
+    const bowlVar = document.getElementById('stat-bowl-var');
+    if (bowlVar) bowlVar.innerText = player.stats.bowling.variation.toString();
+
+    const bowlPace = document.getElementById('stat-bowl-pace');
+    if (bowlPace) bowlPace.innerText = player.stats.bowling.pace.toString();
+
+    const leaderboardBody = document.getElementById('leaderboard-body');
+    if (leaderboardBody) {
+      const key = 'six_hitting_contest_leaderboard';
+      const entries = JSON.parse(localStorage.getItem(key) || '[]');
+      if (entries.length > 0) {
+        leaderboardBody.innerHTML = '';
+        entries.forEach((entry: any, index: number) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td><strong>#${index + 1}</strong></td>
+            <td>${entry.opponent}</td>
+            <td>${entry.biggestSix}m</td>
+            <td><span class="badge ${entry.outcome === 'WON' ? 'success-btn' : 'warning-btn'}">${entry.outcome}</span></td>
+          `;
+          leaderboardBody.appendChild(row);
+        });
+      } else {
+        leaderboardBody.innerHTML = '<tr class="empty-row"><td colspan="4">No matches played yet.</td></tr>';
+      }
+    }
   }
 }

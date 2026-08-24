@@ -64,6 +64,11 @@ function initLobby(): void {
   };
 
   document.getElementById('btn-return-lobby')!.onclick = () => {
+    const modal = document.getElementById('match-summary-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('active');
+    }
     showScreen('screen-lobby');
     loadLobbyProfile();
   };

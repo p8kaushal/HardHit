@@ -85,6 +85,25 @@ export interface Innings {
 
 export type CameraMode = 'bowler_eye' | 'batter_eye' | 'follow_shot' | 'stadium_wide';
 
+export interface TieBreakDetails {
+  deciderTier: 'biggest_six' | 'wickets' | 'total_carry' | 'second_biggest_six' | 'sudden_death' | 'draw';
+  tierLabel: string;
+  description: string;
+  marginText: string;
+}
+
+export interface MatchProgression {
+  xpGained: number;
+  baseXP: number;
+  sixBonusXP: number;
+  sixesCount: number;
+  statUpgraded?: {
+    statName: string;
+    increase: number;
+    newValue: number;
+  };
+}
+
 export interface MatchState {
   player: Player;
   bot: Player;
@@ -96,6 +115,8 @@ export interface MatchState {
   winnerId: string | null;
   tieBreakerActive: boolean;
   cameraMode: CameraMode;
+  tieBreakDetails?: TieBreakDetails;
+  progression?: MatchProgression;
 }
 
 export interface InputIntent {

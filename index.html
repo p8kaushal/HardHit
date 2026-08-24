@@ -376,34 +376,167 @@
       </div>
     </div>
 
-    <!-- Match Game Over Screen -->
-    <div id="screen-gameover" class="screen">
-      <div class="card result-card">
-        <h1 id="gameover-title">Match Completed</h1>
-        <h2 id="gameover-result-msg">Winner: You!</h2>
-
-        <div class="innings-comparison">
-          <div class="comparison-col">
-            <h3>Your Innings</h3>
-            <div>Biggest Six: <strong id="gameover-player-six">0.0m</strong></div>
-            <div>Wickets: <strong id="gameover-player-wickets">0/1</strong></div>
-            <div>Total Distance: <span id="gameover-player-total">0m</span></div>
-          </div>
-          <div class="comparison-col">
-            <h3>Bot's Innings</h3>
-            <div>Biggest Six: <strong id="gameover-bot-six">0.0m</strong></div>
-            <div>Wickets: <strong id="gameover-bot-wickets">0/1</strong></div>
-            <div>Total Distance: <span id="gameover-bot-total">0m</span></div>
+    <!-- Post-Match Scorecard Overlay Modal -->
+    <div id="match-summary-modal" class="summary-modal modal-overlay hidden">
+      <div class="summary-modal-backdrop" id="summary-modal-backdrop"></div>
+      
+      <div class="summary-modal-card">
+        <!-- Winner Banner with Icon & Dynamic XP Pill -->
+        <div class="winner-banner-wrapper">
+          <div id="summary-winner-banner" class="winner-banner won">
+            <div class="winner-trophy-icon" id="summary-winner-icon">🏆</div>
+            <div class="winner-banner-text">
+              <h1 id="summary-winner-title">YOU WON!</h1>
+              <p id="summary-winner-subtitle">Master of the Long Ball</p>
+            </div>
+            <div class="summary-xp-pill" id="summary-xp-badge">
+              <span class="xp-star">⭐</span>
+              <span id="summary-xp-val">+150 XP</span>
+            </div>
           </div>
         </div>
 
-        <div class="progression-box">
-          <h3>Progression & Stats Upgrades</h3>
-          <p id="progression-gains">+100 XP gained!</p>
-          <p id="progression-stats-upgrade">Power upgraded to 52!</p>
+        <!-- Tie-Break Decider Ladder Explanation Box -->
+        <div id="summary-tiebreak-box" class="summary-tiebreak-box">
+          <div class="tiebreak-header">
+            <span class="tiebreak-pill">TIE-BREAK DECIDER</span>
+            <span id="summary-decider-tier" class="tiebreak-tier-name">Single Biggest Six</span>
+          </div>
+          <div id="summary-decider-desc" class="tiebreak-desc">
+            Won via Single Biggest Six: 84.2m vs 62.0m
+          </div>
         </div>
 
-        <button id="btn-return-lobby" class="btn primary-btn">Return to Lobby</button>
+        <!-- Match Scorecards Comparison Grid (Player vs Bot) -->
+        <div class="scorecard-comparison-grid">
+          <!-- Player Innings Card -->
+          <div class="scorecard-card player-card" id="summary-player-card">
+            <div class="scorecard-card-header">
+              <div class="card-identity">
+                <span class="role-badge batter-badge">🏏 YOU</span>
+                <h3 id="summary-player-name">Player</h3>
+                <span class="card-opponent" id="summary-player-bowler">vs Bot</span>
+              </div>
+              <div class="scorecard-status-badge winner" id="summary-player-status-badge">WINNER</div>
+            </div>
+
+            <div class="highlight-metric-box">
+              <span class="metric-label">SINGLE BIGGEST SIX</span>
+              <div class="metric-value-row">
+                <span class="metric-fire">💥</span>
+                <strong class="metric-value" id="summary-player-six">0.0m</strong>
+              </div>
+            </div>
+
+            <div class="scorecard-stats-rows">
+              <div class="stat-row">
+                <span class="stat-label">Runs Scored:</span>
+                <strong class="stat-value" id="summary-player-runs">0</strong>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Wickets Lost:</span>
+                <strong class="stat-value" id="summary-player-wickets">0/1</strong>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Total Carry Distance:</span>
+                <strong class="stat-value" id="summary-player-total">0.0m</strong>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Sixes Hit (≥70m):</span>
+                <strong class="stat-value" id="summary-player-six-count">0</strong>
+              </div>
+            </div>
+
+            <div class="over-breakdown-section">
+              <span class="over-breakdown-label">OVER SEQUENCE</span>
+              <div class="mini-over-tracker" id="summary-player-tracker">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Bot Innings Card -->
+          <div class="scorecard-card bot-card" id="summary-bot-card">
+            <div class="scorecard-card-header">
+              <div class="card-identity">
+                <span class="role-badge bowler-badge">🤖 BOT</span>
+                <h3 id="summary-bot-name">Bot</h3>
+                <span class="card-opponent" id="summary-bot-bowler">vs Player</span>
+              </div>
+              <div class="scorecard-status-badge" id="summary-bot-status-badge">RUNNER-UP</div>
+            </div>
+
+            <div class="highlight-metric-box">
+              <span class="metric-label">SINGLE BIGGEST SIX</span>
+              <div class="metric-value-row">
+                <span class="metric-fire">💥</span>
+                <strong class="metric-value" id="summary-bot-six">0.0m</strong>
+              </div>
+            </div>
+
+            <div class="scorecard-stats-rows">
+              <div class="stat-row">
+                <span class="stat-label">Runs Scored:</span>
+                <strong class="stat-value" id="summary-bot-runs">0</strong>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Wickets Lost:</span>
+                <strong class="stat-value" id="summary-bot-wickets">0/1</strong>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Total Carry Distance:</span>
+                <strong class="stat-value" id="summary-bot-total">0.0m</strong>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Sixes Hit (≥70m):</span>
+                <strong class="stat-value" id="summary-bot-six-count">0</strong>
+              </div>
+            </div>
+
+            <div class="over-breakdown-section">
+              <span class="over-breakdown-label">OVER SEQUENCE</span>
+              <div class="mini-over-tracker" id="summary-bot-tracker">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progression Breakdown & Stat Level-Up -->
+        <div class="summary-progression-box">
+          <div class="progression-header">
+            <span class="progression-title-icon">⚡</span>
+            <h4>Match Progression &amp; Rewards</h4>
+          </div>
+          <div class="progression-grid">
+            <div class="progression-chip">
+              <span class="chip-label">XP Gained</span>
+              <strong id="summary-progression-xp" class="chip-val">+150 XP</strong>
+            </div>
+            <div class="progression-chip">
+              <span class="chip-label">XP Breakdown</span>
+              <span id="summary-progression-breakdown" class="chip-sub">+100 Win + 50 Sixes</span>
+            </div>
+            <div class="progression-chip">
+              <span class="chip-label">Current Rank</span>
+              <strong id="summary-progression-rank" class="chip-val rank-badge">Bronze</strong>
+            </div>
+            <div class="progression-chip">
+              <span class="chip-label">Stat Upgrade</span>
+              <strong id="summary-progression-stat" class="chip-val stat-boost">Power +2 (Now 52)</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Rematch / Lobby Buttons -->
+        <div class="summary-modal-actions">
+          <button id="btn-rematch" class="btn primary-btn summary-action-btn primary-action">
+            <span class="btn-icon">🔄</span> Play Again
+          </button>
+          <button id="btn-return-lobby" class="btn secondary-btn summary-action-btn secondary-action">
+            <span class="btn-icon">🏠</span> Return to Lobby
+          </button>
+        </div>
       </div>
     </div>
   </div>
