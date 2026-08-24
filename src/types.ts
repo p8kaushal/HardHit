@@ -55,7 +55,8 @@ export interface ShotChoice {
   direction: number;    // 0 to 7 (clock angle)
   type: ShotType;
   timing: number;       // 0.0 to 1.0 (0.5 is perfect)
-  contactZone: number;  // 0.0 to 1.0 (0.5 is perfect sweet spot)
+  contactZone: number;
+  footwork?: 'front_foot' | 'back_foot';  // 0.0 to 1.0 (0.5 is perfect sweet spot)
 }
 
 export interface BallOutcome {
@@ -128,5 +129,6 @@ export interface InputIntent {
   shotType: ShotType;
   releaseTiming: number;
   swingTiming: number;
+  footwork?: 'front_foot' | 'back_foot';
 }
 

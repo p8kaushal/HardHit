@@ -42,8 +42,9 @@ export function evaluateWicket(
   batter: Player,
   bowler: Player,
   delivery: DeliveryChoice,
-  shot: ShotChoice
-): { isWicket: boolean; reason: string; safeWindowMs: number } {
+  shot: ShotChoice,
+  assistMultiplier: number = 0
+): { isWicket: boolean; reason: string; safeWindowMs: number; isEdgeFallback?: boolean; outerToleranceMs?: number } {
   const shotRisk = SHOT_RISKS[shot.type];
   const ballThreat = getBallThreat(bowler, delivery);
   const techniqueResist = batter.stats.batting.technique / 100;
@@ -51,14 +52,79 @@ export function evaluateWicket(
   const effectiveRisk = shotRisk * ballThreat * (1 - techniqueResist);
   const safeWindowMs = 180 * (1 - effectiveRisk);
   
+  let outerToleranceMs = safeWindowMs / 2;
+  if (!batter.isBot && bowler.isBot) {
+    const rank = bowler.rank;
+    if (rank === 'Elite' || rank === 'Legend') {
+      outerToleranceMs = 80;
+    } else if (rank === 'Gold') {
+      outerToleranceMs = 120;
+    } else {
+      outerToleranceMs = 180;
+    }
+  } else if (!batter.isBot && !bowler.isBot) {
+    outerToleranceMs = 120; // Default for PvP
+  }
+  
   // Map relative shot timing (0.0 to 1.0) to milliseconds deviation
   // Perfect timing is 0.5. Swing window is 500ms total.
-  const deviationMs = Math.abs(shot.timing - 0.5) * 500;
+  const rawTimingOffset = Math.abs(shot.timing - 0.5);
+  const effectiveOffset = rawTimingOffset * (1 - assistMultiplier);
+  const deviationMs = effectiveOffset * 500;
   
-  const isWicket = deviationMs > safeWindowMs / 2;
+  const isCleanHit = deviationMs <= safeWindowMs / 2;
+  const isWithinTolerance = deviationMs <= outerToleranceMs;
+  
+  let isWicket = !isWithinTolerance;
+  let isEdgeFallback = !isCleanHit && isWithinTolerance;
   let reason = '';
+
+  // 1. Difficulty Sweeping Collision Cones
+  const batX = batter.batterHand === 'LHB' ? -0.45 : 0.45;
+  const ballX = delivery.aimTarget.x;
+  const deltaX = ballX - batX;
+  const deltaZ = -1.0; 
+  const ballAngle = Math.atan2(deltaZ, deltaX);
   
-  if (isWicket) {
+  const baseAngle = (shot.direction * Math.PI) / 4 - Math.PI / 2;
+  const swingAngle = Math.atan2(Math.sin(baseAngle), (batter.batterHand === 'RHB' ? -1 : 1) * Math.cos(baseAngle));
+  
+  let angleDiff = Math.abs(ballAngle - swingAngle);
+  while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+  angleDiff = Math.abs(angleDiff);
+  const angleDiffDeg = angleDiff * (180 / Math.PI);
+  
+  let coneWidth = 10; // Hard Bot (or no assist)
+  if (assistMultiplier >= 0.7) {
+    coneWidth = 45; // Rookie Bot
+  } else if (assistMultiplier >= 0.3) {
+    coneWidth = 25; // Medium Bot
+  }
+  
+  const isInsideCone = angleDiffDeg <= coneWidth / 2;
+
+  if (!isInsideCone) {
+    isWicket = true;
+    reason = 'Play and miss! Swung down the wrong line.';
+  } else {
+    // 2. Safe Edge Deflection System (resolveShot physics)
+    if (!isCleanHit && coneWidth > 10) {
+      isWicket = false; // Force 0% dismissal probability
+      isEdgeFallback = true;
+      // Override trajectory vector to vacant outfield (Third Man = 3, Fine Leg = 5)
+      shot.direction = deltaX < 0 ? 3 : 5; 
+      // Shot type will be processed safely in calculateDistance
+    }
+  }
+  
+  if (!batter.isBot && bowler.isBot && bowler.rank === 'Bronze') {
+    isWicket = false;
+    if (!isCleanHit) {
+      isEdgeFallback = true;
+    }
+  }
+  
+  if (isWicket && !reason) {
     if (shot.timing < 0.5) {
       reason = shot.timing < 0.25 ? 'Bowled - played too early!' : 'LBW - beaten by length!';
     } else {
@@ -69,7 +135,9 @@ export function evaluateWicket(
   return {
     isWicket,
     reason,
-    safeWindowMs
+    safeWindowMs,
+    isEdgeFallback,
+    outerToleranceMs
   };
 }
 
@@ -81,53 +149,69 @@ export function calculateDistance(
   bowler: Player,
   delivery: DeliveryChoice,
   shot: ShotChoice,
-  safeWindowMs: number
+  safeWindowMs: number,
+  isEdgeFallback: boolean = false,
+  assistMultiplier: number = 0
 ): { distance: number; isMiscueWicket: boolean; miscueReason: string } {
   const power = batter.stats.batting.power;
   const mult = SHOT_MULTIPLIERS[shot.type];
   
-  const baseDistance = power * mult * 1.5; // Base scaling to hit ~55-75m at power=50/mult=1.1
+  const baseDistance = power * mult * 1.5;
   
-  // Timing modifier
-  const deviationMs = Math.abs(shot.timing - 0.5) * 500;
-  let timingModifier = 0.2; // poor
+  const rawTimingOffset = Math.abs(shot.timing - 0.5);
+  const effectiveOffset = rawTimingOffset * (1 - assistMultiplier);
+  const deviationMs = effectiveOffset * 500;
+  let timingModifier = 0.2;
   
   if (deviationMs <= safeWindowMs * 0.1) {
-    timingModifier = 1.0; // perfect
+    timingModifier = 1.0;
   } else if (deviationMs <= safeWindowMs * 0.25) {
-    timingModifier = 0.8; // good
+    timingModifier = 0.8;
   } else if (deviationMs <= safeWindowMs * 0.5) {
-    timingModifier = 0.5; // early/late
+    timingModifier = 0.5;
+  } else if (isEdgeFallback) {
+    timingModifier = 0.15;
   }
   
-  // Contact modifier
   const contactDev = Math.abs(shot.contactZone - 0.5);
-  let contactModifier = 0.4; // edge
+  let contactModifier = 0.4;
   if (contactDev <= 0.08) {
-    contactModifier = 1.0; // sweet spot
+    contactModifier = 1.0;
   } else if (contactDev <= 0.2) {
-    contactModifier = 0.7; // good contact
+    contactModifier = 0.7;
+  }
+  if (isEdgeFallback) {
+    contactModifier = 0.3;
   }
   
-  // Bowling resistance
   const acc = bowler.stats.bowling.accuracy;
   const varStat = bowler.stats.bowling.variation;
   const diff = DELIVERY_DIFFICULTIES[delivery.length] || 0.4;
   const bowlingResistance = ((acc + varStat) / 2 / 100) * diff * 30;
   
   let distance = (baseDistance * timingModifier * contactModifier) - bowlingResistance;
-  if (deviationMs > safeWindowMs / 2) {
+  if (!isEdgeFallback && deviationMs > safeWindowMs / 2) {
     distance = 0;
   } else {
     distance = Math.max(0, parseFloat(distance.toFixed(1)));
+  }
+
+  // Safe Edge Deflection System overrides distance for 1-2 runs
+  const isSafeEdge = isEdgeFallback && assistMultiplier >= 0.3;
+  if (isSafeEdge) {
+    distance = 15.0 + Math.random() * 10.0; // 15 to 25 meters (safe 1-2 runs distance)
   }
   
   // Miscue check: Lofted or Power shots falling below 12 meters are resolved as caught
   let isMiscueWicket = false;
   let miscueReason = '';
-  if ((shot.type === 'power' || shot.type === 'lofted') && distance < 12.0 && distance > 0) {
-    isMiscueWicket = true;
-    miscueReason = 'Caught! Miscued shot did not carry and was caught in the infield.';
+  if (!isSafeEdge && (shot.type === 'power' || shot.type === 'lofted') && distance < 12.0 && distance > 0) {
+    if (!batter.isBot && bowler.isBot && bowler.rank === 'Bronze') {
+      // Forgive miscue wicket in Rookie mode
+    } else {
+      isMiscueWicket = true;
+      miscueReason = 'Caught! Miscued shot did not carry and was caught in the infield.';
+    }
   }
   
   return {

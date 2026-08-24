@@ -32,8 +32,9 @@ export class UIManager {
   private deliveryStartFrame = 0;
   
   // Selections
-  private selectedShotType: ShotType = 'lofted';
+  private selectedShotType: ShotType = 'grounded';
   private selectedBowlType: 'fast' | 'medium' | 'slow' | 'offspin' | 'legspin' = 'fast';
+  public isBannerActive: boolean = false;
 
   // Result Toast Auto-dismiss Timer
   private toastDismissTimer: any = null;
@@ -377,9 +378,16 @@ export class UIManager {
   // --- Batting Swings ---
 
   private executeKeyboardBatSwing(): void {
-    // Keyboard fallback swing
-    const clockDirection = 0; // Straight up
-    this.executeBattingSwingGesture(clockDirection, this.selectedShotType);
+    if (this.isBannerActive) {
+      this.executeBattingSwingGesture(0, this.selectedShotType, 0.5);
+      this.isBannerActive = false;
+      const banner = document.getElementById('hit-space-banner');
+      if (banner) banner.style.display = 'none';
+    } else {
+      // Keyboard fallback swing
+      const clockDirection = 0; // Straight up
+      this.executeBattingSwingGesture(clockDirection, this.selectedShotType);
+    }
   }
 
   public executeBattingSwingGesture(direction: number, type: ShotType, simulatedTiming?: number): void {
@@ -422,6 +430,38 @@ export class UIManager {
 
   // --- Ball Trajectory Animation Trigger ---
 
+  private showBattingHelper(recommendation: string): void {
+    let helper = document.getElementById('batting-helper');
+    if (!helper) {
+      helper = document.createElement('div');
+      helper.id = 'batting-helper';
+      helper.style.position = 'absolute';
+      helper.style.top = '25%';
+      helper.style.left = '50%';
+      helper.style.transform = 'translate(-50%, -50%)';
+      helper.style.textAlign = 'center';
+      helper.style.pointerEvents = 'none';
+      helper.style.zIndex = '1000';
+      helper.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
+      document.body.appendChild(helper);
+    }
+    helper.innerHTML = `
+      <div style="color: #22d3ee; font-size: 1.5rem; font-weight: bold; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;">RECOMMENDED: ${recommendation}</div>
+      <div id="hit-space-banner" style="color: #4ade80; font-size: 2.5rem; font-weight: 900; margin-top: 10px; display: none; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 8px; border: 2px solid #4ade80; animation: pulse 1s infinite;">HIT SPACE NOW!</div>
+    `;
+    if (!document.getElementById('pulse-anim')) {
+      const style = document.createElement('style');
+      style.id = 'pulse-anim';
+      style.innerHTML = `@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }`;
+      document.head.appendChild(style);
+    }
+  }
+
+  private hideBattingHelper(): void {
+    const helper = document.getElementById('batting-helper');
+    if (helper) helper.innerHTML = '';
+  }
+
   private deliverBall3D(): void {
     if (!this.activeDelivery || this.deliveryStartFrame > Date.now() - 100) return; // Prevent double trigger in same frame
 
@@ -435,14 +475,59 @@ export class UIManager {
     this.gameScene.setCameraMode(preContactCam);
     this.controller.setCameraMode(preContactCam);
 
+    const botRank = this.controller.state.bot.rank;
+    const difficulty = botRank === 'Legend' ? 'Hard' : (botRank === 'Gold' ? 'Medium' : 'Rookie');
+    const isSlowMotion = isPlayerBatting && (difficulty === 'Rookie' || (window as any).tutorialMode);
+
+    this.isBannerActive = false;
+
+    if (isSlowMotion) {
+      const isRHB = this.controller.getCurrentInnings().batter.batterHand !== 'LHB';
+      let rec = 'Straight Drive [W]';
+      if (this.activeDelivery.aimTarget.x > 0.2) {
+        rec = isRHB ? 'Off-side Drive [W + D] or [D]' : 'Leg-side Pull [W + A] or [A]';
+      } else if (this.activeDelivery.aimTarget.x < -0.2) {
+        rec = isRHB ? 'Leg-side Pull [W + A] or [A]' : 'Off-side Drive [W + D] or [D]';
+      }
+      this.showBattingHelper(rec);
+      
+      const releaseSpeed = this.activeDelivery.releaseTiming;
+      const speedScale = (1.0 + releaseSpeed * 0.5) * 0.35;
+      const framesToCrease = 55 / speedScale;
+      const timeToCreaseMs = framesToCrease * (1000 / 60);
+      const bannerDelay = Math.max(0, timeToCreaseMs - 180);
+      
+      setTimeout(() => {
+        if (this.activeDelivery && this.isBallActive) {
+          const banner = document.getElementById('hit-space-banner');
+          if (banner) banner.style.display = 'block';
+          this.isBannerActive = true;
+        }
+      }, bannerDelay);
+    } else {
+      this.hideBattingHelper();
+    }
+
     // Start delivery trajectory
     this.gameScene.animateDelivery(
       this.activeDelivery.aimTarget,
       this.activeDelivery.length,
       this.activeDelivery.releaseTiming,
-      () => this.handleBallArrivalAtStumps(),
-      () => this.setupActiveTurn(),
-      true
+      () => {
+        this.hideBattingHelper();
+        this.isBannerActive = false;
+        this.handleBallArrivalAtStumps();
+      },
+      () => {
+        this.hideBattingHelper();
+        this.isBannerActive = false;
+        this.setupActiveTurn();
+      },
+      true, // overTheWicket
+      () => { // onCreaseCrossed
+        // Handled early by setTimeout above
+      },
+      isSlowMotion
     );
   }
 

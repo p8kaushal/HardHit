@@ -1,7 +1,15 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
 import { evaluateWicket, calculateDistance, checkExtraBall, SIX_THRESHOLD, calculateDeliveryVelocity, calculateProjectedCreaseX } from './formula';
+import { activeInputManager } from './input';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
+
+export const globalAutoAssistConfig: { isRookie: boolean, currentDelivery: DeliveryChoice | null, batterHand: 'RHB' | 'LHB' } = {
+  isRookie: false,
+  currentDelivery: null,
+  batterHand: 'RHB'
+};
+
 
 const DEFAULT_STATS: PlayerStats = {
   batting: { power: 50, timing: 50, placement: 50, technique: 50, stamina: 50 },
@@ -81,6 +89,7 @@ export class MatchController {
 
   constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard') {
     this.botDifficulty = botDifficulty;
+    globalAutoAssistConfig.isRookie = botDifficulty === 'Rookie';
     this.reset();
   }
 
@@ -211,6 +220,39 @@ export class MatchController {
     let wicketReason = '';
     let distance = 0;
 
+    let assistMultiplier = 0;
+    if (!innings.batter.isBot && innings.bowler.isBot) {
+      if (this.botDifficulty === 'Rookie') assistMultiplier = 0.80;
+      else if (this.botDifficulty === 'Medium') assistMultiplier = 0.40;
+      else if (this.botDifficulty === 'Hard') assistMultiplier = 0.00;
+
+      // --- One-Button Auto-Assist for Rookie ---
+      if (this.botDifficulty === 'Rookie' && shot) {
+        const length = delivery.aimTarget.z;
+        const line = delivery.aimTarget.x;
+        const hand = innings.batter.batterHand || 'RHB';
+        
+        let autoFootwork: 'front_foot' | 'back_foot' = 'front_foot';
+        let autoDirection = 0;
+        
+        if (length < 11.0) { // short/bouncer
+          autoFootwork = 'back_foot';
+          autoDirection = hand === 'RHB' ? (line < 0 ? 3 : 5) : (line > 0 ? 3 : 5);
+        } else { // good/full/yorker
+          autoFootwork = 'front_foot';
+          autoDirection = hand === 'RHB' ? (line < -0.3 ? 1 : (line > 0.3 ? 7 : 0)) : (line > 0.3 ? 1 : (line < -0.3 ? 7 : 0));
+        }
+
+        shot.direction = autoDirection;
+        shot.footwork = autoFootwork;
+        
+        if (activeInputManager && activeInputManager.intent) {
+          activeInputManager.intent.aimDirection = autoDirection;
+          activeInputManager.intent.footwork = autoFootwork;
+        }
+      }
+    }
+
     if (extra.isExtra) {
       innings.score += 1; // +1 run penalty
       innings.isNextFreeHit = true; // next ball is free hit
@@ -228,12 +270,12 @@ export class MatchController {
       console.log(`[GAME EVENT] Missed delivery. Ball number ${ballNumber}`);
     } else {
       // Regular ball
-      const wicketResult = evaluateWicket(innings.batter, innings.bowler, delivery, shot);
+      const wicketResult = evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier);
       isWicket = wicketResult.isWicket;
       wicketReason = wicketResult.reason;
       
       if (!isWicket) {
-        const distResult = calculateDistance(innings.batter, innings.bowler, delivery, shot, wicketResult.safeWindowMs);
+        const distResult = calculateDistance(innings.batter, innings.bowler, delivery, shot, wicketResult.safeWindowMs, wicketResult.isEdgeFallback, assistMultiplier);
         distance = distResult.distance;
         if (distResult.isMiscueWicket) {
           isWicket = true;

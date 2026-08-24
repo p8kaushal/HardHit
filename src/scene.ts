@@ -13,7 +13,9 @@ export class GameScene {
   // Gameplay Meshes
   private ballMesh: BABYLON.Mesh | null = null;
   private ballTrail: BABYLON.LinesMesh | null = null;
+  private predictionPath: BABYLON.LinesMesh | null = null;
   private bounceMarker: BABYLON.Mesh | null = null;
+  private timingRing: BABYLON.Mesh | null = null;
   
   // Characters (Procedural low-poly)
   private bowlerMesh: BABYLON.TransformNode | null = null;
@@ -144,6 +146,16 @@ export class GameScene {
     this.bounceMarker.position.y = 0.04;
     this.bounceMarker.setEnabled(false);
     this.bounceMarker.material = markerMat;
+
+    const ringMat = new BABYLON.StandardMaterial('timingRingMat', this.scene);
+    ringMat.diffuseColor = new BABYLON.Color3(1, 0, 0);
+    ringMat.emissiveColor = new BABYLON.Color3(1, 0, 0);
+    ringMat.alpha = 0.8;
+    this.timingRing = BABYLON.MeshBuilder.CreateTorus('timingRing', { diameter: 1.5, thickness: 0.05 }, this.scene);
+    this.timingRing.rotation.x = Math.PI / 2;
+    this.timingRing.position.y = 0.1;
+    this.timingRing.setEnabled(false);
+    this.timingRing.material = ringMat;
   }
 
   private buildStumps(position: BABYLON.Vector3): void {
@@ -183,6 +195,9 @@ export class GameScene {
   public setCameraMode(mode: CameraMode): void {
     this.activeCameraMode = mode;
     this.scene.activeCamera = this.cameras[mode];
+    if (this.scene.activeCamera) {
+      (this.scene.activeCamera as BABYLON.TargetCamera).fov = 75 * (Math.PI / 180);
+    }
   }
 
   public getCameraMode(): CameraMode {
@@ -332,6 +347,11 @@ export class GameScene {
 
   public hideBounceMarker(): void {
     this.bounceMarker?.setEnabled(false);
+    this.timingRing?.setEnabled(false);
+    if (this.predictionPath) {
+      this.predictionPath.dispose();
+      this.predictionPath = null;
+    }
   }
 
 
@@ -342,7 +362,9 @@ export class GameScene {
     onArrived: () => void,
     onResolved: () => void,
     overTheWicket: boolean = true,
-    onCreaseCrossed?: () => void
+    onCreaseCrossed?: () => void,
+    isSlowMotion: boolean = false,
+    assistMultiplier: number = 0
   ): void {
     this.onBallArrivedCallback = onArrived;
     this.onBallResolvedCallback = onResolved;
@@ -358,7 +380,41 @@ export class GameScene {
     this.bounceMarker?.setEnabled(true);
     this.bounceMarker!.position.set(aimTarget.x, 0.04, -10 + aimTarget.z);
 
+    const lengthColors: Record<string, BABYLON.Color3> = {
+      'good': BABYLON.Color3.FromHexString('#22c55e'),
+      'full': BABYLON.Color3.FromHexString('#eab308'),
+      'short': BABYLON.Color3.FromHexString('#ef4444'),
+      'yorker': BABYLON.Color3.FromHexString('#3b82f6'),
+      'bouncer': BABYLON.Color3.FromHexString('#a855f7')
+    };
+    if (this.bounceMarker && this.bounceMarker.material) {
+      (this.bounceMarker.material as BABYLON.StandardMaterial).diffuseColor = lengthColors[type.toLowerCase()] || new BABYLON.Color3(1, 1, 1);
+    }
+    
+    this.timingRing?.setEnabled(true);
+    if (this.timingRing && this.batterMesh) {
+      this.timingRing.position.set(this.batterMesh.position.x, 0.1, 9.4);
+      this.timingRing.scaling.set(3.0, 3.0, 3.0);
+    }
+
     this.ballTrajectoryPoints = this.generateTrajectoryPoints(aimTarget, type, overTheWicket);
+    
+    if (this.predictionPath) {
+      this.predictionPath.dispose();
+      this.predictionPath = null;
+    }
+    if (!this.isBotBatting && assistMultiplier >= 0.7) {
+      const visiblePoints = this.ballTrajectoryPoints.filter(p => p.z <= 8.2);
+      if (visiblePoints.length > 1) {
+        this.predictionPath = BABYLON.MeshBuilder.CreateDashedLines('predictionPath', {
+          points: visiblePoints,
+          dashSize: 0.2,
+          gapSize: 0.2
+        }, this.scene);
+        this.predictionPath.color = new BABYLON.Color3(0.3, 0.8, 1);
+      }
+    }
+    
     this.ballAnimationTime = 0;
     this.isAnimatingBall = true;
     
@@ -385,18 +441,76 @@ export class GameScene {
     }
 
     // Flight loop runner
-    const speedScale = 1.0 + releaseSpeed * 0.5; // modifier
+    let speedScale = 1.0 + releaseSpeed * 0.5; // modifier
+    if (isSlowMotion) {
+      speedScale *= 0.35; // Reduce by 65% for bullet-time
+    }
+
     const animateFrame = () => {
       if (!this.isAnimatingBall) return;
 
-      this.ballAnimationTime += 1.0 * speedScale;
+      let currentSpeedScale = speedScale;
+      let fov = 75;
+
+      if (this.ballMesh && this.ballMesh.position.z >= 6.9) {
+        // Time Dilation
+        if (!this.isBotBatting) {
+          if (assistMultiplier >= 0.7) { // Rookie
+            currentSpeedScale *= 0.45;
+          } else if (assistMultiplier >= 0.3) { // Medium
+            currentSpeedScale *= 0.85;
+          }
+        }
+
+        // Camera FOV Zoom
+        if (this.activeCameraMode === 'batter_eye' && this.scene.activeCamera) {
+          const progress = Math.min(1, Math.max(0, (this.ballMesh.position.z - 6.9) / (10 - 6.9)));
+          fov = BABYLON.Scalar.Lerp(75, 50, progress);
+          (this.scene.activeCamera as BABYLON.TargetCamera).fov = fov * (Math.PI / 180);
+        }
+      }
+
+      this.ballAnimationTime += 1.0 * currentSpeedScale;
       const index = Math.floor(this.ballAnimationTime);
+
+      if (this.timingRing && this.ballMesh) {
+        const startZ = -11.5;
+        const creaseZ = 9.4;
+        const currentZ = this.ballMesh.position.z;
+        const progress = Math.max(0, Math.min(1, (currentZ - startZ) / (creaseZ - startZ)));
+        const ringScale = 3.0 - (2.0 * progress);
+        this.timingRing.scaling.set(ringScale, ringScale, ringScale);
+
+        if (this.timingRing.material) {
+          const mat = this.timingRing.material as BABYLON.StandardMaterial;
+          
+          const rawOffset = 1.0 - progress;
+          const effectiveOffset = rawOffset * (1 - assistMultiplier);
+          const effectiveProgress = 1.0 - effectiveOffset;
+          const effectiveRingScale = 3.0 - (2.0 * effectiveProgress);
+          
+          let r = 1, g = 0, b = 0;
+          if (effectiveRingScale > 2.0) {
+            g = 1 - (effectiveRingScale - 2.0); 
+          } else {
+            g = 1;
+            r = effectiveRingScale - 1.0;
+          }
+          mat.diffuseColor = new BABYLON.Color3(r, g, b);
+          mat.emissiveColor = new BABYLON.Color3(r, g, b);
+        }
+      }
 
       if (index >= this.ballTrajectoryPoints.length) {
         // Ball passed/reached batter stumps
         this.isAnimatingBall = false;
         this.ballMesh?.setEnabled(false);
         this.bounceMarker?.setEnabled(false);
+        this.timingRing?.setEnabled(false);
+        if (this.predictionPath) {
+          this.predictionPath.dispose();
+          this.predictionPath = null;
+        }
         if (this.onBallArrivedCallback) this.onBallArrivedCallback();
         return;
       }
