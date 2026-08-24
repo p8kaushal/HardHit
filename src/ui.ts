@@ -466,18 +466,100 @@ export class UIManager {
     const state = this.controller.state;
     const currentInn = this.controller.getCurrentInnings();
     
-    document.getElementById('hud-batter-name')!.innerText = currentInn.batter.name;
-    document.getElementById('hud-batter-stats')!.innerText = `PWR: ${currentInn.batter.stats.batting.power} | TIM: ${currentInn.batter.stats.batting.timing}`;
+    // Batter profile badge
+    const batterNameEl = document.getElementById('hud-batter-name');
+    if (batterNameEl) batterNameEl.innerText = currentInn.batter.name;
+
+    const batterStatsEl = document.getElementById('hud-batter-stats');
+    if (batterStatsEl) {
+      batterStatsEl.innerText = `PWR: ${currentInn.batter.stats.batting.power} | TIM: ${currentInn.batter.stats.batting.timing}`;
+    }
     
-    document.getElementById('hud-bowler-name')!.innerText = currentInn.bowler.name;
-    document.getElementById('hud-bowler-stats')!.innerText = `ACC: ${currentInn.bowler.stats.bowling.accuracy} | VAR: ${currentInn.bowler.stats.bowling.variation}`;
+    // Bowler profile badge
+    const bowlerNameEl = document.getElementById('hud-bowler-name');
+    if (bowlerNameEl) bowlerNameEl.innerText = currentInn.bowler.name;
+
+    const bowlerStatsEl = document.getElementById('hud-bowler-stats');
+    if (bowlerStatsEl) {
+      bowlerStatsEl.innerText = `ACC: ${currentInn.bowler.stats.bowling.accuracy} | VAR: ${currentInn.bowler.stats.bowling.variation}`;
+    }
     
-    document.getElementById('hud-innings-title')!.innerText = `Innings ${state.currentInningsIndex + 1}`;
+    // Innings Title
+    const inningsTitleEl = document.getElementById('hud-innings-title');
+    if (inningsTitleEl) {
+      inningsTitleEl.innerText = `Innings ${state.currentInningsIndex + 1}`;
+    }
     
+    // Legal balls count, wickets, runs score, biggest six
     const legalCount = currentInn.balls.filter(b => !checkExtraBall(b.delivery, currentInn.batter.batterHand || 'RHB').isExtra).length;
-    document.getElementById('hud-balls-count')!.innerText = `${legalCount}/6`;
-    document.getElementById('hud-wickets-count')!.innerText = `${currentInn.wicketsLost}/${currentInn.maxWickets}`;
-    document.getElementById('hud-biggest-six')!.innerText = `${currentInn.biggestSix.toFixed(1)}m`;
+    
+    const ballsCountEl = document.getElementById('hud-balls-count');
+    if (ballsCountEl) ballsCountEl.innerText = `${legalCount}/6`;
+
+    const wicketsCountEl = document.getElementById('hud-wickets-count');
+    if (wicketsCountEl) wicketsCountEl.innerText = `${currentInn.wicketsLost}/${currentInn.maxWickets}`;
+
+    const scoreCountEl = document.getElementById('hud-score-count');
+    if (scoreCountEl) scoreCountEl.innerText = `${currentInn.score}`;
+
+    const biggestSixEl = document.getElementById('hud-biggest-six');
+    if (biggestSixEl) biggestSixEl.innerText = `${currentInn.biggestSix.toFixed(1)}m`;
+
+    // 6-Ball Over Tracker Dynamic Outcome Updates
+    const tracker = document.getElementById('over-tracker');
+    if (tracker) {
+      const balls = currentInn.balls;
+      const totalSlots = Math.max(6, balls.length);
+
+      // Ensure tracker has exact number of slots (at least 6)
+      while (tracker.children.length < totalSlots) {
+        const dot = document.createElement('span');
+        dot.className = 'over-dot gray empty upcoming';
+        tracker.appendChild(dot);
+      }
+      while (tracker.children.length > totalSlots) {
+        tracker.removeChild(tracker.lastChild!);
+      }
+
+      const dots = tracker.querySelectorAll('.over-dot');
+      for (let i = 0; i < totalSlots; i++) {
+        const dot = dots[i] as HTMLElement;
+        if (i < balls.length) {
+          const outcome = balls[i];
+          if (outcome.isWicket) {
+            // Red dot: Wicket
+            dot.className = 'over-dot red wicket';
+            dot.textContent = 'W';
+            dot.title = `Ball ${i + 1}: Wicket (${outcome.wicketReason || 'Dismissed'})`;
+          } else if (outcome.isExtra || outcome.extraType) {
+            // Blue dot: Extra ball (Wide / No-ball)
+            dot.className = 'over-dot blue extra';
+            dot.textContent = outcome.extraType === 'wide' ? 'WD' : (outcome.extraType === 'noball' ? 'NB' : 'EX');
+            dot.title = `Ball ${i + 1}: Extra Delivery (${outcome.extraType ? outcome.extraType.toUpperCase() : 'Extra'} +1 Run)`;
+          } else if (outcome.isFreeHit && outcome.distance < 70) {
+            // Blue dot: Free hit delivery
+            dot.className = 'over-dot blue extra free-hit';
+            dot.textContent = 'FH';
+            dot.title = `Ball ${i + 1}: Free Hit Delivery (${outcome.distance > 0 ? outcome.distance.toFixed(1) + 'm' : '0 runs'})`;
+          } else if (outcome.distance >= 70) {
+            // Gold dot: SIX scored (6 runs)
+            dot.className = 'over-dot gold six';
+            dot.textContent = '6';
+            dot.title = `Ball ${i + 1}: SIX! (${outcome.distance.toFixed(1)}m)`;
+          } else {
+            // Green dot: Legal delivery (0-5 runs)
+            dot.className = 'over-dot green legal';
+            dot.textContent = outcome.distance > 0 ? `${Math.round(outcome.distance)}m` : '•';
+            dot.title = `Ball ${i + 1}: Legal Delivery (${outcome.distance > 0 ? outcome.distance.toFixed(1) + 'm' : 'Dot ball'})`;
+          }
+        } else {
+          // Gray/Empty outline: Upcoming/unbowled
+          dot.className = 'over-dot gray empty upcoming';
+          dot.textContent = `${i + 1}`;
+          dot.title = `Ball ${i + 1}: Upcoming`;
+        }
+      }
+    }
 
     const opponentBadge = document.getElementById('opponent-badge');
     if (opponentBadge) {

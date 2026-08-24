@@ -106,29 +106,75 @@
     <!-- Gameplay Screen -->
     <div id="screen-gameplay" class="screen">
       <!-- HUD Overlay -->
+      <!-- HUD Overlay (Broadcast Glass Scorebar HUD) -->
       <div class="game-hud">
-        <div class="hud-box batter-hud">
-          <div class="hud-label">BATTER</div>
-          <div class="hud-value" id="hud-batter-name">Player</div>
-          <div class="hud-sub" id="hud-batter-stats">PWR: 50 | TIM: 50</div>
-        </div>
-
-        <div class="hud-box scoreboard-hud">
-          <div class="hud-main-score">
-            <span id="hud-innings-title">Innings 1</span>
-          </div>
-          <div class="hud-balls-wickets">
-            Balls: <strong id="hud-balls-count">0/6</strong> | Wickets: <strong id="hud-wickets-count">0/1</strong>
-          </div>
-          <div class="hud-sixes">
-            Biggest Six: <strong id="hud-biggest-six">0.0m</strong>
+        <!-- Batter Detail Glass Badge (Top-Left) -->
+        <div class="hud-box hud-profile-badge batter-hud" id="hud-batter-card">
+          <div class="profile-badge-icon">🏏</div>
+          <div class="profile-badge-info">
+            <div class="hud-label">BATTER</div>
+            <div class="hud-value" id="hud-batter-name">Player</div>
+            <div class="hud-sub" id="hud-batter-stats">PWR: 50 | TIM: 50</div>
           </div>
         </div>
 
-        <div class="hud-box bowler-hud">
-          <div class="hud-label">BOWLER</div>
-          <div class="hud-value" id="hud-bowler-name">Bot</div>
-          <div class="hud-sub" id="hud-bowler-stats">ACC: 50 | VAR: 50</div>
+        <!-- Center Broadcast Scorebar Panel -->
+        <div class="hud-box scoreboard-hud broadcast-scorebar">
+          <!-- Innings Section -->
+          <div class="hud-section hud-innings-section">
+            <span class="hud-innings-pill" id="hud-innings-title">Innings 1</span>
+          </div>
+
+          <!-- Score & Wickets Section -->
+          <div class="hud-section hud-score-section">
+            <div class="hud-stat-item">
+              <span class="hud-stat-label">SCORE</span>
+              <div class="hud-stat-value">
+                <span id="hud-score-count">0</span><span class="hud-slash">/</span><strong id="hud-wickets-count">0/1</strong>
+              </div>
+            </div>
+            <div class="hud-stat-divider"></div>
+            <div class="hud-stat-item">
+              <span class="hud-stat-label">BALLS</span>
+              <div class="hud-stat-value">
+                <strong id="hud-balls-count">0/6</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6-Ball Over Tracker Section -->
+          <div class="hud-section hud-tracker-section">
+            <span class="hud-tracker-label">OVER</span>
+            <div id="over-tracker" class="over-tracker">
+              <span class="over-dot gray empty upcoming" title="Ball 1: Upcoming">1</span>
+              <span class="over-dot gray empty upcoming" title="Ball 2: Upcoming">2</span>
+              <span class="over-dot gray empty upcoming" title="Ball 3: Upcoming">3</span>
+              <span class="over-dot gray empty upcoming" title="Ball 4: Upcoming">4</span>
+              <span class="over-dot gray empty upcoming" title="Ball 5: Upcoming">5</span>
+              <span class="over-dot gray empty upcoming" title="Ball 6: Upcoming">6</span>
+            </div>
+          </div>
+
+          <!-- Biggest Six Section -->
+          <div class="hud-section hud-six-section">
+            <div class="hud-six-badge">
+              <span class="hud-six-fire">💥</span>
+              <div class="hud-six-details">
+                <span class="hud-stat-label">BIGGEST 6</span>
+                <strong class="hud-six-val" id="hud-biggest-six">0.0m</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bowler Detail Glass Badge (Top-Right) -->
+        <div class="hud-box hud-profile-badge bowler-hud" id="hud-bowler-card">
+          <div class="profile-badge-info">
+            <div class="hud-label">BOWLER</div>
+            <div class="hud-value" id="hud-bowler-name">Bot</div>
+            <div class="hud-sub" id="hud-bowler-stats">ACC: 50 | VAR: 50</div>
+          </div>
+          <div class="profile-badge-icon">⚡</div>
         </div>
 
         <!-- Help Button -->
