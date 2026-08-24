@@ -59,9 +59,9 @@ export class UIManager {
     this.gameScene.botBattingTriggerCallback = () => {
       const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
       if (!isPlayerBatting && this.pendingBotShot && !this.activeShot) {
-        const difficulty = this.controller.state.bot.rank === 'Legend' ? 'Hard' : (this.controller.state.bot.rank === 'Gold' ? 'Medium' : 'Easy');
+        const difficulty = this.controller.state.bot.rank === 'Legend' ? 'Hard' : (this.controller.state.bot.rank === 'Gold' ? 'Medium' : 'Rookie');
         let offset = 0;
-        if (difficulty === 'Easy') {
+        if (difficulty === 'Rookie') {
           offset = (Math.random() - 0.5) * 0.16;
         } else if (difficulty === 'Medium') {
           offset = (Math.random() - 0.5) * 0.08;
@@ -368,7 +368,7 @@ export class UIManager {
       this.controller.state.bot,
       this.controller.state.player,
       this.activeDelivery,
-      this.controller.state.bot.rank === 'Legend' ? 'Hard' : (this.controller.state.bot.rank === 'Gold' ? 'Medium' : 'Easy')
+      this.controller.state.bot.rank === 'Legend' ? 'Hard' : (this.controller.state.bot.rank === 'Gold' ? 'Medium' : 'Rookie')
     );
 
     this.deliverBall3D();

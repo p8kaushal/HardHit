@@ -1,5 +1,5 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { evaluateWicket, calculateDistance, checkExtraBall, SIX_THRESHOLD } from './formula';
+import { evaluateWicket, calculateDistance, checkExtraBall, SIX_THRESHOLD, calculateDeliveryVelocity, calculateProjectedCreaseX } from './formula';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
 
@@ -35,7 +35,7 @@ export function savePlayer(player: Player): void {
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(player));
 }
 
-export function createBotPlayer(difficulty: 'Easy' | 'Medium' | 'Hard'): Player {
+export function createBotPlayer(difficulty: 'Rookie' | 'Medium' | 'Hard'): Player {
   let statsMultiplier = 1.85; // Rookie
   let botRank: Player['rank'] = 'Bronze';
   
@@ -77,9 +77,9 @@ export function createBotPlayer(difficulty: 'Easy' | 'Medium' | 'Hard'): Player 
 
 export class MatchController {
   public state!: MatchState;
-  private botDifficulty: 'Easy' | 'Medium' | 'Hard';
+  private botDifficulty: 'Rookie' | 'Medium' | 'Hard';
 
-  constructor(botDifficulty: 'Easy' | 'Medium' | 'Hard') {
+  constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard') {
     this.botDifficulty = botDifficulty;
     this.reset();
   }
@@ -180,12 +180,29 @@ export class MatchController {
 
     const ballNumber = innings.ballsBowled + 1;
 
-    // Clamp the bot's delivery target coordinate aimTarget.x based on difficulty
     if (innings.bowler.isBot) {
-      let limit = 0.70; // Easy/Rookie
-      if (innings.bowler.id === 'bot_medium') limit = 0.45;
-      else if (innings.bowler.id === 'bot_hard') limit = 0.25;
-      delivery.aimTarget.x = Math.max(-limit, Math.min(limit, delivery.aimTarget.x));
+      const stanceMultiplier = innings.batter.batterHand === 'LHB' ? -1 : 1;
+      
+      // 1. Batter Stance Normalization
+      delivery.aimTarget.x *= stanceMultiplier;
+
+      // 2. Absolute Center-Clamped Crease Arrival
+      let limit = 0.65; // Easy/Rookie
+      if (innings.bowler.id === 'bot_medium') limit = 0.42;
+      else if (innings.bowler.id === 'bot_hard') limit = 0.20;
+      
+      let X_target_crease = delivery.aimTarget.x;
+      X_target_crease = Math.max(-limit, Math.min(limit, X_target_crease));
+      
+      const X_release = delivery.overTheWicket !== false ? -0.6 : 0.6;
+      const t_flight = 0.6;
+      const Ax_swing = 0;
+      const X_spin = 0;
+      
+      const Vx = calculateDeliveryVelocity(X_release, X_target_crease, t_flight, Ax_swing, X_spin);
+      const X_projected_crease = calculateProjectedCreaseX(X_release, Vx, t_flight, Ax_swing, X_spin);
+      
+      delivery.aimTarget.x = X_projected_crease;
     }
 
     const extra = checkExtraBall(delivery, innings.batter.batterHand || 'RHB');

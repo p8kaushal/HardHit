@@ -24,7 +24,7 @@ function initLobby(): void {
   const btnStartToss = document.getElementById('btn-start-toss')!;
   btnStartToss.onclick = () => {
     const diffSelect = document.getElementById('select-difficulty') as HTMLSelectElement;
-    const difficulty = diffSelect.value as 'Easy' | 'Medium' | 'Hard';
+    const difficulty = diffSelect.value as 'Rookie' | 'Medium' | 'Hard';
     
     // Initialize controllers
     controller = new MatchController(difficulty);

@@ -140,7 +140,7 @@ export function calculateDistance(
 /**
  * Check for wide/no-ball based on release timing.
  */
-export function checkExtraBall(delivery: DeliveryChoice, batterHand: 'RHB' | 'LHB' = 'RHB'): { isExtra: boolean; type: 'wide' | 'noball' | null } {
+export function checkExtraBall(delivery: DeliveryChoice, _batterHand: 'RHB' | 'LHB' = 'RHB'): { isExtra: boolean; type: 'wide' | 'noball' | null } {
   if (delivery.releaseTiming < 0.05) {
     return { isExtra: true, type: 'wide' };
   } else if (delivery.releaseTiming > 0.95) {
@@ -148,12 +148,9 @@ export function checkExtraBall(delivery: DeliveryChoice, batterHand: 'RHB' | 'LH
   }
 
   const x = delivery.aimTarget.x;
-  if (batterHand === 'RHB') {
-    if (x < -0.89) return { isExtra: true, type: 'wide' };
-    if (x > 0.15) return { isExtra: true, type: 'wide' };
-  } else {
-    if (x > 0.89) return { isExtra: true, type: 'wide' };
-    if (x < -0.15) return { isExtra: true, type: 'wide' };
+  // Measure strictly relative to absolute pitch center line (X=0.0m) bypassing stance offsets
+  if (Math.abs(x) > 0.89) {
+    return { isExtra: true, type: 'wide' };
   }
 
   return { isExtra: false, type: null };
@@ -252,11 +249,30 @@ export function verifyFormulas(): void {
  * so spin breaks do not push deliveries outside the wide lines (|X| > 0.89m)
  */
 export function clampLateralVelocity(vx: number, difficulty: string): number {
-  let maxVx = 0.19; // Easy/Rookie: aim up to 0.70 (0.89 - 0.70 = 0.19)
+  let maxVx = 0.21; // Easy/Rookie: aim up to 0.68 (0.89 - 0.68 = 0.21)
   if (difficulty === 'Medium') {
     maxVx = 0.44; // Medium: aim up to 0.45 (0.89 - 0.45 = 0.44)
   } else if (difficulty === 'Hard') {
-    maxVx = 0.64; // Hard: aim up to 0.25 (0.89 - 0.25 = 0.64)
+    maxVx = 0.67; // Hard: aim up to 0.22 (0.89 - 0.22 = 0.67)
   }
   return Math.max(-maxVx, Math.min(maxVx, vx));
+}
+export function calculateDeliveryVelocity(
+  X_release: number,
+  X_target_crease: number,
+  t_flight: number,
+  Ax_swing: number,
+  X_spin: number
+): number {
+  return (X_target_crease - X_release - 0.5 * Ax_swing * Math.pow(t_flight, 2) - X_spin) / t_flight;
+}
+
+export function calculateProjectedCreaseX(
+  X_release: number,
+  Vx: number,
+  t_flight: number,
+  Ax_swing: number,
+  X_spin_post_bounce: number
+): number {
+  return X_release + (Vx * t_flight) + (0.5 * Ax_swing * Math.pow(t_flight, 2)) + X_spin_post_bounce;
 }

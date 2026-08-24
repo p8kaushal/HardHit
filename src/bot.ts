@@ -1,25 +1,7 @@
-import { Player, DeliveryChoice, ShotChoice, ShotType, LineType, LengthType, DeliveryType } from './types';
+import { Player, DeliveryChoice, ShotChoice, ShotType } from './types';
 
 
-const LINES: LineType[] = ['off', 'middle', 'leg'];
-const LENGTHS: LengthType[] = ['bouncer', 'short', 'good', 'full', 'yorker'];
-const TYPES: DeliveryType[] = ['fast', 'medium', 'slow', 'offspin', 'legspin'];
-
-// Map Line to default X target
-const LINE_X_MAP: Record<LineType, number> = {
-  middle: 0.0,
-  off: 0.9,
-  leg: -0.9
-};
-
-// Map Length to default Z offset from bowling crease (total distance 20m)
-const LENGTH_Z_MAP: Record<LengthType, number> = {
-  yorker: 17.5,
-  full: 15.0,
-  good: 12.0,
-  short: 9.5,
-  bouncer: 7.0
-};
+// Unused constants removed
 
 function randomNormal(mean: number, stdDev: number): number {
   const u1 = Math.random() || 0.0001;
@@ -35,56 +17,49 @@ function clamp(val: number, min: number, max: number): number {
 /**
  * Bot generates its 3D delivery parameters.
  */
-export function botChooseDelivery(_botPlayer: Player, difficulty: 'Easy' | 'Medium' | 'Hard'): DeliveryChoice {
-  const line = LINES[Math.floor(Math.random() * LINES.length)];
-  const length = LENGTHS[Math.floor(Math.random() * LENGTHS.length)];
-  const type = TYPES[Math.floor(Math.random() * TYPES.length)];
-  
-  // Calculate raw targeting coordinates
-  let baseTargetX = LINE_X_MAP[line];
-  let baseTargetZ = LENGTH_Z_MAP[length];
-  
-  // Apply aiming inaccuracy deviation depending on bowler Accuracy stat
-  const accuracyStat = _botPlayer.stats.bowling.accuracy;
-  const inaccuracy = Math.max(0.05, 0.65 - (accuracyStat / 100) * 0.55);
-  
-  let targetX = clamp(baseTargetX + randomNormal(0, inaccuracy), -1.5, 1.5);
-  const targetZ = clamp(baseTargetZ + randomNormal(0, inaccuracy * 1.5), 4.0, 19.5);
+export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium' | 'Hard' = 'Medium'): DeliveryChoice {
+  const pace = bowler.stats.bowling.pace;
+  const deliveryType: import('./types').DeliveryType = pace > 70 ? 'fast' : (pace > 40 ? 'medium' : 'slow');
 
-  // Calibrate accuracy metrics: Rookie bowls <8% wides, Medium <3%, Hard 0%
-  let legalChance = 0.93; // 93% chance of being legal (leaves 7% chance for illegal, which is < 8%)
-  if (difficulty === 'Medium') legalChance = 0.98; // 98% -> 2% < 3%
-  else if (difficulty === 'Hard') legalChance = 1.00; // 0% wides
+  const lines: import('./types').LineType[] = ['off', 'middle', 'leg'];
+  const lengths: import('./types').LengthType[] = ['bouncer', 'short', 'good', 'full', 'yorker'];
 
-  if (Math.random() < legalChance) {
-    // Force legal delivery (for RHB defaults)
-    targetX = clamp(targetX, -0.88, 0.14);
-  } else {
-    // Force illegal delivery (wide on leg side, but clamped to 0.7 later in game.ts)
-    targetX = 0.5; // > 0.15 is wide for RHB
+  let line = lines[Math.floor(Math.random() * lines.length)];
+  let length = lengths[Math.floor(Math.random() * lengths.length)];
+  
+  if (difficulty === 'Hard' && Math.random() > 0.4) {
+    line = 'off';
+    length = Math.random() > 0.5 ? 'good' : 'yorker';
+  } else if (difficulty === 'Medium' && Math.random() > 0.6) {
+    line = Math.random() > 0.5 ? 'off' : 'middle';
+    length = 'good';
   }
 
-  // Release timing accuracy scales with Accuracy stat
-  const timingStdDev = Math.max(0.015, 0.15 - (accuracyStat / 100) * 0.13);
+  // Use formula utility if available, else approximate
+  let baseAimX = 0;
+  if (line === 'off') baseAimX = -0.6;
+  if (line === 'leg') baseAimX = 0.4;
 
-  // Bound bot release timing calculations based on difficulty
-  let timingMin = 0.15, timingMax = 0.85;
-  if (difficulty === 'Medium') {
-    timingMin = 0.35;
-    timingMax = 0.65;
-  } else if (difficulty === 'Hard') {
-    timingMin = 0.5;
-    timingMax = 0.5;
-  }
+  let aimZ = 10;
+  if (length === 'yorker') aimZ = 18;
+  else if (length === 'full') aimZ = 15;
+  else if (length === 'good') aimZ = 10;
+  else if (length === 'short') aimZ = 6;
+  else if (length === 'bouncer') aimZ = 4;
 
-  const releaseTiming = clamp(randomNormal(0.5, timingStdDev), timingMin, timingMax);
+  const errorMargin = (100 - bowler.stats.bowling.accuracy) / 100;
+  const xWobble = (Math.random() - 0.5) * errorMargin;
+  const zWobble = (Math.random() - 0.5) * errorMargin * 2;
+
+  const releaseTiming = 0.45 + (Math.random() * 0.1); 
 
   return {
-    aimTarget: { x: targetX, z: targetZ },
+    aimTarget: { x: baseAimX + xWobble, z: aimZ + zWobble },
     line,
     length,
-    type,
-    releaseTiming
+    type: deliveryType,
+    releaseTiming,
+    overTheWicket: Math.random() > 0.3
   };
 }
 
@@ -92,14 +67,14 @@ export function botChooseDelivery(_botPlayer: Player, difficulty: 'Easy' | 'Medi
  * Bot generates its shot response.
  */
 export function botChooseShot(
-  botPlayer: Player,
+  batter: Player,
   _bowler: Player,
   delivery: DeliveryChoice,
-  difficulty: 'Easy' | 'Medium' | 'Hard'
+  difficulty: 'Rookie' | 'Medium' | 'Hard' = 'Medium'
 ): ShotChoice {
   let shotType: ShotType = 'lofted';
   
-  if (difficulty === 'Easy') {
+  if (difficulty === 'Rookie') {
     const rand = Math.random();
     if (rand < 0.1) shotType = 'defensive';
     else if (rand < 0.2) shotType = 'grounded';
@@ -153,7 +128,7 @@ export function botChooseShot(
   const timing = clamp(0.5 + (swingFrame - arrivalFrame) / 40, 0.15, 0.85);
   
   // Contact execution scales dynamically with batter Timing stat
-  const timingStat = botPlayer.stats.batting.timing;
+  const timingStat = batter.stats.batting.timing;
   const contactStdDev = Math.max(0.02, 0.18 - (timingStat / 100) * 0.15);
   const contactZone = clamp(randomNormal(0.5, contactStdDev), 0.15, 0.85);
 
