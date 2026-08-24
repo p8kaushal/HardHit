@@ -1,6 +1,6 @@
 import { MatchController } from './game';
 import { GameScene } from './scene';
-import { DeliveryChoice, ShotChoice, ShotType } from './types';
+import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseShot } from './bot';
 import { checkExtraBall, getLineTypeFromAimX } from './formula';
 import { KeyboardInputManager } from './input';
@@ -192,6 +192,9 @@ export class UIManager {
     if (btnReturnLobby) {
       btnReturnLobby.addEventListener('click', () => this.handleReturnToLobby());
     }
+
+    // Stats Popover Listeners
+    initStatsPopover();
 
     // Global listeners
     window.addEventListener('mouseup', () => this.triggerReleaseMeter());
@@ -810,9 +813,20 @@ export class UIManager {
       date: new Date().toLocaleDateString(),
       opponent: state.bot.name,
       biggestSix: playerInnings ? playerInnings.biggestSix.toFixed(1) : '0.0',
+      wicketsLost: playerInnings ? playerInnings.wicketsLost : 0,
       outcome: state.winnerId === state.player.id ? 'WON' : (state.winnerId === state.bot.id ? 'LOST' : 'TIED')
     });
-    entries.sort((a: any, b: any) => parseFloat(b.biggestSix) - parseFloat(a.biggestSix));
+    // Sort primarily by single biggest six (m) descending and secondarily by fewest wickets lost ascending
+    entries.sort((a: any, b: any) => {
+      const sixA = parseFloat(a.biggestSix) || 0;
+      const sixB = parseFloat(b.biggestSix) || 0;
+      if (Math.abs(sixB - sixA) > 0.001) {
+        return sixB - sixA;
+      }
+      const wA = typeof a.wicketsLost === 'number' ? a.wicketsLost : (parseInt(a.wicketsLost, 10) || 0);
+      const wB = typeof b.wicketsLost === 'number' ? b.wicketsLost : (parseInt(b.wicketsLost, 10) || 0);
+      return wA - wB;
+    });
     localStorage.setItem('six_hitting_contest_leaderboard', JSON.stringify(entries.slice(0, 10)));
 
     // 6. Show the modal overlay
@@ -944,54 +958,295 @@ export class UIManager {
   }
 
   private refreshLobbyView(): void {
-    const player = this.controller.state.player;
+    renderProfile(this.controller.state.player);
+    renderLeaderboard();
+  }
+}
 
-    const nameEl = document.getElementById('profile-name');
-    if (nameEl) nameEl.innerText = player.name;
+export interface RankProgress {
+  currentRank: 'Bronze' | 'Silver' | 'Gold' | 'Elite' | 'Legend';
+  nextRank: string;
+  rankIcon: string;
+  rankClass: string;
+  currentXp: number;
+  tierMinXp: number;
+  tierMaxXp: number;
+  xpInTier: number;
+  xpNeededForTier: number;
+  percent: number;
+  nextRankText: string;
+}
 
-    const rankEl = document.getElementById('profile-rank');
-    if (rankEl) rankEl.innerText = player.rank;
+export function getRankProgress(xp: number): RankProgress {
+  const currentXp = Math.max(0, xp || 0);
+  if (currentXp >= 1000) {
+    return {
+      currentRank: 'Legend',
+      nextRank: 'MAX',
+      rankIcon: '👑',
+      rankClass: 'rank-legend',
+      currentXp,
+      tierMinXp: 1000,
+      tierMaxXp: 1000,
+      xpInTier: currentXp - 1000,
+      xpNeededForTier: 0,
+      percent: 100,
+      nextRankText: 'Master Tier • Max Rank Achieved'
+    };
+  } else if (currentXp >= 600) {
+    const tierMin = 600;
+    const tierMax = 1000;
+    const needed = tierMax - tierMin;
+    const current = currentXp - tierMin;
+    const percent = Math.min(100, Math.max(0, Math.round((current / needed) * 100)));
+    return {
+      currentRank: 'Elite',
+      nextRank: 'Legend',
+      rankIcon: '💎',
+      rankClass: 'rank-elite',
+      currentXp,
+      tierMinXp: tierMin,
+      tierMaxXp: tierMax,
+      xpInTier: current,
+      xpNeededForTier: needed,
+      percent,
+      nextRankText: `${tierMax - currentXp} XP to Legend (Tier 5)`
+    };
+  } else if (currentXp >= 300) {
+    const tierMin = 300;
+    const tierMax = 600;
+    const needed = tierMax - tierMin;
+    const current = currentXp - tierMin;
+    const percent = Math.min(100, Math.max(0, Math.round((current / needed) * 100)));
+    return {
+      currentRank: 'Gold',
+      nextRank: 'Elite',
+      rankIcon: '🥇',
+      rankClass: 'rank-gold',
+      currentXp,
+      tierMinXp: tierMin,
+      tierMaxXp: tierMax,
+      xpInTier: current,
+      xpNeededForTier: needed,
+      percent,
+      nextRankText: `${tierMax - currentXp} XP to Elite (Tier 4)`
+    };
+  } else if (currentXp >= 100) {
+    const tierMin = 100;
+    const tierMax = 300;
+    const needed = tierMax - tierMin;
+    const current = currentXp - tierMin;
+    const percent = Math.min(100, Math.max(0, Math.round((current / needed) * 100)));
+    return {
+      currentRank: 'Silver',
+      nextRank: 'Gold',
+      rankIcon: '🥈',
+      rankClass: 'rank-silver',
+      currentXp,
+      tierMinXp: tierMin,
+      tierMaxXp: tierMax,
+      xpInTier: current,
+      xpNeededForTier: needed,
+      percent,
+      nextRankText: `${tierMax - currentXp} XP to Gold (Tier 3)`
+    };
+  } else {
+    const tierMin = 0;
+    const tierMax = 100;
+    const needed = tierMax - tierMin;
+    const current = currentXp;
+    const percent = Math.min(100, Math.max(0, Math.round((current / needed) * 100)));
+    return {
+      currentRank: 'Bronze',
+      nextRank: 'Silver',
+      rankIcon: '🥉',
+      rankClass: 'rank-bronze',
+      currentXp,
+      tierMinXp: tierMin,
+      tierMaxXp: tierMax,
+      xpInTier: current,
+      xpNeededForTier: needed,
+      percent,
+      nextRankText: `${tierMax - currentXp} XP to Silver (Tier 2)`
+    };
+  }
+}
 
-    const xpEl = document.getElementById('profile-xp');
-    if (xpEl) xpEl.innerText = player.xp.toString();
+export function renderProfile(player: Player): void {
+  // Ensure Stats popover triggers are wired
+  initStatsPopover();
 
-    const batPower = document.getElementById('stat-bat-power');
-    if (batPower) batPower.innerText = player.stats.batting.power.toString();
+  const nameEl = document.getElementById('profile-name');
+  if (nameEl) nameEl.innerText = player.name;
 
-    const batTiming = document.getElementById('stat-bat-timing');
-    if (batTiming) batTiming.innerText = player.stats.batting.timing.toString();
+  const rankProgress = getRankProgress(player.xp || 0);
 
-    const batTech = document.getElementById('stat-bat-tech');
-    if (batTech) batTech.innerText = player.stats.batting.technique.toString();
+  const rankEl = document.getElementById('profile-rank');
+  if (rankEl) rankEl.innerText = rankProgress.currentRank;
 
-    const bowlAcc = document.getElementById('stat-bowl-acc');
-    if (bowlAcc) bowlAcc.innerText = player.stats.bowling.accuracy.toString();
+  const rankBadgeEl = document.getElementById('profile-rank-badge');
+  if (rankBadgeEl) {
+    rankBadgeEl.className = `rank-tier-badge ${rankProgress.rankClass}`;
+  }
 
-    const bowlVar = document.getElementById('stat-bowl-var');
-    if (bowlVar) bowlVar.innerText = player.stats.bowling.variation.toString();
+  const rankIconEl = document.getElementById('profile-rank-icon');
+  if (rankIconEl) {
+    rankIconEl.innerText = rankProgress.rankIcon;
+  }
 
-    const bowlPace = document.getElementById('stat-bowl-pace');
-    if (bowlPace) bowlPace.innerText = player.stats.bowling.pace.toString();
+  const xpEl = document.getElementById('profile-xp');
+  if (xpEl) xpEl.innerText = (player.xp || 0).toString();
 
-    const leaderboardBody = document.getElementById('leaderboard-body');
-    if (leaderboardBody) {
-      const key = 'six_hitting_contest_leaderboard';
-      const entries = JSON.parse(localStorage.getItem(key) || '[]');
-      if (entries.length > 0) {
-        leaderboardBody.innerHTML = '';
-        entries.forEach((entry: any, index: number) => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td><strong>#${index + 1}</strong></td>
-            <td>${entry.opponent}</td>
-            <td>${entry.biggestSix}m</td>
-            <td><span class="badge ${entry.outcome === 'WON' ? 'success-btn' : 'warning-btn'}">${entry.outcome}</span></td>
-          `;
-          leaderboardBody.appendChild(row);
-        });
-      } else {
-        leaderboardBody.innerHTML = '<tr class="empty-row"><td colspan="4">No matches played yet.</td></tr>';
+  const xpNextEl = document.getElementById('profile-xp-next');
+  if (xpNextEl) {
+    xpNextEl.innerText = rankProgress.currentRank === 'Legend' ? 'MAX' : rankProgress.tierMaxXp.toString();
+  }
+
+  const xpFillEl = document.getElementById('profile-xp-fill');
+  if (xpFillEl) {
+    xpFillEl.style.width = `${rankProgress.percent}%`;
+  }
+
+  const xpPercentEl = document.getElementById('profile-xp-percent');
+  if (xpPercentEl) {
+    xpPercentEl.innerText = `${rankProgress.percent}%`;
+  }
+
+  const xpDescEl = document.getElementById('profile-xp-next-desc');
+  if (xpDescEl) {
+    xpDescEl.innerText = rankProgress.nextRankText;
+  }
+
+  // Batting stats
+  const batPower = document.getElementById('stat-bat-power');
+  if (batPower && player.stats?.batting?.power !== undefined) batPower.innerText = player.stats.batting.power.toString();
+  const meterBatPower = document.getElementById('stat-meter-bat-power');
+  if (meterBatPower && player.stats?.batting?.power !== undefined) meterBatPower.style.width = `${player.stats.batting.power}%`;
+
+  const batTiming = document.getElementById('stat-bat-timing');
+  if (batTiming && player.stats?.batting?.timing !== undefined) batTiming.innerText = player.stats.batting.timing.toString();
+  const meterBatTiming = document.getElementById('stat-meter-bat-timing');
+  if (meterBatTiming && player.stats?.batting?.timing !== undefined) meterBatTiming.style.width = `${player.stats.batting.timing}%`;
+
+  const batTech = document.getElementById('stat-bat-tech');
+  if (batTech && player.stats?.batting?.technique !== undefined) batTech.innerText = player.stats.batting.technique.toString();
+  const meterBatTech = document.getElementById('stat-meter-bat-tech');
+  if (meterBatTech && player.stats?.batting?.technique !== undefined) meterBatTech.style.width = `${player.stats.batting.technique}%`;
+
+  // Bowling stats
+  const bowlAcc = document.getElementById('stat-bowl-acc');
+  if (bowlAcc && player.stats?.bowling?.accuracy !== undefined) bowlAcc.innerText = player.stats.bowling.accuracy.toString();
+  const meterBowlAcc = document.getElementById('stat-meter-bowl-acc');
+  if (meterBowlAcc && player.stats?.bowling?.accuracy !== undefined) meterBowlAcc.style.width = `${player.stats.bowling.accuracy}%`;
+
+  const bowlVar = document.getElementById('stat-bowl-var');
+  if (bowlVar && player.stats?.bowling?.variation !== undefined) bowlVar.innerText = player.stats.bowling.variation.toString();
+  const meterBowlVar = document.getElementById('stat-meter-bowl-var');
+  if (meterBowlVar && player.stats?.bowling?.variation !== undefined) meterBowlVar.style.width = `${player.stats.bowling.variation}%`;
+
+  const bowlPace = document.getElementById('stat-bowl-pace');
+  if (bowlPace && player.stats?.bowling?.pace !== undefined) bowlPace.innerText = player.stats.bowling.pace.toString();
+  const meterBowlPace = document.getElementById('stat-meter-bowl-pace');
+  if (meterBowlPace && player.stats?.bowling?.pace !== undefined) meterBowlPace.style.width = `${player.stats.bowling.pace}%`;
+}
+
+let statsPopoverEscapeListenerBound = false;
+
+export function initStatsPopover(): void {
+  const btnViewStats = document.getElementById('btn-view-stats');
+  const popover = document.getElementById('player-stats-popover');
+  const btnClose = document.getElementById('btn-stats-close');
+  const backdrop = document.getElementById('stats-popover-backdrop');
+
+  if (btnViewStats && popover) {
+    btnViewStats.onclick = (e) => {
+      e.stopPropagation();
+      popover.classList.toggle('hidden');
+    };
+  }
+
+  if (btnClose && popover) {
+    btnClose.onclick = (e) => {
+      e.stopPropagation();
+      popover.classList.add('hidden');
+    };
+  }
+
+  if (backdrop && popover) {
+    backdrop.onclick = () => {
+      popover.classList.add('hidden');
+    };
+  }
+
+  if (!statsPopoverEscapeListenerBound && typeof window !== 'undefined') {
+    statsPopoverEscapeListenerBound = true;
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && popover && !popover.classList.contains('hidden')) {
+        popover.classList.add('hidden');
       }
+    });
+  }
+}
+
+if (typeof window !== 'undefined') {
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', () => initStatsPopover());
+  } else {
+    initStatsPopover();
+  }
+}
+
+export function renderLeaderboard(): void {
+  const leaderboardBody = document.getElementById('leaderboard-body');
+  if (!leaderboardBody) return;
+
+  const key = 'six_hitting_contest_leaderboard';
+  const entries: any[] = JSON.parse(localStorage.getItem(key) || '[]');
+
+  // Sort primarily by single biggest six (m) descending and secondarily by fewest wickets lost ascending
+  entries.sort((a: any, b: any) => {
+    const sixA = parseFloat(a.biggestSix) || 0;
+    const sixB = parseFloat(b.biggestSix) || 0;
+    if (Math.abs(sixB - sixA) > 0.001) {
+      return sixB - sixA;
     }
+    const wA = typeof a.wicketsLost === 'number' ? a.wicketsLost : (parseInt(a.wicketsLost, 10) || 0);
+    const wB = typeof b.wicketsLost === 'number' ? b.wicketsLost : (parseInt(b.wicketsLost, 10) || 0);
+    return wA - wB;
+  });
+
+  if (entries.length > 0) {
+    leaderboardBody.innerHTML = '';
+    entries.forEach((entry: any, index: number) => {
+      const row = document.createElement('tr');
+      row.className = `leaderboard-row ${index === 0 ? 'top-rank' : ''}`;
+
+      const rankMedal = index === 0 ? '🥇' : (index === 1 ? '🥈' : (index === 2 ? '🥉' : ''));
+      const outcome = (entry.outcome || 'TIED').toUpperCase();
+      const outcomeClass = outcome === 'WON' ? 'badge-won' : (outcome === 'LOST' ? 'badge-lost' : 'badge-tied');
+      const wicketsVal = entry.wicketsLost !== undefined ? entry.wicketsLost : 0;
+      const sixVal = parseFloat(entry.biggestSix || '0').toFixed(1);
+
+      row.innerHTML = `
+        <td class="col-rank">
+          <span class="leaderboard-rank-pill rank-pos-${index + 1}">#${index + 1} ${rankMedal}</span>
+        </td>
+        <td class="col-opponent">
+          <span class="opponent-name">${entry.opponent || 'Bot'}</span>
+        </td>
+        <td class="col-six">
+          <strong class="six-stat"><span class="fire-icon">💥</span> ${sixVal}m</strong>
+        </td>
+        <td class="col-wickets">
+          <span class="wickets-stat ${wicketsVal === 0 ? 'flawless' : 'lost'}">${wicketsVal}/1</span>
+        </td>
+        <td class="col-outcome">
+          <span class="badge ${outcomeClass}">${outcome}</span>
+        </td>
+      `;
+      leaderboardBody.appendChild(row);
+    });
+  } else {
+    leaderboardBody.innerHTML = '<tr class="empty-row"><td colspan="5">No matches played yet. Step onto the pitch to set your high score!</td></tr>';
   }
 }

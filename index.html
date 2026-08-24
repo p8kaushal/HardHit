@@ -9,96 +9,219 @@
 <body>
   <div id="app">
     <!-- Main Menu / Lobby Screen -->
-    <div id="screen-lobby" class="screen active">
-      <div class="card header-card">
-        <h1>Six Hitting Contest</h1>
-        <p>1 Over. 1 Wicket. Maximize your Biggest Six.</p>
-      </div>
+    <div id="screen-lobby" class="screen active menu-overlay">
+      <div class="menu-card">
+        <div class="card header-card lobby-header" id="lobby-title">
+          <h1>SIX HITTING CONTEST</h1>
+          <p>1 Over. 1 Wicket. Maximize your Biggest Six.</p>
+        </div>
 
-      <div class="card player-profile">
-        <h2>Your Profile</h2>
-        <div class="profile-details">
-          <div class="detail-row">
-            <span>Name:</span> <strong id="profile-name">Player</strong>
+        <!-- 2-Column Dashboard Top Row Grid -->
+        <div class="dashboard-grid">
+          <!-- Left Card: Player Profile Card -->
+          <div class="card player-profile-card glass-card" id="profile-card">
+            <div class="profile-header-row">
+              <div class="profile-user-identity">
+                <div class="player-avatar-badge">🏏</div>
+                <div class="player-identity-info">
+                  <h2 id="profile-name">Player</h2>
+                  <span class="player-subtitle">All-Rounder Power Hitter</span>
+                </div>
+              </div>
+              <div id="profile-rank-badge" class="rank-tier-badge rank-bronze">
+                <span class="rank-icon" id="profile-rank-icon">🥉</span>
+                <span class="rank-name" id="profile-rank">Bronze</span>
+              </div>
+            </div>
+
+            <!-- XP Level Progress Bar Section -->
+            <div class="profile-xp-section">
+              <div class="xp-header-row">
+                <span class="xp-label">Career XP Progress</span>
+                <span class="xp-values">
+                  <strong id="profile-xp">0</strong> / <span id="profile-xp-next">100</span> XP
+                  <span class="xp-percent-pill" id="profile-xp-percent">0%</span>
+                </span>
+              </div>
+              <div class="xp-progress-bar-container" id="profile-xp-track">
+                <div class="xp-progress-bar-fill" id="profile-xp-fill" style="width: 0%;">
+                  <span class="xp-bar-glow"></span>
+                </div>
+              </div>
+              <div class="xp-footer-row">
+                <span class="xp-next-target" id="profile-xp-next-desc">100 XP to Silver (Tier 2)</span>
+              </div>
+            </div>
+
+            <!-- View Stats Button -->
+            <div class="profile-actions-row">
+              <button id="btn-view-stats" class="btn secondary-btn view-stats-btn" type="button" title="View Detailed Player Attributes">
+                <span class="btn-icon">📊</span> View Stats
+              </button>
+            </div>
           </div>
-          <div class="detail-row">
-            <span>Rank:</span> <span id="profile-rank" class="badge">Bronze</span>
-          </div>
-          <div class="detail-row">
-            <span>XP:</span> <span id="profile-xp">0</span>
+
+          <!-- Right Card: Start Match Card -->
+          <div class="card setup-card glass-card" id="setup-card">
+            <div class="setup-header-row">
+              <span class="setup-icon">⚔️</span>
+              <div>
+                <h2>Start a Match</h2>
+                <p class="setup-desc">1 Over Contest vs AI Bot</p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="select-difficulty">Select Bot Difficulty:</label>
+              <select id="select-difficulty" class="glass-select">
+                <option value="Easy">Easy (Rookie Bot)</option>
+                <option value="Medium" selected>Medium (Pro Bot)</option>
+                <option value="Hard">Hard (Legend Bot)</option>
+              </select>
+            </div>
+            <div class="form-group setup-toss-option">
+              <label>Toss Option:</label>
+              <div class="toss-option-badge">
+                <span class="toss-badge-icon">🪙</span>
+                <span class="toss-badge-text">Coin Toss Decider (Heads / Tails)</span>
+              </div>
+            </div>
+            <button id="btn-start-toss" class="btn primary-btn size-large start-btn">
+              <span class="btn-icon">🪙</span> Go to Toss
+            </button>
           </div>
         </div>
-        <div class="stats-grid">
-          <div class="stat-col">
-            <h3>Batting</h3>
-            <div>Power: <span id="stat-bat-power">50</span></div>
-            <div>Timing: <span id="stat-bat-timing">50</span></div>
-            <div>Technique: <span id="stat-bat-tech">50</span></div>
+
+        <!-- Bottom Row: Leaderboard Card (Full-Width) -->
+        <div class="card leaderboard-card glass-card dashboard-full-width" id="leaderboard-card">
+          <div class="leaderboard-header-row">
+            <div class="leaderboard-title-group">
+              <span class="leaderboard-icon">🏆</span>
+              <div>
+                <h2>Personal Best Leaderboard</h2>
+                <p class="leaderboard-desc">Sorted by Biggest Six &amp; Fewest Wickets Lost</p>
+              </div>
+            </div>
           </div>
-          <div class="stat-col">
-            <h3>Bowling</h3>
-            <div>Accuracy: <span id="stat-bowl-acc">50</span></div>
-            <div>Variation: <span id="stat-bowl-var">50</span></div>
-            <div>Pace: <span id="stat-bowl-pace">50</span></div>
+          <div class="leaderboard-table-container">
+            <table id="leaderboard-table" class="dark-glass-table">
+              <thead>
+                <tr>
+                  <th class="th-rank">Rank</th>
+                  <th class="th-opp">Opponent</th>
+                  <th class="th-six">Biggest Six</th>
+                  <th class="th-wickets">Wickets Lost</th>
+                  <th class="th-outcome">Outcome</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-body">
+                <!-- Populated dynamically -->
+                <tr class="empty-row"><td colspan="5">No matches played yet. Step onto the pitch to set your high score!</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="card setup-card">
-        <h2>Start a Match</h2>
-        <div class="form-group">
-          <label for="select-difficulty">Select Bot Difficulty:</label>
-          <select id="select-difficulty">
-            <option value="Easy">Easy (Rookie Bot)</option>
-            <option value="Medium" selected>Medium (Pro Bot)</option>
-            <option value="Hard">Hard (Legend Bot)</option>
-          </select>
+    <!-- Collapsible Player Stats Popover Modal -->
+    <div id="player-stats-popover" class="stats-popover modal-overlay hidden">
+      <div class="stats-popover-backdrop" id="stats-popover-backdrop"></div>
+      <div class="stats-popover-card glass-card">
+        <div class="stats-popover-header">
+          <div class="stats-popover-title">
+            <span class="stats-popover-icon">📊</span>
+            <h3>Player Career Attributes</h3>
+          </div>
+          <button id="btn-stats-close" class="btn-close-modal" aria-label="Close Stats">&times;</button>
         </div>
-        <button id="btn-start-toss" class="btn primary-btn">Go to Toss</button>
-      </div>
+        
+        <div class="stats-popover-body">
+          <div class="stats-grid">
+            <div class="stat-col batting-col">
+              <div class="stat-col-header">
+                <span class="stat-col-icon">🏏</span>
+                <h3>Batting Attributes</h3>
+              </div>
+              <div class="stat-row-item">
+                <span class="stat-name">Power</span>
+                <div class="stat-meter-track">
+                  <div class="stat-meter-fill bat-power" id="stat-meter-bat-power" style="width: 50%;"></div>
+                </div>
+                <strong class="stat-num" id="stat-bat-power">50</strong>
+              </div>
+              <div class="stat-row-item">
+                <span class="stat-name">Timing</span>
+                <div class="stat-meter-track">
+                  <div class="stat-meter-fill bat-timing" id="stat-meter-bat-timing" style="width: 50%;"></div>
+                </div>
+                <strong class="stat-num" id="stat-bat-timing">50</strong>
+              </div>
+              <div class="stat-row-item">
+                <span class="stat-name">Technique</span>
+                <div class="stat-meter-track">
+                  <div class="stat-meter-fill bat-tech" id="stat-meter-bat-tech" style="width: 50%;"></div>
+                </div>
+                <strong class="stat-num" id="stat-bat-tech">50</strong>
+              </div>
+            </div>
 
-      <div class="card leaderboard-card">
-        <h2>Leaderboard (Personal Best)</h2>
-        <table id="leaderboard-table">
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Opponent</th>
-              <th>Biggest Six</th>
-              <th>Outcome</th>
-            </tr>
-          </thead>
-          <tbody id="leaderboard-body">
-            <!-- Populated dynamically -->
-            <tr class="empty-row"><td colspan="4">No matches played yet.</td></tr>
-          </tbody>
-        </table>
+            <div class="stat-col bowling-col">
+              <div class="stat-col-header">
+                <span class="stat-col-icon">⚡</span>
+                <h3>Bowling Attributes</h3>
+              </div>
+              <div class="stat-row-item">
+                <span class="stat-name">Accuracy</span>
+                <div class="stat-meter-track">
+                  <div class="stat-meter-fill bowl-acc" id="stat-meter-bowl-acc" style="width: 50%;"></div>
+                </div>
+                <strong class="stat-num" id="stat-bowl-acc">50</strong>
+              </div>
+              <div class="stat-row-item">
+                <span class="stat-name">Variation</span>
+                <div class="stat-meter-track">
+                  <div class="stat-meter-fill bowl-var" id="stat-meter-bowl-var" style="width: 50%;"></div>
+                </div>
+                <strong class="stat-num" id="stat-bowl-var">50</strong>
+              </div>
+              <div class="stat-row-item">
+                <span class="stat-name">Pace</span>
+                <div class="stat-meter-track">
+                  <div class="stat-meter-fill bowl-pace" id="stat-meter-bowl-pace" style="width: 50%;"></div>
+                </div>
+                <strong class="stat-num" id="stat-bowl-pace">50</strong>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Toss Screen -->
-    <div id="screen-toss" class="screen">
-      <div class="card">
-        <h2>The Coin Toss</h2>
-        <p>Pick Heads or Tails to decide who gets to choose first.</p>
-        
-        <div class="toss-buttons">
-          <button id="btn-toss-heads" class="btn secondary-btn">Heads</button>
-          <button id="btn-toss-tails" class="btn secondary-btn">Tails</button>
-        </div>
-
-        <div id="toss-animation-container" class="toss-anim">
-          <!-- Animation element -->
-          <div id="coin" class="coin">?</div>
-        </div>
-
-        <div id="toss-result-message" class="hidden">
-          <p id="toss-won-text"></p>
-          <div id="toss-choice-buttons" class="hidden">
-            <button id="btn-choice-bat" class="btn success-btn">Bat First</button>
-            <button id="btn-choice-bowl" class="btn warning-btn">Bowl First</button>
+    <div id="screen-toss" class="screen menu-overlay">
+      <div class="menu-card">
+        <div class="card toss-card glass-card" id="toss-card">
+          <h2>The Coin Toss</h2>
+          <p>Pick Heads or Tails to decide who gets to choose first.</p>
+          
+          <div class="toss-buttons">
+            <button id="btn-toss-heads" class="btn secondary-btn">Heads</button>
+            <button id="btn-toss-tails" class="btn secondary-btn">Tails</button>
           </div>
-          <button id="btn-start-match" class="btn primary-btn hidden">Start Innings</button>
+
+          <div id="toss-animation-container" class="toss-anim">
+            <!-- Animation element -->
+            <div id="coin" class="coin">?</div>
+          </div>
+
+          <div id="toss-result-message" class="hidden">
+            <p id="toss-won-text"></p>
+            <div id="toss-choice-buttons" class="hidden">
+              <button id="btn-choice-bat" class="btn success-btn">Bat First</button>
+              <button id="btn-choice-bowl" class="btn warning-btn">Bowl First</button>
+            </div>
+            <button id="btn-start-match" class="btn primary-btn hidden">Start Innings</button>
+          </div>
         </div>
       </div>
     </div>

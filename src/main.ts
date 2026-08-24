@@ -1,5 +1,5 @@
 import { getOrCreatePlayer, MatchController } from './game';
-import { UIManager } from './ui';
+import { UIManager, renderProfile, renderLeaderboard } from './ui';
 import { verifyFormulas } from './formula';
 
 let controller: MatchController | null = null;
@@ -7,39 +7,8 @@ let ui: UIManager | null = null;
 
 function loadLobbyProfile(): void {
   const player = getOrCreatePlayer();
-  
-  document.getElementById('profile-name')!.innerText = player.name;
-  document.getElementById('profile-rank')!.innerText = player.rank;
-  document.getElementById('profile-xp')!.innerText = player.xp.toString();
-
-  document.getElementById('stat-bat-power')!.innerText = player.stats.batting.power.toString();
-  document.getElementById('stat-bat-timing')!.innerText = player.stats.batting.timing.toString();
-  document.getElementById('stat-bat-tech')!.innerText = player.stats.batting.technique.toString();
-
-  document.getElementById('stat-bowl-acc')!.innerText = player.stats.bowling.accuracy.toString();
-  document.getElementById('stat-bowl-var')!.innerText = player.stats.bowling.variation.toString();
-  document.getElementById('stat-bowl-pace')!.innerText = player.stats.bowling.pace.toString();
-
-  // Populate leaderboard
-  const leaderboardBody = document.getElementById('leaderboard-body')!;
-  const key = 'six_hitting_contest_leaderboard';
-  const entries = JSON.parse(localStorage.getItem(key) || '[]');
-  
-  if (entries.length > 0) {
-    leaderboardBody.innerHTML = '';
-    entries.forEach((entry: any, index: number) => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td><strong>#${index + 1}</strong></td>
-        <td>${entry.opponent}</td>
-        <td>${entry.biggestSix}m</td>
-        <td><span class="badge ${entry.outcome === 'WON' ? 'success-btn' : 'warning-btn'}">${entry.outcome}</span></td>
-      `;
-      leaderboardBody.appendChild(row);
-    });
-  } else {
-    leaderboardBody.innerHTML = '<tr class="empty-row"><td colspan="4">No matches played yet.</td></tr>';
-  }
+  renderProfile(player);
+  renderLeaderboard();
 }
 
 function showScreen(screenId: string): void {
