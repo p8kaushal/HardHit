@@ -1,14 +1,54 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { evaluateWicket, calculateDistance, checkExtraBall, SIX_THRESHOLD, calculateDeliveryVelocity, calculateProjectedCreaseX } from './formula';
+import { evaluateWicket, calculateDistance, checkExtraBall, SIX_THRESHOLD, calculateDeliveryVelocity, calculateProjectedCreaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { activeInputManager } from './input';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
 
-export const globalAutoAssistConfig: { isRookie: boolean, currentDelivery: DeliveryChoice | null, batterHand: 'RHB' | 'LHB' } = {
+export const globalAutoAssistConfig: { 
+  isRookie: boolean, 
+  currentDelivery: DeliveryChoice | null, 
+  batterHand: 'RHB' | 'LHB', 
+  bufferedTiming?: number | null,
+  deliveryStartTime?: number,
+  delta_t?: number,
+  ballZ?: number,
+  isDeliveryActive?: boolean,
+  isBallInPlay?: boolean,
+  hasBounced?: boolean
+} = {
   isRookie: false,
   currentDelivery: null,
-  batterHand: 'RHB'
+  batterHand: 'RHB',
+  bufferedTiming: null,
+  isDeliveryActive: true,
+  isBallInPlay: false,
+  hasBounced: false
 };
+
+export function resolveShot(delta_t: number, botTier: string, shotType: string, deliveryLength: string): { contact: boolean, Q: number, tier: string } {
+  const delta_t_window = calculateEffectiveWindow(botTier, shotType, deliveryLength);
+  const Q = calculateContactQuality(delta_t, delta_t_window);
+  const tier = getContactQualityTier(Q);
+  
+  let contact = false;
+  if (Q >= 0.40) {
+    contact = true;
+  }
+  
+  // Spatial Crease Hard Fallback
+  if (globalAutoAssistConfig.isRookie && globalAutoAssistConfig.ballZ !== undefined) {
+    if (globalAutoAssistConfig.ballZ >= 6.0 && globalAutoAssistConfig.ballZ <= 9.4) {
+      contact = true;
+    }
+  }
+
+  if (contact) {
+    globalAutoAssistConfig.isDeliveryActive = false;
+    globalAutoAssistConfig.isBallInPlay = true;
+  }
+
+  return { contact, Q, tier };
+}
 
 
 const DEFAULT_STATS: PlayerStats = {
@@ -179,6 +219,10 @@ export class MatchController {
     return this.state.innings[this.state.currentInningsIndex];
   }
 
+  public recordDeliveryStart(): void {
+    globalAutoAssistConfig.deliveryStartTime = performance.now();
+  }
+
   public recordBall(delivery: DeliveryChoice, shot: ShotChoice | null): BallOutcome {
     const innings = this.getCurrentInnings();
     
@@ -186,6 +230,9 @@ export class MatchController {
     const isFreeHit = innings.isNextFreeHit;
     // Reset next ball's Free Hit state
     innings.isNextFreeHit = false;
+
+    // Reset bounce state for the new delivery
+    globalAutoAssistConfig.hasBounced = false;
 
     const ballNumber = innings.ballsBowled + 1;
 
@@ -250,6 +297,12 @@ export class MatchController {
           activeInputManager.intent.aimDirection = autoDirection;
           activeInputManager.intent.footwork = autoFootwork;
         }
+
+        // Apply buffered timing from scene Spacebar press
+        if (globalAutoAssistConfig.bufferedTiming !== null && globalAutoAssistConfig.bufferedTiming !== undefined) {
+          shot.timing = globalAutoAssistConfig.bufferedTiming;
+          globalAutoAssistConfig.bufferedTiming = null;
+        }
       }
     }
 
@@ -273,6 +326,23 @@ export class MatchController {
       const wicketResult = evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier);
       isWicket = wicketResult.isWicket;
       wicketReason = wicketResult.reason;
+
+      // 4. Bounding Box Bypass & Contact Guarantee
+      if (globalAutoAssistConfig.delta_t !== undefined) {
+        
+        let botTier = 'Medium';
+        if (innings.bowler.id.includes('rookie')) botTier = 'Rookie';
+        if (innings.bowler.id.includes('hard')) botTier = 'Hard';
+        
+        const resolution = resolveShot(globalAutoAssistConfig.delta_t, botTier, shot.type, delivery.length);
+
+        if (resolution.contact) {
+          isWicket = false;
+          wicketReason = '';
+          wicketResult.isEdgeFallback = false;
+        }
+        globalAutoAssistConfig.delta_t = undefined; // Reset
+      }
       
       if (!isWicket) {
         const distResult = calculateDistance(innings.batter, innings.bowler, delivery, shot, wicketResult.safeWindowMs, wicketResult.isEdgeFallback, assistMultiplier);
@@ -292,16 +362,8 @@ export class MatchController {
       }
 
       if (!isWicket) {
-        if (distance >= SIX_THRESHOLD) {
-          innings.biggestSix = Math.max(innings.biggestSix, distance);
-          innings.score += 6; // Six adds +6 runs
-          this.state.cameraMode = 'follow_shot';
-          console.log(`[GAME EVENT] Massive SIX: ${distance}m! Innings score: ${innings.score}`);
-        } else {
-          // Hits below six-hitting threshold (70m) are scored as 0 runs (Dot Ball) and distance is set to 0 in delivery record
-          distance = 0;
-          console.log(`[GAME EVENT] Hit did not clear ${SIX_THRESHOLD}m threshold - Dot Ball (0 runs). Innings score: ${innings.score}`);
-        }
+        // Runs are now dynamically resolved after ball motion finishes
+        console.log(`[GAME EVENT] Ball hit into the field. Pending physical resolution for runs.`);
       }
     }
 
@@ -336,8 +398,33 @@ export class MatchController {
       console.log(`[GAME EVENT] Innings completed. Legal balls: ${innings.ballsBowled}. Wickets: ${innings.wicketsLost}. Biggest Six: ${innings.biggestSix}m.`);
     }
 
-    this.checkInningsTransitions();
+    // In case of wicket or extra, we can transition immediately, but we will rely on ui.ts delayed reset.
+    // So we can still evaluate it here. But we will remove checkInningsTransitions from here for hits.
+    if (isWicket || distance === 0) {
+      this.checkInningsTransitions();
+    }
     return outcome;
+  }
+
+  public finalizeBallOutcome(distance: number, hasBounced: boolean): number {
+    const innings = this.getCurrentInnings();
+    
+    // Evaluate outcome using formula
+    const runs = evaluateFinalOutcome(distance, hasBounced);
+    
+    innings.score += runs;
+    if (runs === 6) {
+      innings.biggestSix = Math.max(innings.biggestSix, distance);
+    }
+    
+    const lastBall = innings.balls[innings.balls.length - 1];
+    if (lastBall) {
+      lastBall.distance = distance;
+    }
+    
+    console.log(`[GAME EVENT] Dynamic resolution: ${distance.toFixed(1)}m, bounced: ${hasBounced} => ${runs} runs. Score: ${innings.score}`);
+    this.checkInningsTransitions();
+    return runs;
   }
 
   private checkInningsTransitions(): void {

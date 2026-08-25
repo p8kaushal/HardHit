@@ -1,7 +1,22 @@
 import { Player, DeliveryChoice, ShotChoice, ShotType } from './types';
 
 export const SIX_THRESHOLD = 70;
+export const BAT_ANIMATION_LEAD_TIME = 0.15; // 150ms swing apex delay
 
+/**
+ * Predicted Arrival Z Timestamp Solver
+ */
+export function calculateBallArrival(
+  releaseZ: number,
+  creaseZ: number,
+  vZ: number,
+  deceleration: number,
+  timeDilation: number
+): number {
+  const distance = Math.abs(creaseZ - releaseZ);
+  const flightDuration = distance / vZ;
+  return flightDuration * timeDilation * (1 + deceleration);
+}
 const DELIVERY_DIFFICULTIES: Record<string, number> = {
   yorker: 0.8,
   full: 0.5,
@@ -96,7 +111,12 @@ export function evaluateWicket(
   
   let coneWidth = 10; // Hard Bot (or no assist)
   if (assistMultiplier >= 0.7) {
-    coneWidth = 45; // Rookie Bot
+    // Generous spatial raycast frustum sweeping on Easy mode
+    if (Math.abs(ballX) <= 0.89) {
+      coneWidth = 360; // Guarantee bat contact for balls inside pitch bounds
+    } else {
+      coneWidth = 45; // Rookie Bot default
+    }
   } else if (assistMultiplier >= 0.3) {
     coneWidth = 25; // Medium Bot
   }
@@ -211,6 +231,13 @@ export function calculateDistance(
     } else {
       isMiscueWicket = true;
       miscueReason = 'Caught! Miscued shot did not carry and was caught in the infield.';
+    }
+  }
+
+  // Calibrate carry/roll equations so the resulting shot carries/rolls at least 25m to 55m.
+  if (!batter.isBot && bowler.isBot && bowler.rank === 'Bronze') { // Rookie mode
+    if (distance > 0 && distance < 25) {
+      distance = 25.0 + Math.random() * 30.0; // 25 to 55m
     }
   }
   
@@ -360,3 +387,104 @@ export function calculateProjectedCreaseX(
 ): number {
   return X_release + (Vx * t_flight) + (0.5 * Ax_swing * Math.pow(t_flight, 2)) + X_spin_post_bounce;
 }
+
+export const delta_t_base = 0.15;
+
+export const M_bot: Record<string, number> = {
+  Rookie: 1.8,
+  Medium: 1.0,
+  Hard: 0.5
+};
+
+export const M_shot: Record<string, number> = {
+  defensive: 1.6,
+  grounded: 1.2,
+  lofted: 0.7,
+  power: 0.7
+};
+
+export const M_delivery: Record<string, number> = {
+  good: 1.0,
+  full: 0.8,
+  short: 0.8,
+  yorker: 0.6,
+  bouncer: 0.6
+};
+
+export function calculateEffectiveWindow(botTier: string, shotType: string, deliveryLength: string): number {
+  const m_bot = M_bot[botTier] || 1.0;
+  const m_shot = M_shot[shotType] || 1.0;
+  const m_del = M_delivery[deliveryLength] || 1.0;
+  return delta_t_base * m_bot * m_shot * m_del;
+}
+
+export function calculateContactQuality(delta_t: number, delta_t_window: number): number {
+  return Math.max(0, 1 - (delta_t / delta_t_window));
+}
+
+export function getContactQualityTier(Q: number): string {
+  if (Q >= 0.85) return 'Perfect';
+  if (Q >= 0.40) return 'Good / Early-Late';
+  return 'Poor';
+}
+
+export function calculateShotTrajectory(
+  _Q: number,
+  _t_input: number,
+  _t_ideal: number,
+  theta_shot: number,
+  _V_in: { x: number, y: number, z: number },
+  _V_bat: { x: number, y: number, z: number },
+  _isRHB: boolean = true,
+  _isHuman: boolean = false,
+  _difficulty: string = 'Medium',
+  shotType: string = 'power'
+): { x: number, y: number, z: number } {
+  let Vy = 0;
+  let Vz = 0;
+  
+  switch (shotType) {
+    case 'lofted':
+      Vy = 16.0;
+      Vz = 34.0;
+      break;
+    case 'power':
+      Vy = 8.0;
+      Vz = 44.0;
+      break;
+    case 'grounded':
+      Vy = 0.0;
+      Vz = 30.0;
+      break;
+    case 'defensive':
+      Vy = 2.0;
+      Vz = 8.0;
+      break;
+    default:
+      Vy = 8.0;
+      Vz = 44.0;
+      break;
+  }
+  
+  let Vx = Vz * Math.tan(theta_shot);
+  
+  return { x: Vx, y: Vy, z: Vz };
+}
+
+/**
+ * Dynamically evaluate runs based on final physical distance and bounce status.
+ */
+export function evaluateFinalOutcome(distance: number, hasBounced: boolean): number {
+  if (distance >= 65 && !hasBounced) {
+    return 6;
+  } else if (distance >= 65 && hasBounced) {
+    return 4;
+  } else if (distance >= 40 && distance < 65) {
+    return distance >= 55 ? 3 : 2;
+  } else if (distance >= 15 && distance < 40) {
+    return distance >= 25 ? 2 : 1;
+  } else {
+    return distance >= 5 ? 1 : 0;
+  }
+}
+

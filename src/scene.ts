@@ -1,5 +1,6 @@
 import * as BABYLON from 'babylonjs';
 import { CameraMode } from './types';
+import { globalAutoAssistConfig } from './game';
 
 export class GameScene {
   public scene: BABYLON.Scene;
@@ -38,6 +39,12 @@ export class GameScene {
   public hasBotSwung: boolean = false;
   public botBattingTriggerCallback: (() => void) | null = null;
   
+  private currentBallVelocity: BABYLON.Vector3 | null = null;
+  private currentBallPos: BABYLON.Vector3 | null = null;
+  private ballPathPoints: BABYLON.Vector3[] = [];
+  private ballUnitDir: BABYLON.Vector3 | null = null;
+  private ballSideDir: BABYLON.Vector3 | null = null;
+  
   constructor(canvasElementId: string) {
     this.canvas = document.getElementById(canvasElementId) as unknown as HTMLCanvasElement;
     this.engine = new BABYLON.Engine(this.canvas, true);
@@ -50,11 +57,30 @@ export class GameScene {
     this.buildBall();
 
     this.scene.onBeforeRenderObservable.add(() => {
+      if (globalAutoAssistConfig.isBallInPlay) {
+        this.updateBallPhysics();
+      }
       if (this.isAnimatingBall && this.isBotBatting) {
-        if (this.ballMesh && this.ballMesh.position.z >= 6.9 && !this.hasBotSwung) {
+        // Swing trigger adjusted so collision mesh reaches crease center exactly when ball reaches z=9.4
+        // Ball travels ~0.33m/frame post-bounce. Swing takes 9 frames (0.15s), halfway is 4.5 frames.
+        // 4.5 * 0.33m = 1.5m before 9.4m => trigger at z >= 7.9
+        if (this.ballMesh && this.ballMesh.position.z >= 7.9 && !this.hasBotSwung) {
           this.hasBotSwung = true;
           if (this.botBattingTriggerCallback) {
             this.botBattingTriggerCallback();
+          }
+        }
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      // Crease-Zone Input Buffering (Easy Mode)
+      if (e.code === 'Space' && !this.isBotBatting && globalAutoAssistConfig.isRookie) {
+        if (this.isAnimatingBall && this.ballMesh) {
+          const z = this.ballMesh.position.z;
+          // Physical arrival zone definition
+          if (z >= 6.0 && z <= 9.4) {
+            globalAutoAssistConfig.bufferedTiming = 0.5; // Guaranteed valid timing offset (0 deviation)
           }
         }
       }
@@ -448,6 +474,10 @@ export class GameScene {
 
     const animateFrame = () => {
       if (!this.isAnimatingBall) return;
+      if (globalAutoAssistConfig.isDeliveryActive === false) {
+        this.isAnimatingBall = false;
+        return;
+      }
 
       let currentSpeedScale = speedScale;
       let fov = 75;
@@ -556,13 +586,13 @@ export class GameScene {
 
   public animateBatterSwing(_directionAngle: number, successCallback: () => void): void {
     if (this.batMesh && this.batterMesh) {
-      // Temporarily rotate batter and bat to swing
+      // Temporarily rotate batter and bat to swing (9 frames at 60fps = 0.15s)
       const swingAnim = BABYLON.Animation.CreateAndStartAnimation(
         'batterSwing',
         this.batMesh,
         'rotation.y',
         60,
-        12,
+        9,
         0,
         Math.PI * 0.9,
         BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
@@ -578,100 +608,114 @@ export class GameScene {
     }
   }
 
-  /**
-   * Animates a hit ball carrying towards the boundary and dynamically follows with the trajectory camera.
-   */
-  public animateHitPath(distance: number, direction: number): void {
+  private updateBallPhysics(): void {
+    if (!this.currentBallPos || !this.currentBallVelocity || !this.ballUnitDir || !this.ballSideDir || !this.ballMesh) return;
+
+    const ballRadius = 0.075;
+    if (this.currentBallPos.y < ballRadius) {
+      this.currentBallPos.y = ballRadius;
+      globalAutoAssistConfig.hasBounced = true;
+      // Ground drag application for rolling (0.12 coefficient)
+      const groundDrag = 0.12; 
+      this.currentBallVelocity.x *= Math.max(0, 1 - groundDrag);
+      this.currentBallVelocity.z *= Math.max(0, 1 - groundDrag);
+      // Turf bounce rebounds (0.55 coefficient)
+      this.currentBallVelocity.y = Math.abs(this.currentBallVelocity.y) * 0.55;
+    }
+
+    const currentSpeed = Math.sqrt(this.currentBallVelocity.x ** 2 + this.currentBallVelocity.z ** 2);
+    const distanceToOrigin = Math.sqrt(this.currentBallPos.x ** 2 + this.currentBallPos.z ** 2);
+    const isAtBoundary = distanceToOrigin >= 65;
+
+    if ((currentSpeed < 0.3 && this.currentBallPos.y <= 0.2) || isAtBoundary) {
+      globalAutoAssistConfig.isBallInPlay = false;
+      this.ballMesh?.setEnabled(false);
+      if (this.ballTrail) this.ballTrail.dispose();
+      
+      // Reset camera target to pitch center
+      if (this.activeCameraMode === 'follow_shot') {
+        this.cameras.follow_shot.setTarget(new BABYLON.Vector3(0, 0, 0));
+      }
+      
+      if (this.onBallResolvedCallback) this.onBallResolvedCallback();
+      return;
+    }
+
+    const dt = this.engine.getDeltaTime() / 1000;
+    // Apply gravity
+    if (this.currentBallPos.y > ballRadius) {
+        this.currentBallVelocity.y -= 9.81 * dt;
+    }
+    
+    this.currentBallPos.addInPlace(this.currentBallVelocity.scale(dt));
+    this.ballPathPoints.push(this.currentBallPos.clone());
+
+    this.ballMesh.position.copyFrom(this.currentBallPos);
+
+    // Dynamically track the ball mesh and its high trajectory arc
+    if (this.activeCameraMode === 'follow_shot') {
+      const camDistBehind = 7.0;
+      const camSideOffset = 3.2;
+      const camHeight = Math.max(3.5, this.currentBallPos.y * 0.55 + 2.5);
+
+      const camPos = new BABYLON.Vector3(
+        this.currentBallPos.x - this.ballUnitDir.x * camDistBehind + this.ballSideDir.x * camSideOffset,
+        camHeight,
+        this.currentBallPos.z - this.ballUnitDir.z * camDistBehind + this.ballSideDir.z * camSideOffset
+      );
+
+      // Smooth interpolation towards ball position
+      this.cameras.follow_shot.position = BABYLON.Vector3.Lerp(this.cameras.follow_shot.position, camPos, 0.1);
+      
+      const currentTarget = this.cameras.follow_shot.getTarget();
+      const newTarget = BABYLON.Vector3.Lerp(currentTarget, this.ballMesh.position, 0.1);
+      this.cameras.follow_shot.setTarget(newTarget);
+      
+      // Retain clear elevated FOV
+      this.cameras.follow_shot.fov = 75 * (Math.PI / 180);
+    }
+
+    // Draw custom line trail for hit path
+    const trailPoints = this.ballPathPoints.slice(Math.max(0, this.ballPathPoints.length - 10), this.ballPathPoints.length);
+    if (trailPoints.length > 1) {
+      if (this.ballTrail) this.ballTrail.dispose();
+      this.ballTrail = BABYLON.MeshBuilder.CreateLines('ballTrail', {
+        points: trailPoints,
+        updatable: true
+      }, this.scene);
+      this.ballTrail.color = new BABYLON.Color3(1, 0.85, 0.2);
+    }
+  }
+
+  public animateHitPath(distance: number, direction: number, V_out?: { x: number, y: number, z: number }): void {
     this.isAnimatingBall = false;
     this.ballMesh?.setEnabled(true);
     
     // Transition active camera to follow_shot trajectory view immediately upon bat contact
     this.setCameraMode('follow_shot');
     
-    // Calculate 3D end coordinates based on direction (0-7 clock slices)
     const angle = (direction * Math.PI) / 4 - Math.PI / 2;
-    const carryDistance = Math.min(65, distance); // visual clamp to boundary
-    
-    let xOffset = Math.cos(angle) * carryDistance;
-    if (this.batterHand === 'RHB') {
-      xOffset = -xOffset; // RHB Off-side is negative X, Leg-side is positive X
-    }
-    
-    const endPoint = new BABYLON.Vector3(
-      xOffset,
-      0.15,
-      10 + Math.sin(angle) * carryDistance
-    );
-
     const startPoint = new BABYLON.Vector3(this.batterMesh?.position.x || 0, 0.4, 9.4);
-    const midpoint = BABYLON.Vector3.Center(startPoint, endPoint);
-    midpoint.y = Math.max(3, distance * 0.15); // visual height scales with distance
-
-    // Compute flight direction vectors for dynamic camera framing behind and to the side of the arc
-    const flightDir = endPoint.subtract(startPoint);
-    flightDir.y = 0;
-    const horizDist = flightDir.length();
-    const unitDir = horizDist > 0.001 ? flightDir.scale(1 / horizDist) : new BABYLON.Vector3(0, 0, -1);
-    const sideDir = new BABYLON.Vector3(-unitDir.z, 0, unitDir.x);
-
-    const points: BABYLON.Vector3[] = [];
-    const steps = 80;
     
-    // Generate parabola to boundary
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const x = BABYLON.Scalar.Lerp(startPoint.x, endPoint.x, t);
-      const z = BABYLON.Scalar.Lerp(startPoint.z, endPoint.z, t);
-      const y = BABYLON.Scalar.Lerp(startPoint.y, endPoint.y, t) + Math.sin(t * Math.PI) * midpoint.y;
-      points.push(new BABYLON.Vector3(x, y, z));
+    let currentVelocity = V_out 
+      ? new BABYLON.Vector3(V_out.x, V_out.y, V_out.z) 
+      : new BABYLON.Vector3(Math.cos(angle) * (distance / 2), Math.max(10, distance * 0.3), Math.sin(angle) * (distance / 2));
+      
+    if (this.batterHand === 'RHB' && !V_out) {
+      currentVelocity.x = -currentVelocity.x;
     }
 
-    // Run animation frames
-    let animIdx = 0;
+    this.ballPathPoints = [startPoint.clone()];
+    this.currentBallPos = startPoint.clone();
+    this.currentBallVelocity = currentVelocity;
 
-    const animateHit = () => {
-      if (animIdx >= points.length) {
-        this.ballMesh?.setEnabled(false);
-        if (this.ballTrail) this.ballTrail.dispose();
-        if (this.onBallResolvedCallback) this.onBallResolvedCallback();
-        return;
-      }
-
-      const currentBallPos = points[animIdx];
-      this.ballMesh?.position.copyFrom(currentBallPos);
-
-      // Dynamically track the ball mesh and its high trajectory arc
-      if (this.activeCameraMode === 'follow_shot' && this.ballMesh) {
-        const camDistBehind = 7.0;
-        const camSideOffset = 3.2;
-        const camHeight = Math.max(3.5, currentBallPos.y * 0.55 + 2.5);
-
-        const camPos = new BABYLON.Vector3(
-          currentBallPos.x - unitDir.x * camDistBehind + sideDir.x * camSideOffset,
-          camHeight,
-          currentBallPos.z - unitDir.z * camDistBehind + sideDir.z * camSideOffset
-        );
-
-        this.cameras.follow_shot.position.copyFrom(camPos);
-        this.cameras.follow_shot.setTarget(this.ballMesh.position);
-      }
-
-      // Draw custom line trail for hit path
-      const trailPoints = points.slice(Math.max(0, animIdx - 10), animIdx + 1);
-      if (trailPoints.length > 1) {
-        if (this.ballTrail) this.ballTrail.dispose();
-        this.ballTrail = BABYLON.MeshBuilder.CreateLines('ballTrail', {
-          points: trailPoints,
-          updatable: true
-        }, this.scene);
-        this.ballTrail.color = new BABYLON.Color3(1, 0.85, 0.2);
-      }
-
-      animIdx++;
-      requestAnimationFrame(animateHit);
-    };
-
-    animateHit();
+    // Flight direction for camera
+    const unitDir = currentVelocity.clone().normalize();
+    unitDir.y = 0;
+    this.ballSideDir = new BABYLON.Vector3(-unitDir.z, 0, unitDir.x);
+    this.ballUnitDir = unitDir;
+    
+    globalAutoAssistConfig.isBallInPlay = true;
   }
 
   public animateMissWicket(isWicket: boolean): void {

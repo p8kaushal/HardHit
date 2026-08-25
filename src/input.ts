@@ -1,4 +1,5 @@
 import { InputIntent, ShotType } from './types';
+import { globalAutoAssistConfig } from './game';
 
 export let activeInputManager: KeyboardInputManager | null = null;
 
@@ -260,6 +261,34 @@ export class KeyboardInputManager {
     // 3. Swing trigger (Spacebar)
     if (e.code === 'Space' && !this.spacePressed) {
       this.spacePressed = true;
+      
+      // Calculate temporal Time-To-Impact (TTI) engine
+      const t_input = performance.now();
+      
+      const releaseZ = 10.5;
+      const creaseZ = -8.2;
+      const vZ = 20.0;
+      const deceleration = 0.15;
+      const timeDilation = 1.0;
+      
+      // We calculate flightDurationSeconds
+      const distance = Math.abs(creaseZ - releaseZ);
+      const flightDurationSeconds = (distance / vZ) * timeDilation * (1 + deceleration);
+      
+      const deliveryStartTime = globalAutoAssistConfig.deliveryStartTime || (t_input - 500);
+      const t_arrival_ms = deliveryStartTime + (flightDurationSeconds * 1000);
+      
+      const delta_t_ms = Math.abs(t_input - (t_arrival_ms - 150));
+      globalAutoAssistConfig.delta_t = delta_t_ms;
+      
+      // Calculate ballZ based on time elapsed since deliveryStartTime
+      const timeElapsedSec = (t_input - deliveryStartTime) / 1000;
+      // Ball travels from bowler stumps (z ≈ -11.5) to batsman stumps (z ≈ 9.4)
+      const calculatedBallZ = -11.5 + (20.0 * timeElapsedSec);
+      globalAutoAssistConfig.ballZ = calculatedBallZ;
+      
+      console.log("[BATTING TELEMETRY]", { t_input, t_arrival_ms, delta_t_ms, ballZ: calculatedBallZ });
+      
       this.onBatSwing(this.intent.aimDirection, this.intent.shotType);
     }
   }

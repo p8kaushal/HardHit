@@ -1,8 +1,8 @@
-import { MatchController } from './game';
+import { MatchController, globalAutoAssistConfig } from './game';
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseShot } from './bot';
-import { checkExtraBall, getLineTypeFromAimX, SIX_THRESHOLD } from './formula';
+import { checkExtraBall, getLineTypeFromAimX, SIX_THRESHOLD, calculateShotTrajectory } from './formula';
 import { KeyboardInputManager } from './input';
 
 export class UIManager {
@@ -521,7 +521,35 @@ export class UIManager {
       () => {
         this.hideBattingHelper();
         this.isBannerActive = false;
-        this.setupActiveTurn();
+        
+        // Finalize runs dynamically if ball was hit
+        const innings = this.controller.getCurrentInnings();
+        const lastBall = innings.balls[innings.balls.length - 1];
+        if (lastBall && lastBall.shot && !lastBall.isWicket) {
+          const finalDistance = Math.sqrt((this.gameScene as any).currentBallPos?.x ** 2 + (this.gameScene as any).currentBallPos?.z ** 2) || lastBall.distance;
+          const hasBounced = globalAutoAssistConfig.hasBounced || false;
+          
+          const runs = this.controller.finalizeBallOutcome(finalDistance, hasBounced);
+          
+          let title = `${runs} RUNS`;
+          let desc = `Shot yielded ${runs} runs.`;
+          if (runs === 6) {
+             title = `SIX! ${finalDistance.toFixed(1)}m`;
+             desc = `Cleared the boundary at Aim Direction ${lastBall.shot.direction}!`;
+          } else if (runs === 4) {
+             title = `FOUR!`;
+             desc = `Bounced over the boundary!`;
+          } else if (runs === 0) {
+             title = `Dot Ball`;
+             desc = `Fielded safely. 0 runs.`;
+          }
+          this.showResultToast(title, desc);
+          this.updateHUD();
+        }
+
+        setTimeout(() => {
+          this.setupActiveTurn();
+        }, 1500);
       },
       true, // overTheWicket
       () => { // onCreaseCrossed
@@ -548,22 +576,27 @@ export class UIManager {
       title = outcome.wicketReason || 'Extra Ball!';
       desc = 'Bowler committed an illegal delivery. Extra ball!';
       this.gameScene.animateMissWicket(false);
+      this.showResultToast(title, desc);
     } else if (outcome.isWicket) {
       title = 'WICKET!';
       desc = outcome.wicketReason;
       this.gameScene.animateMissWicket(true);
-    } else if (outcome.distance >= SIX_THRESHOLD) {
-      title = `SIX! ${outcome.distance.toFixed(1)}m`;
-      desc = `Cleared the boundary at Aim Direction ${outcome.shot?.direction}!`;
-      this.gameScene.animateHitPath(outcome.distance, outcome.shot?.direction || 0);
-      this.controller.setCameraMode('follow_shot');
+      this.showResultToast(title, desc);
+    } else if (outcome.shot) {
+      const theta_shot = (outcome.shot.direction * Math.PI) / 4 - Math.PI / 2;
+      const vOut = calculateShotTrajectory(1, 0.5, 0.5, theta_shot, {x:0, y:0, z:0}, {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type);
+      
+      this.gameScene.animateHitPath(outcome.distance, outcome.shot.direction, vOut);
+      if (outcome.distance >= SIX_THRESHOLD) {
+        this.controller.setCameraMode('follow_shot');
+      }
+      // Result toast is deferred to onBallResolvedCallback
     } else {
       title = 'Dot Ball';
-      desc = outcome.shot ? 'Shot failed to clear the boundary. 0 runs scored.' : (outcome.wicketReason || 'A swing and a miss!');
+      desc = outcome.wicketReason || 'A swing and a miss!';
       this.gameScene.animateMissWicket(false);
+      this.showResultToast(title, desc);
     }
-
-    this.showResultToast(title, desc);
   }
 
   // --- Result Toast Management ---
