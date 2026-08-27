@@ -14,13 +14,15 @@ export const globalAutoAssistConfig: {
   ballZ?: number,
   isDeliveryActive?: boolean,
   isBallInPlay?: boolean,
-  hasBounced?: boolean
+  hasBounced?: boolean,
+  removeTrajectoryObserver?: () => void;
+  resetSceneForInnings?: () => void;
 } = {
   isRookie: false,
   currentDelivery: null,
   batterHand: 'RHB',
   bufferedTiming: null,
-  isDeliveryActive: true,
+  isDeliveryActive: false,
   isBallInPlay: false,
   hasBounced: false
 };
@@ -134,9 +136,18 @@ export class MatchController {
   }
 
   public reset(): void {
+    if (globalAutoAssistConfig.isBallInPlay) return;
     const player = getOrCreatePlayer();
     const bot = createBotPlayer(this.botDifficulty);
     this.state = this.createInitialMatchState(player, bot);
+  }
+
+  public nextBall(): void {
+    if (globalAutoAssistConfig.isBallInPlay) return;
+  }
+
+  public resetPositions(): void {
+    if (globalAutoAssistConfig.isBallInPlay) return;
   }
 
   private createInitialMatchState(player: Player, bot: Player): MatchState {
@@ -193,6 +204,7 @@ export class MatchController {
   }
 
   public startMatch(): void {
+    if (globalAutoAssistConfig.isBallInPlay) return;
     this.state.status = 'playing';
     this.state.currentInningsIndex = 0;
     this.updateActiveCameraMode();
@@ -401,44 +413,96 @@ export class MatchController {
     // In case of wicket or extra, we can transition immediately, but we will rely on ui.ts delayed reset.
     // So we can still evaluate it here. But we will remove checkInningsTransitions from here for hits.
     if (isWicket || distance === 0) {
-      this.checkInningsTransitions();
+      this.handleInningsCompletion();
     }
     return outcome;
   }
 
-  public finalizeBallOutcome(distance: number, hasBounced: boolean): number {
-    const innings = this.getCurrentInnings();
-    
-    // Evaluate outcome using formula
-    const runs = evaluateFinalOutcome(distance, hasBounced);
-    
-    innings.score += runs;
-    if (runs === 6) {
-      innings.biggestSix = Math.max(innings.biggestSix, distance);
+  public finalizeBallOutcome(rawDistance: number, hasBounced: boolean): number {
+    try {
+      let distance = rawDistance;
+      if (isNaN(distance) || !isFinite(distance) || distance < 0) {
+        distance = 0.0;
+      }
+      distance = Math.min(distance, 130.0);
+
+      const innings = this.getCurrentInnings();
+      
+      // Evaluate outcome using formula
+      const runs = evaluateFinalOutcome(distance, hasBounced);
+      
+      innings.score += runs;
+      if (runs === 6) {
+        innings.biggestSix = Math.max(innings.biggestSix, distance);
+      }
+      
+      const lastBall = innings.balls[innings.balls.length - 1];
+      if (lastBall) {
+        lastBall.distance = distance;
+      }
+      
+      console.log(`[GAME EVENT] Dynamic resolution: ${distance.toFixed(1)}m, bounced: ${hasBounced} => ${runs} runs. Score: ${innings.score}`);
+      this.handleInningsCompletion();
+      return runs;
+    } catch (e) {
+      console.error("[BALL TRACKING CRASH GUARD]", e);
+      return 0;
     }
-    
-    const lastBall = innings.balls[innings.balls.length - 1];
-    if (lastBall) {
-      lastBall.distance = distance;
-    }
-    
-    console.log(`[GAME EVENT] Dynamic resolution: ${distance.toFixed(1)}m, bounced: ${hasBounced} => ${runs} runs. Score: ${innings.score}`);
-    this.checkInningsTransitions();
-    return runs;
   }
 
-  private checkInningsTransitions(): void {
+  public handleInningsCompletion(): void {
     const currentInnings = this.getCurrentInnings();
     if (currentInnings.finished) {
-      // If we are at an even index (0, 2, 4), move to the next innings
-      if (this.state.currentInningsIndex % 2 === 0) {
-        this.state.currentInningsIndex++;
-        console.log(`[GAME EVENT] Transitioning to Innings ${this.state.currentInningsIndex + 1}. Swapping roles.`);
-        this.updateActiveCameraMode();
-      } else {
-        // End of the pair, resolve match or tie-break
-        this.resolveMatch();
+      if (globalAutoAssistConfig.removeTrajectoryObserver) {
+        globalAutoAssistConfig.removeTrajectoryObserver();
       }
+      globalAutoAssistConfig.isBallInPlay = false;
+      globalAutoAssistConfig.isDeliveryActive = false;
+      
+      if (globalAutoAssistConfig.resetSceneForInnings) {
+        globalAutoAssistConfig.resetSceneForInnings();
+      }
+
+      // Overlay
+      const overlay = document.createElement('div');
+      overlay.id = 'innings-transition-overlay';
+      overlay.style.position = 'absolute';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.width = '100vw';
+      overlay.style.height = '100vh';
+      overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+      overlay.style.color = 'white';
+      overlay.style.display = 'flex';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+      overlay.style.fontSize = '3rem';
+      overlay.style.fontWeight = 'bold';
+      overlay.style.zIndex = '9999';
+      overlay.innerText = 'INNINGS OVER - PREPARING TO BOWL';
+      document.body.appendChild(overlay);
+
+      // Restore bowling panel controls immediately
+      const controlBowling = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
+      if (controlBowling) {
+        controlBowling.classList.remove('hidden', 'panel-hidden');
+      }
+
+      setTimeout(() => {
+        if (overlay.parentNode) {
+          overlay.parentNode.removeChild(overlay);
+        }
+        
+        // If we are at an even index (0, 2, 4), move to the next innings
+        if (this.state.currentInningsIndex % 2 === 0) {
+          this.state.currentInningsIndex++;
+          console.log(`[GAME EVENT] Transitioning to Innings ${this.state.currentInningsIndex + 1}. Swapping roles.`);
+          this.updateActiveCameraMode();
+        } else {
+          // End of the pair, resolve match or tie-break
+          this.resolveMatch();
+        }
+      }, 2000);
     }
   }
 
@@ -655,3 +719,13 @@ export class MatchController {
     savePlayer(player);
   }
 }
+
+  export function startBotDelivery(ball: any): void {
+    if (ball) {
+      ball.isVisible = true;
+      ball.setEnabled(true);
+      if (ball.position) {
+        ball.position.set(0.0, 1.8, 16.5);
+      }
+    }
+  }

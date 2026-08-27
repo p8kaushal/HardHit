@@ -1,0 +1,8 @@
+--- src/scene.ts
++++ src/scene.ts
+@@ -10,6 +10,5 @@
+   // Cameras
+-  private cameras!: Record<CameraMode, BABYLON.TargetCamera>;
+-  private activeCameraMode: CameraMode = 'stadium_wide';
++  private primaryCamera!: BABYLON.ArcRotateCamera;
+ 

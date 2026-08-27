@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig } from './game';
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseShot } from './bot';
-import { checkExtraBall, getLineTypeFromAimX, SIX_THRESHOLD, calculateShotTrajectory } from './formula';
+import { checkExtraBall, getLineTypeFromAimX, SIX_THRESHOLD, calculateShotTrajectory, calculateShotDistance } from './formula';
 import { KeyboardInputManager } from './input';
 
 export class UIManager {
@@ -378,11 +378,14 @@ export class UIManager {
   // --- Batting Swings ---
 
   private executeKeyboardBatSwing(): void {
+    const recShotHud = document.getElementById('recommended-shot-hud');
+    if (recShotHud) {
+      recShotHud.style.display = 'none';
+      recShotHud.innerText = '';
+    }
     if (this.isBannerActive) {
       this.executeBattingSwingGesture(0, this.selectedShotType, 0.5);
-      this.isBannerActive = false;
-      const banner = document.getElementById('hit-space-banner');
-      if (banner) banner.style.display = 'none';
+      this.hideAssistedPrompt();
     } else {
       // Keyboard fallback swing
       const clockDirection = 0; // Straight up
@@ -394,6 +397,7 @@ export class UIManager {
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     if ((!isPlayerBatting && simulatedTiming === undefined) || !this.activeDelivery || this.activeShot) return;
 
+    this.hideAssistedPrompt();
     // Auto-hide panels to clear view
     const controlBatting = document.getElementById('control-batting') || document.getElementById('setup-batting-panel');
     if (controlBatting) controlBatting.classList.add('hidden', 'panel-hidden');
@@ -457,7 +461,16 @@ export class UIManager {
     }
   }
 
+  public hideAssistedPrompt(): void {
+    const banner = document.getElementById('hit-space-banner');
+    if (banner) {
+      banner.style.display = 'none';
+    }
+    this.isBannerActive = false;
+  }
+
   private hideBattingHelper(): void {
+    this.hideAssistedPrompt();
     const helper = document.getElementById('batting-helper');
     if (helper) helper.innerHTML = '';
   }
@@ -470,6 +483,11 @@ export class UIManager {
     this.deliveryStartFrame = Date.now();
 
     // Lock camera in pre-contact player perspective before delivery commences
+    const recShotHud = document.getElementById('recommended-shot-hud');
+    if (recShotHud) {
+      recShotHud.style.display = 'none';
+      recShotHud.innerText = '';
+    }
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     const preContactCam = isPlayerBatting ? 'batter_eye' : 'bowler_eye';
     this.gameScene.setCameraMode(preContactCam);
@@ -515,26 +533,29 @@ export class UIManager {
       this.activeDelivery.releaseTiming,
       () => {
         this.hideBattingHelper();
+        this.hideAssistedPrompt();
         this.isBannerActive = false;
         this.handleBallArrivalAtStumps();
       },
       () => {
         this.hideBattingHelper();
+        this.hideAssistedPrompt();
         this.isBannerActive = false;
         
         // Finalize runs dynamically if ball was hit
         const innings = this.controller.getCurrentInnings();
         const lastBall = innings.balls[innings.balls.length - 1];
         if (lastBall && lastBall.shot && !lastBall.isWicket) {
-          const finalDistance = Math.sqrt((this.gameScene as any).currentBallPos?.x ** 2 + (this.gameScene as any).currentBallPos?.z ** 2) || lastBall.distance;
+          const currentPos = (this.gameScene as any).currentBallPos;
+          let shotDistanceMeters = currentPos ? calculateShotDistance({ position: currentPos }) : (lastBall.distance || 0);
           const hasBounced = globalAutoAssistConfig.hasBounced || false;
           
-          const runs = this.controller.finalizeBallOutcome(finalDistance, hasBounced);
+          const runs = this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced);
           
           let title = `${runs} RUNS`;
           let desc = `Shot yielded ${runs} runs.`;
           if (runs === 6) {
-             title = `SIX! ${finalDistance.toFixed(1)}m`;
+             title = `SIX! ${(shotDistanceMeters || 0).toFixed(1)}m`;
              desc = `Cleared the boundary at Aim Direction ${lastBall.shot.direction}!`;
           } else if (runs === 4) {
              title = `FOUR!`;
@@ -553,7 +574,7 @@ export class UIManager {
       },
       true, // overTheWicket
       () => { // onCreaseCrossed
-        // Handled early by setTimeout above
+        this.hideAssistedPrompt();
       },
       isSlowMotion
     );
@@ -1427,3 +1448,19 @@ export function renderLeaderboard(): void {
     leaderboardBody.innerHTML = '<tr class="empty-row"><td colspan="5">No matches played yet. Step onto the pitch to set your high score!</td></tr>';
   }
 }
+
+  export function resetHUD(): void {
+    const recShotHud = document.getElementById('recommended-shot-hud');
+    if (recShotHud) {
+      recShotHud.style.display = 'none';
+      recShotHud.innerText = '';
+    }
+  }
+
+  export function startDelivery(): void {
+    const recShotHud = document.getElementById('recommended-shot-hud');
+    if (recShotHud) {
+      recShotHud.style.display = 'none';
+      recShotHud.innerText = '';
+    }
+  }

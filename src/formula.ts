@@ -488,3 +488,15 @@ export function evaluateFinalOutcome(distance: number, hasBounced: boolean): num
   }
 }
 
+
+export function calculateShotDistance(ball: { position: { x: number, z: number } } | any): number {
+  if (!ball || !ball.position) return 0.0;
+  const dx = ball.position.x - 0.0;
+  const dz = ball.position.z - (-18.5);
+  let shotDistanceMeters = Math.hypot(dx, dz);
+  
+  if (isNaN(shotDistanceMeters) || !isFinite(shotDistanceMeters) || shotDistanceMeters < 0) {
+    shotDistanceMeters = 0.0;
+  }
+  return Math.min(shotDistanceMeters, 130.0);
+}
