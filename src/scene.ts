@@ -241,8 +241,8 @@ export class GameScene {
     
     // Smooth snaps or fixed snaps depending on mode
     if (mode === 'batter_eye') {
-      this.primaryCamera.position = new BABYLON.Vector3(0.0, 2.8, -22.5);
-      this.primaryCamera.setTarget(new BABYLON.Vector3(0.0, 1.2, 15.0));
+      this.primaryCamera.position = new BABYLON.Vector3(-1.8, 3.6, -23.5);
+      this.primaryCamera.setTarget(new BABYLON.Vector3(0.0, 1.0, -2.0));
       this.primaryCamera.fov = 0.85;
     } else if (mode === 'bowler_eye') {
       if (this.isBotBatting) {
@@ -287,6 +287,7 @@ export class GameScene {
     const batterContainer = new BABYLON.TransformNode('batterContainer', this.scene);
     const batterMat = new BABYLON.StandardMaterial('batterMat', this.scene);
     batterMat.diffuseColor = new BABYLON.Color3(0.9, 0.2, 0.4);
+    batterMat.alpha = 0.65;
 
     const bTorso = BABYLON.MeshBuilder.CreateCylinder('batterTorso', { height: 1.2, diameter: 0.4 }, this.scene);
     bTorso.position.y = 1.2;
