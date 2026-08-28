@@ -474,6 +474,34 @@ export function calculateShotTrajectory(
 /**
  * Dynamically evaluate runs based on final physical distance and bounce status.
  */
+export function getParabolicFlightPosition(
+  progress: number,
+  release: { x: number, y: number, z: number },
+  bounce: { x: number, y: number, z: number },
+  end: { x: number, y: number, z: number }
+): { x: number, y: number, z: number } {
+  const totalZ = end.z - release.z;
+  const t_bounce = totalZ !== 0 ? (bounce.z - release.z) / totalZ : 0.5;
+  
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  
+  if (progress <= t_bounce) {
+    const f = t_bounce > 0 ? progress / t_bounce : 1.0;
+    x = release.x + (bounce.x - release.x) * f;
+    z = release.z + (bounce.z - release.z) * f;
+    y = release.y + (bounce.y - release.y) * f + 0.4 * f * (1 - f);
+  } else {
+    const f = (1 - t_bounce) > 0 ? (progress - t_bounce) / (1 - t_bounce) : 1.0;
+    x = bounce.x + (end.x - bounce.x) * f;
+    z = bounce.z + (end.z - bounce.z) * f;
+    y = bounce.y + (end.y - bounce.y) * f + 0.3 * f * (1 - f);
+  }
+  
+  return { x, y, z };
+}
+
 export function evaluateFinalOutcome(distance: number, hasBounced: boolean): number {
   if (distance >= 65 && !hasBounced) {
     return 6;
