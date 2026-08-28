@@ -500,16 +500,25 @@ export class UIManager {
 
     this.isBannerActive = false;
 
-    if (isSlowMotion) {
-      const isRHB = this.controller.getCurrentInnings().batter.batterHand !== 'LHB';
-      let rec = 'Straight Drive [W]';
-      if (this.activeDelivery.aimTarget.x > 0.2) {
-        rec = isRHB ? 'Off-side Drive [W + D] or [D]' : 'Leg-side Pull [W + A] or [A]';
-      } else if (this.activeDelivery.aimTarget.x < -0.2) {
-        rec = isRHB ? 'Leg-side Pull [W + A] or [A]' : 'Off-side Drive [W + D] or [D]';
+    if (isPlayerBatting) {
+      const btnBat = document.getElementById('btn-bat-swing');
+      if (btnBat) btnBat.innerText = 'PRESS SPACE TO HIT';
+
+      if (isSlowMotion) {
+        const isRHB = this.controller.getCurrentInnings().batter.batterHand !== 'LHB';
+        let rec = 'Straight Drive [W]';
+        if (this.activeDelivery.aimTarget.x > 0.2) {
+          rec = isRHB ? 'Off-side Drive [W + D] or [D]' : 'Leg-side Pull [W + A] or [A]';
+        } else if (this.activeDelivery.aimTarget.x < -0.2) {
+          rec = isRHB ? 'Leg-side Pull [W + A] or [A]' : 'Off-side Drive [W + D] or [D]';
+        }
+        this.showBattingHelper(rec);
+      } else {
+        this.showBattingHelper('');
+        const recBanner = document.getElementById('recommended-shot-banner');
+        if (recBanner) recBanner.style.display = 'none';
       }
-      this.showBattingHelper(rec);
-      
+
       // Start polling for flight progression
       const checkFlight = () => {
         if (!this.isBallActive || !this.activeDelivery) return;
@@ -521,16 +530,9 @@ export class UIManager {
         } else {
           z = (this.gameScene as any).currentBallPos?.z || 0;
         }
-
-        // The user coordinate check specifies: "when ball reaches Z position z <= -8.0m" for Reaction Zone
-        // and "when the ball's position passes crease Z (z <= -19.5m)" for Crease Pass
-        // In GameScene.animateDelivery, Z starts at -10.5 and ends at 10.0 (if standard coordinates),
-        // but if using the coordinate system from the prompt, we assume it reaches -8.0 and -19.5.
-        // We will do a robust check that handles both systems (if ball drops below -8.0 or -19.5, or crosses positive 8.0/9.4).
         
-        const isStandard = z > -11 && z < 11;
-        const reactionTrigger = isStandard ? (z >= 6.0) : (z <= -8.0);
-        const creaseTrigger = isStandard ? (z >= 9.4) : (z <= -19.5);
+        const reactionTrigger = z <= -8.0;
+        const creaseTrigger = z <= -19.5;
 
         if (creaseTrigger) {
           this.hideAssistedPrompt();
@@ -846,6 +848,10 @@ export class UIManager {
       this.controller.setCameraMode('batter_eye');
       if (controlBatting) {
         controlBatting.classList.remove('hidden', 'panel-hidden');
+      }
+      const btnBat = document.getElementById('btn-bat-swing');
+      if (btnBat) {
+        btnBat.innerText = 'Select Shot & Direction';
       }
       if (controlBowling) {
         controlBowling.classList.add('hidden', 'panel-hidden');
