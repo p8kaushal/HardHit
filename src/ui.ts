@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseShot } from './bot';
-import { checkExtraBall, getLineTypeFromAimX, SIX_THRESHOLD, calculateShotTrajectory, calculateShotDistance } from './formula';
+import { checkExtraBall, getLineTypeFromAimX, SIX_THRESHOLD, calculateShotTrajectory, calculateShotDistance, getDirectionName, evaluateFinalOutcome } from './formula';
 import { KeyboardInputManager } from './input';
 
 export class UIManager {
@@ -87,6 +87,7 @@ export class UIManager {
     const batTypeButtons = document.querySelectorAll('#bat-type-group .btn');
     batTypeButtons.forEach(btn => {
       btn.addEventListener('click', (e) => {
+        if (globalAutoAssistConfig.isDeliveryActive) return;
         batTypeButtons.forEach(b => b.classList.remove('active'));
         const target = e.currentTarget as HTMLButtonElement;
         target.classList.add('active');
@@ -158,6 +159,7 @@ export class UIManager {
     const clockButtons = document.querySelectorAll('#aim-clock .clock-btn');
     clockButtons.forEach(btn => {
       btn.addEventListener('click', (e) => {
+        if (globalAutoAssistConfig.isDeliveryActive) return;
         clockButtons.forEach(b => b.classList.remove('active'));
         const target = e.currentTarget as HTMLButtonElement;
         target.classList.add('active');
@@ -564,38 +566,61 @@ export class UIManager {
     };
     
     const onResolvedCb = () => {
+      // Step 1: Detect that the ball has come to a rest or crossed boundary (triggers this callback)
       this.hideBattingHelper();
       this.hideAssistedPrompt();
       this.isBannerActive = false;
       
       const innings = this.controller.getCurrentInnings();
       const lastBall = innings.balls[innings.balls.length - 1];
+      
+      let shotDistanceMeters = 0;
+      let hasBounced = false;
+
       if (lastBall && lastBall.shot && !lastBall.isWicket) {
         const currentPos = (this.gameScene as any).currentBallPos;
-        let shotDistanceMeters = currentPos ? calculateShotDistance({ position: currentPos }) : (lastBall.distance || 0);
-        const hasBounced = globalAutoAssistConfig.hasBounced || false;
+        shotDistanceMeters = currentPos ? calculateShotDistance({ position: currentPos }) : (lastBall.distance || 0);
+        hasBounced = globalAutoAssistConfig.hasBounced || false;
         
-        const runs = this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced);
+        const runs = evaluateFinalOutcome(shotDistanceMeters, hasBounced);
         
         let title = `${runs} RUNS`;
         let desc = `Shot yielded ${runs} runs.`;
         if (runs === 6) {
            title = `SIX! ${(shotDistanceMeters || 0).toFixed(1)}m`;
-           desc = `Cleared the boundary at Aim Direction ${lastBall.shot.direction}!`;
+           desc = `Cleared the boundary towards ${getDirectionName(lastBall.shot.direction)}!`;
         } else if (runs === 4) {
            title = `FOUR!`;
-           desc = `Bounced over the boundary!`;
+           desc = `Bounced over the boundary towards ${getDirectionName(lastBall.shot.direction)}!`;
         } else if (runs === 0) {
            title = `Dot Ball`;
            desc = `Fielded safely. 0 runs.`;
         }
+        // Step 2: Freeze the tracking camera target on ball's final location and display scoring result banner for exactly 2.0 seconds
         this.showResultToast(title, desc);
-        this.updateHUD();
       }
 
       setTimeout(() => {
-        this.setupActiveTurn();
-      }, 1500);
+        // Step 3: Fade out and hide the result banner overlay completely
+        this.hideResultToast();
+
+        if (lastBall && lastBall.shot && !lastBall.isWicket) {
+          // Step 4: Add points/update active scoreboard HUD scores
+          this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced);
+          this.updateHUD();
+        }
+
+        // Step 5: LERP the camera back to crease setup view coordinates and unlock control panels for next delivery
+        if (this.controller.state.status === 'playing') {
+          const playerCam = this.controller.getActiveCameraMode();
+          this.gameScene.setCameraMode(playerCam);
+          this.controller.updateActiveCameraMode();
+        }
+        
+        if ((this as any).setupActiveTurn) {
+          (this as any).setupActiveTurn();
+        }
+      }, 2000);
     };
 
     if (isPlayerBatting) {

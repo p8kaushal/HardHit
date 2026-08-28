@@ -222,41 +222,43 @@ export class KeyboardInputManager {
     if (e.key.toLowerCase() === 'q') (this.intent as any).footwork = 'front';
     if (e.key.toLowerCase() === 'e') (this.intent as any).footwork = 'back';
     
-    // Calculate 8-way direction based on WASD or Arrows
-    const up = this.pressedKeys.has('w') || this.pressedKeys.has('arrowup');
-    const down = this.pressedKeys.has('s') || this.pressedKeys.has('arrowdown');
-    const left = this.pressedKeys.has('a') || this.pressedKeys.has('arrowleft');
-    const right = this.pressedKeys.has('d') || this.pressedKeys.has('arrowright');
+    if (!globalAutoAssistConfig.isDeliveryActive) {
+      // Calculate 8-way direction based on WASD or Arrows
+      const up = this.pressedKeys.has('w') || this.pressedKeys.has('arrowup');
+      const down = this.pressedKeys.has('s') || this.pressedKeys.has('arrowdown');
+      const left = this.pressedKeys.has('a') || this.pressedKeys.has('arrowleft');
+      const right = this.pressedKeys.has('d') || this.pressedKeys.has('arrowright');
 
-    let dir = -1;
-    if (up && !right && !left) dir = 0; // Straight
-    else if (up && right) dir = 1; // Off-Side High
-    else if (right && !up && !down) dir = 2; // Off-Side Flat
-    else if (down && right) dir = 3; // Behind Off
-    else if (down && !right && !left) dir = 4; // Behind Leg
-    else if (down && left) dir = 5; // Behind Leg High
-    else if (left && !up && !down) dir = 6; // Leg-Side Flat
-    else if (up && left) dir = 7; // Leg-Side High
+      let dir = -1;
+      if (up && !right && !left) dir = 0; // Straight
+      else if (up && right) dir = 1; // Off-Side High
+      else if (right && !up && !down) dir = 2; // Off-Side Flat
+      else if (down && right) dir = 3; // Behind Off
+      else if (down && !right && !left) dir = 4; // Behind Leg
+      else if (down && left) dir = 5; // Behind Leg High
+      else if (left && !up && !down) dir = 6; // Leg-Side Flat
+      else if (up && left) dir = 7; // Leg-Side High
 
-    if (dir !== -1) {
-      this.intent.aimDirection = dir;
-      this.syncAimClockDOM();
+      if (dir !== -1) {
+        this.intent.aimDirection = dir;
+        this.syncAimClockDOM();
+      }
+
+      // Numpad 1-8 Direct selection
+      if (e.code.startsWith('Numpad') && e.key >= '1' && e.key <= '8') {
+        const num = parseInt(e.key) - 1;
+        this.intent.aimDirection = num;
+        this.syncAimClockDOM();
+      }
+
+      // 2. Shot Type Selector (Keys 1-4)
+      if (e.key === '1') this.intent.shotType = 'lofted';
+      else if (e.key === '2') this.intent.shotType = 'power';
+      else if (e.key === '3') this.intent.shotType = 'grounded';
+      else if (e.key === '4') this.intent.shotType = 'defensive';
+
+      this.syncShotTypeDOM();
     }
-
-    // Numpad 1-8 Direct selection
-    if (e.code.startsWith('Numpad') && e.key >= '1' && e.key <= '8') {
-      const num = parseInt(e.key) - 1;
-      this.intent.aimDirection = num;
-      this.syncAimClockDOM();
-    }
-
-    // 2. Shot Type Selector (Keys 1-4)
-    if (e.key === '1') this.intent.shotType = 'lofted';
-    else if (e.key === '2') this.intent.shotType = 'power';
-    else if (e.key === '3') this.intent.shotType = 'grounded';
-    else if (e.key === '4') this.intent.shotType = 'defensive';
-
-    this.syncShotTypeDOM();
 
     // 3. Swing trigger (Spacebar)
     if (e.code === 'Space' && !this.spacePressed) {

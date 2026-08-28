@@ -541,3 +541,17 @@ export function calculateShotDistance(ball: { position: { x: number, z: number }
   }
   return Math.min(shotDistanceMeters, 130.0);
 }
+
+export function getDirectionName(dir: number): string {
+  switch(dir) {
+    case 0: return "Straight Drive";
+    case 1: return "Off-side Cover Drive";
+    case 2: return "Point / Square Cut";
+    case 3: return "Third Man / Behind Off";
+    case 4: return "Fine Leg / Behind Leg";
+    case 5: return "Leg-side glance";
+    case 6: return "On-side sweep";
+    case 7: return "Leg-side On Drive / Pull";
+    default: return "Unknown Direction";
+  }
+}
