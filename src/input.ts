@@ -1,5 +1,5 @@
 import { InputIntent, ShotType } from './types';
-import { globalAutoAssistConfig } from './game';
+import { globalAutoAssistConfig, resolveShot } from './game';
 
 export let activeInputManager: KeyboardInputManager | null = null;
 
@@ -288,6 +288,17 @@ export class KeyboardInputManager {
       globalAutoAssistConfig.ballZ = calculatedBallZ;
       
       console.log("[BATTING TELEMETRY]", { t_input, t_arrival_ms, delta_t_ms, ballZ: calculatedBallZ });
+      
+      // Clear HUD instantly on swing
+      const banner = document.getElementById('hit-space-banner');
+      if (banner) banner.style.display = 'none';
+      const recBanner = document.getElementById('recommended-shot-banner');
+      if (recBanner) recBanner.style.display = 'none';
+
+      const delivery = globalAutoAssistConfig.currentDelivery;
+      const botTier = 'Medium'; // fallback
+      const deliveryLength = delivery ? delivery.length : 'good';
+      resolveShot(delta_t_ms, botTier, this.intent.shotType, deliveryLength);
       
       this.onBatSwing(this.intent.aimDirection, this.intent.shotType);
     }

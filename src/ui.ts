@@ -360,6 +360,7 @@ export class UIManager {
       type: this.selectedBowlType,
       releaseTiming: finalTiming
     };
+    globalAutoAssistConfig.currentDelivery = this.activeDelivery;
 
     // Hide bowler setup panel
     document.getElementById('control-bowling')!.classList.add('hidden');
@@ -450,7 +451,7 @@ export class UIManager {
       document.body.appendChild(helper);
     }
     helper.innerHTML = `
-      <div style="color: #22d3ee; font-size: 1.5rem; font-weight: bold; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;">RECOMMENDED: ${recommendation}</div>
+      <div id="recommended-shot-banner" style="color: #22d3ee; font-size: 1.5rem; font-weight: bold; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;">RECOMMENDED: ${recommendation}</div>
       <div id="hit-space-banner" style="color: #4ade80; font-size: 2.5rem; font-weight: 900; margin-top: 10px; display: none; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 8px; border: 2px solid #4ade80; animation: pulse 1s infinite;">HIT SPACE NOW!</div>
     `;
     if (!document.getElementById('pulse-anim')) {
@@ -509,19 +510,46 @@ export class UIManager {
       }
       this.showBattingHelper(rec);
       
-      const releaseSpeed = this.activeDelivery.releaseTiming;
-      const speedScale = (1.0 + releaseSpeed * 0.5) * 0.35;
-      const framesToCrease = 55 / speedScale;
-      const timeToCreaseMs = framesToCrease * (1000 / 60);
-      const bannerDelay = Math.max(0, timeToCreaseMs - 180);
-      
-      setTimeout(() => {
-        if (this.activeDelivery && this.isBallActive) {
+      // Start polling for flight progression
+      const checkFlight = () => {
+        if (!this.isBallActive || !this.activeDelivery) return;
+        
+        let z = 0;
+        const ballMesh = this.gameScene.scene.getMeshByName('cricketBall');
+        if (ballMesh) {
+          z = ballMesh.position.z;
+        } else {
+          z = (this.gameScene as any).currentBallPos?.z || 0;
+        }
+
+        // The user coordinate check specifies: "when ball reaches Z position z <= -8.0m" for Reaction Zone
+        // and "when the ball's position passes crease Z (z <= -19.5m)" for Crease Pass
+        // In GameScene.animateDelivery, Z starts at -10.5 and ends at 10.0 (if standard coordinates),
+        // but if using the coordinate system from the prompt, we assume it reaches -8.0 and -19.5.
+        // We will do a robust check that handles both systems (if ball drops below -8.0 or -19.5, or crosses positive 8.0/9.4).
+        
+        const isStandard = z > -11 && z < 11;
+        const reactionTrigger = isStandard ? (z >= 6.0) : (z <= -8.0);
+        const creaseTrigger = isStandard ? (z >= 9.4) : (z <= -19.5);
+
+        if (creaseTrigger) {
+          this.hideAssistedPrompt();
+          this.hideBattingHelper();
+          return;
+        }
+
+        if (reactionTrigger) {
+          const recBanner = document.getElementById('recommended-shot-banner');
+          if (recBanner) recBanner.style.display = 'none';
+          
           const banner = document.getElementById('hit-space-banner');
           if (banner) banner.style.display = 'block';
           this.isBannerActive = true;
         }
-      }, bannerDelay);
+
+        requestAnimationFrame(checkFlight);
+      };
+      requestAnimationFrame(checkFlight);
     } else {
       this.hideBattingHelper();
     }
@@ -821,6 +849,7 @@ export class UIManager {
         type: 'fast',
         releaseTiming: 0.5
       };
+      globalAutoAssistConfig.currentDelivery = this.activeDelivery;
 
       if (this.botDeliveryTimer) clearTimeout(this.botDeliveryTimer);
       this.botDeliveryTimer = setTimeout(() => {
