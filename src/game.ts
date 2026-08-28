@@ -720,20 +720,40 @@ export class MatchController {
   }
 }
 
+  export function initBattingDelivery(isBotBowler: boolean, ball: any): void {
+    if (isBotBowler) {
+      const indicator = document.createElement('div');
+      indicator.id = 'bowler-runup-indicator';
+      indicator.style.position = 'absolute';
+      indicator.style.top = '10%';
+      indicator.style.left = '50%';
+      indicator.style.transform = 'translateX(-50%)';
+      indicator.style.fontSize = '2rem';
+      indicator.style.color = 'white';
+      indicator.style.backgroundColor = 'rgba(0,0,0,0.7)';
+      indicator.style.padding = '10px';
+      indicator.style.zIndex = '9999';
+      indicator.innerText = 'Bowler Running In...';
+      document.body.appendChild(indicator);
+  
+      setTimeout(() => {
+        if (indicator.parentNode) {
+          indicator.parentNode.removeChild(indicator);
+        }
+        startBotDelivery(ball);
+      }, 1200);
+    }
+  }
+
   export function startBotDelivery(ball: any): void {
     if (ball) {
       ball.isVisible = true;
-      ball.setEnabled(true);
+      if (typeof ball.setEnabled === 'function') ball.setEnabled(true);
       if (ball.position) {
         ball.position.set(0.0, 1.8, 16.5);
       }
       globalAutoAssistConfig.isDeliveryActive = true;
+      globalAutoAssistConfig.deliveryStartTime = performance.now();
       globalAutoAssistConfig.hasBounced = false;
-      if (!ball.velocity) {
-        ball.velocity = { x: 0, y: 0, z: 0 };
-      }
-      ball.velocity.x = 0;
-      ball.velocity.y = -2.0;
-      ball.velocity.z = -30.0;
     }
   }

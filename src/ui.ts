@@ -1,4 +1,4 @@
-import { MatchController, globalAutoAssistConfig } from './game';
+import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './game';
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseShot } from './bot';
@@ -554,58 +554,68 @@ export class UIManager {
       this.hideBattingHelper();
     }
 
-    // Start delivery trajectory
-    this.gameScene.animateDelivery(
-      this.activeDelivery.aimTarget,
-      this.activeDelivery.length,
-      this.activeDelivery.releaseTiming,
-      () => {
-        this.hideBattingHelper();
-        this.hideAssistedPrompt();
-        this.isBannerActive = false;
-        this.handleBallArrivalAtStumps();
-      },
-      () => {
-        this.hideBattingHelper();
-        this.hideAssistedPrompt();
-        this.isBannerActive = false;
+    const onArrivedCb = () => {
+      this.hideBattingHelper();
+      this.hideAssistedPrompt();
+      this.isBannerActive = false;
+      this.handleBallArrivalAtStumps();
+    };
+    
+    const onResolvedCb = () => {
+      this.hideBattingHelper();
+      this.hideAssistedPrompt();
+      this.isBannerActive = false;
+      
+      const innings = this.controller.getCurrentInnings();
+      const lastBall = innings.balls[innings.balls.length - 1];
+      if (lastBall && lastBall.shot && !lastBall.isWicket) {
+        const currentPos = (this.gameScene as any).currentBallPos;
+        let shotDistanceMeters = currentPos ? calculateShotDistance({ position: currentPos }) : (lastBall.distance || 0);
+        const hasBounced = globalAutoAssistConfig.hasBounced || false;
         
-        // Finalize runs dynamically if ball was hit
-        const innings = this.controller.getCurrentInnings();
-        const lastBall = innings.balls[innings.balls.length - 1];
-        if (lastBall && lastBall.shot && !lastBall.isWicket) {
-          const currentPos = (this.gameScene as any).currentBallPos;
-          let shotDistanceMeters = currentPos ? calculateShotDistance({ position: currentPos }) : (lastBall.distance || 0);
-          const hasBounced = globalAutoAssistConfig.hasBounced || false;
-          
-          const runs = this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced);
-          
-          let title = `${runs} RUNS`;
-          let desc = `Shot yielded ${runs} runs.`;
-          if (runs === 6) {
-             title = `SIX! ${(shotDistanceMeters || 0).toFixed(1)}m`;
-             desc = `Cleared the boundary at Aim Direction ${lastBall.shot.direction}!`;
-          } else if (runs === 4) {
-             title = `FOUR!`;
-             desc = `Bounced over the boundary!`;
-          } else if (runs === 0) {
-             title = `Dot Ball`;
-             desc = `Fielded safely. 0 runs.`;
-          }
-          this.showResultToast(title, desc);
-          this.updateHUD();
+        const runs = this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced);
+        
+        let title = `${runs} RUNS`;
+        let desc = `Shot yielded ${runs} runs.`;
+        if (runs === 6) {
+           title = `SIX! ${(shotDistanceMeters || 0).toFixed(1)}m`;
+           desc = `Cleared the boundary at Aim Direction ${lastBall.shot.direction}!`;
+        } else if (runs === 4) {
+           title = `FOUR!`;
+           desc = `Bounced over the boundary!`;
+        } else if (runs === 0) {
+           title = `Dot Ball`;
+           desc = `Fielded safely. 0 runs.`;
         }
+        this.showResultToast(title, desc);
+        this.updateHUD();
+      }
 
-        setTimeout(() => {
-          this.setupActiveTurn();
-        }, 1500);
-      },
-      true, // overTheWicket
-      () => { // onCreaseCrossed
-        this.hideAssistedPrompt();
-      },
-      isSlowMotion
-    );
+      setTimeout(() => {
+        this.setupActiveTurn();
+      }, 1500);
+    };
+
+    if (isPlayerBatting) {
+      // Bot is bowler
+      (this.gameScene as any).onBallArrivedCallback = onArrivedCb;
+      (this.gameScene as any).onBallResolvedCallback = onResolvedCb;
+      initBattingDelivery(true, this.gameScene.scene.getMeshByName('cricketBall'));
+    } else {
+      // Start delivery trajectory
+      this.gameScene.animateDelivery(
+        this.activeDelivery.aimTarget,
+        this.activeDelivery.length,
+        this.activeDelivery.releaseTiming,
+        onArrivedCb,
+        onResolvedCb,
+        true, // overTheWicket
+        () => { // onCreaseCrossed
+          this.hideAssistedPrompt();
+        },
+        isSlowMotion
+      );
+    }
   }
 
   private handleBallArrivalAtStumps(): void {

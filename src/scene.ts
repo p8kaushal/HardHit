@@ -676,29 +676,26 @@ export class GameScene {
 
   public updateBallFlight(): void {
     const ball = this.ballMesh as any;
-    if (!ball || !ball.velocity) return;
+    if (!ball) return;
     
-    const dt = this.engine.getDeltaTime() / 1000;
-    
-    // Apply gravity
-    ball.velocity.y -= 9.81 * dt;
-    
-    ball.position.x += ball.velocity.x * dt;
-    ball.position.y += ball.velocity.y * dt;
-    ball.position.z += ball.velocity.z * dt;
-    
-    const ballRadius = 0.075;
-    if (ball.position.y <= ballRadius) {
-      ball.position.y = ballRadius;
-      ball.velocity.y = Math.abs(ball.velocity.y) * 0.55; // Turf bounce
-      globalAutoAssistConfig.hasBounced = true;
+    if (this.predictionPath) {
+      this.predictionPath.dispose();
+      this.predictionPath = null;
     }
-    
-    if (ball.position.z <= -18.5) {
-      globalAutoAssistConfig.isDeliveryActive = false;
-      if (this.onBallCreaseCrossedCallback) {
-        this.onBallCreaseCrossedCallback();
+
+    if (globalAutoAssistConfig.deliveryStartTime) {
+      const elapsed = performance.now() - globalAutoAssistConfig.deliveryStartTime;
+      const duration = 1400; // 1.4 seconds
+      let progress = elapsed / duration;
+      
+      if (progress >= 1.0) {
+        progress = 1.0;
+        globalAutoAssistConfig.isDeliveryActive = false;
+        if (this.onBallArrivedCallback) {
+          this.onBallArrivedCallback();
+        }
       }
+      ball.position.z = 16.5 + (-18.5 - 16.5) * progress;
     }
   }
 
