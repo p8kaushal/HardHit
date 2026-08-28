@@ -75,9 +75,15 @@ export class GameScene {
         }
         if (this.activeCameraMode === 'follow_shot' && this.ballMesh) {
           const currentTarget = this.primaryCamera.getTarget();
-          const newTarget = BABYLON.Vector3.Lerp(currentTarget, this.ballMesh.position, 0.10);
+          const newTarget = BABYLON.Vector3.Lerp(currentTarget, this.ballMesh.position, 0.08);
           if (Number.isFinite(newTarget.x) && Number.isFinite(newTarget.y) && Number.isFinite(newTarget.z)) {
             this.primaryCamera.setTarget(newTarget);
+          }
+          
+          const targetPos = this.ballMesh.position.add(new BABYLON.Vector3(0, 4.5, -11.0));
+          this.primaryCamera.position = BABYLON.Vector3.Lerp(this.primaryCamera.position, targetPos, 0.05);
+          if (this.primaryCamera.position.y < 3.0) {
+            this.primaryCamera.position.y = 3.0;
           }
         }
       } catch (error) {
@@ -704,14 +710,18 @@ export class GameScene {
     try {
       if (!this.currentBallPos || !this.currentBallVelocity || !this.ballUnitDir || !this.ballSideDir || !this.ballMesh) return;
 
+      // Air drag applied every frame
+      this.currentBallVelocity.x *= 0.985;
+      this.currentBallVelocity.y *= 0.985;
+      this.currentBallVelocity.z *= 0.985;
+
       const ballRadius = 0.075;
       if (this.currentBallPos.y < ballRadius) {
         this.currentBallPos.y = ballRadius;
         globalAutoAssistConfig.hasBounced = true;
-        // Ground drag application for rolling (0.12 coefficient)
-        const groundDrag = 0.12; 
-        this.currentBallVelocity.x *= Math.max(0, 1 - groundDrag);
-        this.currentBallVelocity.z *= Math.max(0, 1 - groundDrag);
+        // Turf rolling friction deceleration
+        this.currentBallVelocity.x *= 0.92;
+        this.currentBallVelocity.z *= 0.92;
         // Turf bounce rebounds (0.55 coefficient)
         this.currentBallVelocity.y = Math.abs(this.currentBallVelocity.y) * 0.55;
       }
@@ -744,10 +754,6 @@ export class GameScene {
           return;
         }
 
-        // Camera Position interpolation
-        const targetPos = ball.position.add(new BABYLON.Vector3(0, 3.0, 8.0));
-        this.primaryCamera.position = BABYLON.Vector3.Lerp(this.primaryCamera.position, targetPos, 0.08);
-        
         // Retain clear elevated FOV
         this.primaryCamera.fov = 0.85;
       }

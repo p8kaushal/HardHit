@@ -468,6 +468,19 @@ export function calculateShotTrajectory(
   
   let Vx = Vz * Math.tan(theta_shot);
   
+  let mag = Math.sqrt(Vx * Vx + Vy * Vy + Vz * Vz);
+  let cap = 40.0;
+  if (shotType === 'grounded') cap = 28.0;
+  else if (shotType === 'lofted') cap = 34.0;
+  else if (shotType === 'power') cap = 38.0;
+  
+  if (mag > cap) {
+    const scale = cap / mag;
+    Vx *= scale;
+    Vy *= scale;
+    Vz *= scale;
+  }
+  
   return { x: Vx, y: Vy, z: Vz };
 }
 
