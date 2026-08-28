@@ -727,5 +727,13 @@ export class MatchController {
       if (ball.position) {
         ball.position.set(0.0, 1.8, 16.5);
       }
+      globalAutoAssistConfig.isDeliveryActive = true;
+      globalAutoAssistConfig.hasBounced = false;
+      if (!ball.velocity) {
+        ball.velocity = { x: 0, y: 0, z: 0 };
+      }
+      ball.velocity.x = 0;
+      ball.velocity.y = -2.0;
+      ball.velocity.z = -30.0;
     }
   }

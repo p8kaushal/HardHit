@@ -61,6 +61,9 @@ export class GameScene {
         if (globalAutoAssistConfig.isBallInPlay) {
           this.updateBallPhysics();
         }
+        if (globalAutoAssistConfig.isDeliveryActive) {
+          this.updateBallFlight();
+        }
         if (this.isAnimatingBall && this.isBotBatting) {
           if (this.ballMesh && this.ballMesh.position.z >= 7.9 && !this.hasBotSwung) {
             this.hasBotSwung = true;
@@ -665,11 +668,36 @@ export class GameScene {
       this.ballTrail = null;
     }
 
-    // Restore camera targets cleanly handled by setCameraMode later.
-
-
     if (this.onBallResolvedCallback) {
       this.onBallResolvedCallback();
+    }
+  }
+
+  public updateBallFlight(): void {
+    const ball = this.ballMesh as any;
+    if (!ball || !ball.velocity) return;
+    
+    const dt = this.engine.getDeltaTime() / 1000;
+    
+    // Apply gravity
+    ball.velocity.y -= 9.81 * dt;
+    
+    ball.position.x += ball.velocity.x * dt;
+    ball.position.y += ball.velocity.y * dt;
+    ball.position.z += ball.velocity.z * dt;
+    
+    const ballRadius = 0.075;
+    if (ball.position.y <= ballRadius) {
+      ball.position.y = ballRadius;
+      ball.velocity.y = Math.abs(ball.velocity.y) * 0.55; // Turf bounce
+      globalAutoAssistConfig.hasBounced = true;
+    }
+    
+    if (ball.position.z <= -18.5) {
+      globalAutoAssistConfig.isDeliveryActive = false;
+      if (this.onBallCreaseCrossedCallback) {
+        this.onBallCreaseCrossedCallback();
+      }
     }
   }
 
