@@ -15,6 +15,9 @@ export const globalAutoAssistConfig: {
   isDeliveryActive?: boolean,
   isBallInPlay?: boolean,
   hasBounced?: boolean,
+  isRunUpActive?: boolean,
+  runUpStartTime?: number,
+  bowlerArm?: 'Right' | 'Left',
   removeTrajectoryObserver?: () => void;
   resetSceneForInnings?: () => void;
 } = {
@@ -24,7 +27,8 @@ export const globalAutoAssistConfig: {
   bufferedTiming: null,
   isDeliveryActive: false,
   isBallInPlay: false,
-  hasBounced: false
+  hasBounced: false,
+  isRunUpActive: false
 };
 
 export function resolveShot(delta_t: number, botTier: string, shotType: string, deliveryLength: string): { contact: boolean, Q: number, tier: string } {
@@ -233,6 +237,8 @@ export class MatchController {
 
   public recordDeliveryStart(): void {
     globalAutoAssistConfig.deliveryStartTime = performance.now();
+    const innings = this.getCurrentInnings();
+    globalAutoAssistConfig.bowlerArm = (innings.bowler as any).bowlingArm || 'Right';
   }
 
   public recordBall(delivery: DeliveryChoice, shot: ShotChoice | null): BallOutcome {
@@ -722,6 +728,8 @@ export class MatchController {
 
   export function initBattingDelivery(isBotBowler: boolean, ball: any): void {
     if (isBotBowler) {
+      globalAutoAssistConfig.isRunUpActive = true;
+      globalAutoAssistConfig.runUpStartTime = performance.now();
       const indicator = document.createElement('div');
       indicator.id = 'bowler-runup-indicator';
       indicator.style.position = 'absolute';
@@ -740,6 +748,7 @@ export class MatchController {
         if (indicator.parentNode) {
           indicator.parentNode.removeChild(indicator);
         }
+        globalAutoAssistConfig.isRunUpActive = false;
         startBotDelivery(ball);
       }, 1200);
     }
@@ -749,8 +758,9 @@ export class MatchController {
     if (ball) {
       ball.isVisible = true;
       if (typeof ball.setEnabled === 'function') ball.setEnabled(true);
+      const startX = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
       if (ball.position) {
-        ball.position.set(0.0, 1.8, 16.5);
+        ball.position.set(startX, 1.9, 16.5);
       }
       globalAutoAssistConfig.isDeliveryActive = true;
       globalAutoAssistConfig.deliveryStartTime = performance.now();
