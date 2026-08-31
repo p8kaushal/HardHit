@@ -380,11 +380,11 @@ export class GameScene {
     // True Pitch Batter (White/Blue, physical presence at crease)
     // --------------------------------------------------------
     const pitchBatterRoot = new BABYLON.TransformNode('pitchBatterRoot', this.scene);
-    pitchBatterRoot.position = new BABYLON.Vector3(0.4, 0.0, -17.8);
+    pitchBatterRoot.position = new BABYLON.Vector3(0.4, 0.1, -17.6);
     pitchBatterRoot.parent = null;
 
     const pitchBatterMat = new BABYLON.StandardMaterial('pitchBatterMat', this.scene);
-    pitchBatterMat.diffuseColor = new BABYLON.Color3(0.9, 0.9, 0.9); // Clean white/blue standard cricket jersey
+    pitchBatterMat.diffuseColor = new BABYLON.Color3(0.8, 0.9, 1.0); // Clean white/blue standard cricket jersey
     pitchBatterMat.alpha = 1.0;
 
     const pitchTorso = BABYLON.MeshBuilder.CreateCylinder('pitchBatterTorso', { height: 1.2, diameter: 0.4 }, this.scene);
@@ -392,19 +392,42 @@ export class GameScene {
     pitchTorso.position = new BABYLON.Vector3(0, 1.2, 0);
     pitchTorso.material = pitchBatterMat;
     pitchTorso.visibility = 1.0;
+    pitchTorso.isVisible = true;
+    pitchTorso.setEnabled(true);
 
     const pitchHead = BABYLON.MeshBuilder.CreateSphere('pitchBatterHead', { diameter: 0.35 }, this.scene);
     pitchHead.parent = pitchBatterRoot;
     pitchHead.position = new BABYLON.Vector3(0, 1.9, 0);
     pitchHead.material = pitchBatterMat;
     pitchHead.visibility = 1.0;
+    pitchHead.isVisible = true;
+    pitchHead.setEnabled(true);
+    
+    const pitchLeftLeg = BABYLON.MeshBuilder.CreateCylinder('pitchBatterLeftLeg', { height: 0.6, diameter: 0.15 }, this.scene);
+    pitchLeftLeg.parent = pitchBatterRoot;
+    pitchLeftLeg.position = new BABYLON.Vector3(-0.1, 0.3, 0);
+    pitchLeftLeg.material = pitchBatterMat;
+    pitchLeftLeg.visibility = 1.0;
+    pitchLeftLeg.isVisible = true;
+    pitchLeftLeg.setEnabled(true);
+    
+    const pitchRightLeg = BABYLON.MeshBuilder.CreateCylinder('pitchBatterRightLeg', { height: 0.6, diameter: 0.15 }, this.scene);
+    pitchRightLeg.parent = pitchBatterRoot;
+    pitchRightLeg.position = new BABYLON.Vector3(0.1, 0.3, 0);
+    pitchRightLeg.material = pitchBatterMat;
+    pitchRightLeg.visibility = 1.0;
+    pitchRightLeg.isVisible = true;
+    pitchRightLeg.setEnabled(true);
 
     // True Pitch Bat
-    const pitchBat = BABYLON.MeshBuilder.CreateBox('pitchBat', { width: 0.08, height: 0.9, depth: 0.04 }, this.scene);
+    const pitchBat = BABYLON.MeshBuilder.CreateBox('batMesh', { width: 0.08, height: 0.9, depth: 0.04 }, this.scene);
     pitchBat.parent = pitchBatterRoot;
     pitchBat.position.set(0, 0.7, 0);
     pitchBat.rotation.z = -0.4;
     pitchBat.material = hudBatMat; // Share bat material
+    pitchBat.visibility = 1.0;
+    pitchBat.isVisible = true;
+    pitchBat.setEnabled(true);
     
     this.pitchBatMesh = pitchBat;
 
@@ -413,9 +436,6 @@ export class GameScene {
     pitchBatterRoot.parent = null;
     pitchBatterRoot.position.copyFrom(GameScene.CREASE_ANCHOR.add(this.playerCreaseOffset));
     pitchBatterRoot.setEnabled(true);
-
-    pitchTorso.isVisible = true;
-    pitchHead.isVisible = true;
 
     this.pitchBatterRoot = pitchBatterRoot;
     this.updateBatterPosition();
