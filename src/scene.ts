@@ -115,6 +115,9 @@ export class GameScene {
         this.ballMesh.position = new BABYLON.Vector3(0, 1.8, 18.0);
         this.ballMesh.setEnabled(false);
       }
+      if (this.hudAvatarRoot) {
+        this.hudAvatarRoot.setEnabled(false);
+      }
     };
 
     window.addEventListener('keydown', (e) => {
@@ -387,10 +390,9 @@ export class GameScene {
     // but the prompt says: Set its position ONCE at initialization: batterRoot.position.set(0.4, 0.0, -8.8);
         this.updateBatterPosition();
 
-    // Isolate HUD Avatar
+    // Isolate HUD Avatar (Now used as Contact Marker)
     const hudAvatarRoot = new BABYLON.TransformNode("hudAvatarRoot", this.scene);
-    hudAvatarRoot.parent = this.primaryCamera;
-    hudAvatarRoot.position = new BABYLON.Vector3(1.5, -1.0, 3.0); // bottom-right corner relative to camera
+    hudAvatarRoot.parent = null; // Removed from primaryCamera
     
     // Add a simple representation for the avatar so it is visible
     const avatarMesh = BABYLON.MeshBuilder.CreateBox("hudAvatarMesh", { size: 0.3 }, this.scene);
@@ -398,6 +400,8 @@ export class GameScene {
     const avatarMat = new BABYLON.StandardMaterial('avatarMat', this.scene);
     avatarMat.diffuseColor = new BABYLON.Color3(1.0, 0.5, 0.0);
     avatarMesh.material = avatarMat;
+    
+    hudAvatarRoot.setEnabled(false);
     
     this.hudAvatarRoot = hudAvatarRoot;
   }
@@ -762,6 +766,7 @@ export class GameScene {
     if (this.ballMesh) this.ballMesh.setEnabled(false);
     if (this.bounceMarker) this.bounceMarker.setEnabled(false);
     if (this.timingRing) this.timingRing.setEnabled(false);
+    if (this.hudAvatarRoot) this.hudAvatarRoot.setEnabled(false);
     if (this.predictionPath) {
       this.predictionPath.dispose();
       this.predictionPath = null;
@@ -793,6 +798,12 @@ export class GameScene {
   public updateBowlerRunUp(): void {
     if (!this.bowlerMesh || !globalAutoAssistConfig.runUpStartTime) return;
     
+    // ENFORCE BATTER VISIBILITY
+    if (this.batterRoot) {
+      this.batterRoot.setEnabled(true);
+      this.batterRoot.getChildMeshes().forEach(m => { m.isVisible = true; });
+    }
+
     this.resetBowlerMesh();
     
     const elapsed = performance.now() - globalAutoAssistConfig.runUpStartTime;
@@ -812,6 +823,12 @@ export class GameScene {
     const ball = this.ballMesh as any;
     if (!ball) return;
     
+    // ENFORCE BATTER VISIBILITY
+    if (this.batterRoot) {
+      this.batterRoot.setEnabled(true);
+      this.batterRoot.getChildMeshes().forEach(m => { m.isVisible = true; });
+    }
+
     // Do not dispose predictionPath if we want to show it. But we should render it if we need to.
     // If we only render predictionPath for player, then for bot we just move the ball.
 
@@ -921,6 +938,12 @@ export class GameScene {
     
     // Set startPoint to the actual batter's position (crease anchor Z = -8.8)
     const startPoint = new BABYLON.Vector3(this.batterRoot?.position.x || 0, 0.4, this.batterRoot?.position.z || -8.8);
+    
+    // Only render/position the marker when valid bat-ball contact occurs in pitch/outfield space (Z > -10.0m)
+    if (this.hudAvatarRoot && startPoint.z > -10.0) {
+      this.hudAvatarRoot.setEnabled(true);
+      this.hudAvatarRoot.position.copyFrom(startPoint);
+    }
     
     // Fix angle so that direction 0 (straight) maps to +Z, and 2 (right/off-side) maps to +X
     const angle = Math.PI / 2 - (direction * Math.PI) / 4;
