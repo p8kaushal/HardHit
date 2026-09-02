@@ -765,7 +765,7 @@ export class MatchController {
       if (typeof ball.setEnabled === 'function') ball.setEnabled(true);
       const startX = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
       if (ball.position) {
-        ball.position.set(startX, 1.9, 16.5);
+        ball.position.set(startX, 1.9, 10.0);
       }
       globalAutoAssistConfig.isDeliveryActive = true;
       globalAutoAssistConfig.deliveryStartTime = performance.now();

@@ -22,7 +22,7 @@ export class GameScene {
   // Characters (Procedural low-poly)
   public static CREASE_ANCHOR = new BABYLON.Vector3(0.0, 0.0, -8.8);
   public playerCreaseOffset = new BABYLON.Vector3(-0.35, 0.0, 0.0);
-  private bowlerMesh: BABYLON.TransformNode | null = null;
+  private bowlerRoot: BABYLON.TransformNode | null = null;
         public batterRoot: BABYLON.TransformNode | null = null;
         public hudAvatarRoot: BABYLON.TransformNode | null = null;
     public batMesh: BABYLON.Mesh | null = null;
@@ -326,9 +326,40 @@ export class GameScene {
     const batterTransforms = this.scene.transformNodes.filter(t => purgeNames.some(pn => t.name.toLowerCase().includes(pn)));
     batterTransforms.forEach(t => t.dispose());
 
-    // Purged Bowler Phantom Model
-    // (Secondary player mesh near bowler end removed as requested)
-    this.bowlerMesh = null;
+    // --------------------------------------------------------
+    // Dedicated Bowler Mesh Hierarchy
+    // --------------------------------------------------------
+    const bowlerRoot = new BABYLON.TransformNode("bowlerRoot", this.scene);
+    bowlerRoot.position.set(0.0, 0.0, 16.0);
+    bowlerRoot.parent = null;
+
+    const bowlerMat = new BABYLON.StandardMaterial('bowlerMat', this.scene);
+    bowlerMat.diffuseColor = new BABYLON.Color3(0.2, 0.6, 0.2); // Green
+    bowlerMat.alpha = 1.0;
+
+    const bowlerTorso = BABYLON.MeshBuilder.CreateCylinder('bowlerTorso', { height: 1.2, diameter: 0.4 }, this.scene);
+    bowlerTorso.parent = bowlerRoot;
+    bowlerTorso.position = new BABYLON.Vector3(0, 1.2, 0);
+    bowlerTorso.material = bowlerMat;
+
+    const bowlerHead = BABYLON.MeshBuilder.CreateSphere('bowlerHead', { diameter: 0.35 }, this.scene);
+    bowlerHead.parent = bowlerRoot;
+    bowlerHead.position = new BABYLON.Vector3(0, 1.95, 0);
+    bowlerHead.material = bowlerMat;
+
+    const bowlerLeftArm = BABYLON.MeshBuilder.CreateCylinder('bowlerLArm', { height: 0.6, diameter: 0.15 }, this.scene);
+    bowlerLeftArm.parent = bowlerRoot;
+    bowlerLeftArm.position = new BABYLON.Vector3(-0.3, 1.4, 0);
+    bowlerLeftArm.rotation.z = Math.PI / 8;
+    bowlerLeftArm.material = bowlerMat;
+
+    const bowlerRightArm = BABYLON.MeshBuilder.CreateCylinder('bowlerRArm', { height: 0.6, diameter: 0.15 }, this.scene);
+    bowlerRightArm.parent = bowlerRoot;
+    bowlerRightArm.position = new BABYLON.Vector3(0.3, 1.4, 0);
+    bowlerRightArm.rotation.z = -Math.PI / 8;
+    bowlerRightArm.material = bowlerMat;
+
+    this.bowlerRoot = bowlerRoot;
 
     // --------------------------------------------------------
     // Unified Batter (Physical presence at crease)
@@ -469,7 +500,7 @@ export class GameScene {
     const bounceZ = this.bounceMarker ? this.bounceMarker.position.z : -10 + aimTarget.z;
     
     const startX = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
-    const release = { x: startX, y: 1.9, z: 16.5 };
+    const release = { x: startX, y: 1.9, z: 10.0 };
     const bounce = { x: targetX, y: 0.06, z: bounceZ };
     const seamDrift = 0;
     const end = { x: targetX + seamDrift, y: 0.85, z: -18.5 };
@@ -570,20 +601,20 @@ export class GameScene {
     this.ballMesh?.position.copyFrom(this.ballTrajectoryPoints[0]);
 
     // Set bowler initial X based on bowler arm
-    if (this.bowlerMesh) {
-      this.bowlerMesh.position.x = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
+    if (this.bowlerRoot) {
+      this.bowlerRoot.position.x = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
     }
 
     // Animate bowler release arm rotation (for player bowling context if needed)
-    if (this.bowlerMesh) {
+    if (this.bowlerRoot) {
       BABYLON.Animation.CreateAndStartAnimation(
         'bowlerArm',
-        this.bowlerMesh,
+        this.bowlerRoot,
         'position.z',
         30,
         15,
-        24.0,
-        16.5,
+        16.0,
+        10.0,
         BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
       );
     }
@@ -626,7 +657,7 @@ export class GameScene {
       const index = Math.floor(this.ballAnimationTime);
 
       if (this.timingRing && this.ballMesh) {
-        const startZ = 16.5;
+        const startZ = 10.0;
         const creaseZ = -8.8;
         const currentZ = this.ballMesh.position.z;
         const progress = Math.max(0, Math.min(1, (startZ - currentZ) / (startZ - creaseZ)));
@@ -768,12 +799,14 @@ export class GameScene {
   }
 
   public resetBowlerMesh(): void {
-    if (!this.bowlerMesh) return;
-    this.bowlerMesh.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
-    this.bowlerMesh.rotation = new BABYLON.Vector3(0, Math.PI, 0);
+    if (!this.bowlerRoot) return;
+    this.bowlerRoot.setEnabled(true);
+    this.bowlerRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
+    this.bowlerRoot.rotation = new BABYLON.Vector3(0, Math.PI, 0);
+    this.bowlerRoot.position = new BABYLON.Vector3(0.0, 0.0, 16.0);
     
     // Ensure no ball meshes or other unintended geometries are parented
-    const children = this.bowlerMesh.getChildren();
+    const children = this.bowlerRoot.getChildren();
     for (const child of children) {
       if (child.name === 'cricketBall' || child.name === 'ballTrail') {
         child.parent = null;
@@ -782,27 +815,28 @@ export class GameScene {
   }
 
   public updateBowlerRunUp(): void {
-    if (!this.bowlerMesh || !globalAutoAssistConfig.runUpStartTime) return;
+    if (!this.bowlerRoot || !globalAutoAssistConfig.runUpStartTime) return;
     
+    this.bowlerRoot.setEnabled(true);
+
     // ENFORCE BATTER VISIBILITY
     if (this.batterRoot) {
       this.batterRoot.setEnabled(true);
       this.batterRoot.getChildMeshes().forEach(m => { m.isVisible = true; });
     }
-
-    this.resetBowlerMesh();
     
     const elapsed = performance.now() - globalAutoAssistConfig.runUpStartTime;
     const duration = 1200;
     const progress = Math.min(1.0, elapsed / duration);
     
-    const z = BABYLON.Scalar.Lerp(24.0, 16.5, progress);
+    // Smoothly interpolate from +16.0m to +10.0m (release crease)
+    const z = BABYLON.Scalar.Lerp(16.0, 10.0, progress);
     const bounce = Math.sin(progress * Math.PI * 8) * 0.15;
     
-    this.bowlerMesh.position.z = z;
-    this.bowlerMesh.position.y = bounce;
-    this.bowlerMesh.rotation.x = Math.sin(progress * Math.PI * 16) * 0.2;
-    this.bowlerMesh.position.x = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
+    this.bowlerRoot.position.z = z;
+    this.bowlerRoot.position.y = bounce;
+    this.bowlerRoot.rotation.x = Math.sin(progress * Math.PI * 16) * 0.2;
+    this.bowlerRoot.position.x = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
   }
 
   public updateBallFlight(): void {
@@ -837,7 +871,7 @@ export class GameScene {
         : (globalAutoAssistConfig.currentDelivery ? -10 + globalAutoAssistConfig.currentDelivery.aimTarget.z : 0);
         
       const startX = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
-      const release = { x: startX, y: 1.9, z: 16.5 };
+      const release = { x: startX, y: 1.9, z: 10.0 };
       const bounce = { x: targetX, y: 0.06, z: targetZ };
       const seamDrift = 0;
       const end = { x: targetX + seamDrift, y: 0.85, z: -18.5 };
