@@ -43,7 +43,7 @@ export function resolveShot(delta_t: number, botTier: string, shotType: string, 
   
   // Spatial Crease Hard Fallback
   if (globalAutoAssistConfig.isRookie && globalAutoAssistConfig.ballZ !== undefined) {
-    if (globalAutoAssistConfig.ballZ >= 6.0 && globalAutoAssistConfig.ballZ <= 9.4) {
+    if (globalAutoAssistConfig.ballZ <= -14.0 && globalAutoAssistConfig.ballZ >= -18.5) {
       contact = true;
     }
   }
@@ -488,6 +488,11 @@ export class MatchController {
       overlay.innerText = 'INNINGS OVER - PREPARING TO BOWL';
       document.body.appendChild(overlay);
 
+      // Ensure all UI panels from the batting phase are cleanly hidden/unmounted.
+      const controlBatting = document.getElementById('control-batting');
+      if (controlBatting) {
+        controlBatting.classList.add('hidden', 'panel-hidden');
+      }
       // Restore bowling panel controls immediately
       const controlBowling = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
       if (controlBowling) {

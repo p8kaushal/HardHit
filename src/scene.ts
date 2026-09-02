@@ -20,13 +20,12 @@ export class GameScene {
   private timingRing: BABYLON.Mesh | null = null;
   
   // Characters (Procedural low-poly)
-  public static CREASE_ANCHOR = new BABYLON.Vector3(0.0, 0.0, -17.8);
+  public static CREASE_ANCHOR = new BABYLON.Vector3(0.0, 0.0, -8.8);
   public playerCreaseOffset = new BABYLON.Vector3(0.4, 0.0, 0.0);
   private bowlerMesh: BABYLON.TransformNode | null = null;
-  public hudAvatarRoot: BABYLON.TransformNode | null = null;
-  public hudAvatarTorso: BABYLON.Mesh | null = null;
-  private pitchBatterRoot: BABYLON.TransformNode | null = null;
-  private pitchBatMesh: BABYLON.Mesh | null = null;
+        public batterRoot: BABYLON.TransformNode | null = null;
+        public hudAvatarRoot: BABYLON.TransformNode | null = null;
+    public batMesh: BABYLON.Mesh | null = null;
 
 
   // Animation state
@@ -75,7 +74,7 @@ export class GameScene {
           this.updateBallFlight();
         }
         if (this.isAnimatingBall && this.isBotBatting) {
-          if (this.ballMesh && this.ballMesh.position.z >= 7.9 && !this.hasBotSwung) {
+          if (this.ballMesh && this.ballMesh.position.z <= -16.0 && !this.hasBotSwung) {
             this.hasBotSwung = true;
             if (this.botBattingTriggerCallback) {
               this.botBattingTriggerCallback();
@@ -124,7 +123,7 @@ export class GameScene {
         if (this.isAnimatingBall && this.ballMesh) {
           const z = this.ballMesh.position.z;
           // Physical arrival zone definition
-          if (z >= 6.0 && z <= 9.4) {
+          if (z <= -14.0 && z >= -18.5) {
             globalAutoAssistConfig.bufferedTiming = 0.5; // Guaranteed valid timing offset (0 deviation)
           }
         }
@@ -256,16 +255,13 @@ export class GameScene {
 
   public setCameraMode(mode: CameraMode): void {
     this.activeCameraMode = mode;
-    if (this.pitchBatterRoot) this.pitchBatterRoot.parent = null;
+    if (this.batterRoot) this.batterRoot.parent = null;
     
     // Smooth snaps or fixed snaps depending on mode
     if (mode === 'batter_eye') {
       this.setBattingCameraView();
     } else if (mode === 'bowler_eye') {
-      if (this.isBotBatting) {
-        this.primaryCamera.position = new BABYLON.Vector3(0, 2.2, 22.5);
-        this.primaryCamera.setTarget(new BABYLON.Vector3(0, 1.2, -18.0));
-      }
+      this.setBowlingCameraView();
     } else if (mode === 'stadium_wide') {
       this.primaryCamera.position = new BABYLON.Vector3(15, 12, -22);
       this.primaryCamera.setTarget(new BABYLON.Vector3(0, 1.5, 0));
@@ -273,8 +269,15 @@ export class GameScene {
   }
 
   public setBattingCameraView(): void {
-    this.primaryCamera.position = new BABYLON.Vector3(-1.8, 3.2, -23.5);
+    this.primaryCamera.position = new BABYLON.Vector3(0.0, 2.5, -14.0);
     this.primaryCamera.setTarget(new BABYLON.Vector3(0.0, 1.0, 0.0));
+    this.primaryCamera.lockedTarget = null;
+    this.primaryCamera.fov = 0.85;
+  }
+
+  public setBowlingCameraView(): void {
+    this.primaryCamera.position = new BABYLON.Vector3(0.0, 2.5, 14.0);
+    this.primaryCamera.setTarget(new BABYLON.Vector3(0.4, 1.0, -8.8));
     this.primaryCamera.lockedTarget = null;
     this.primaryCamera.fov = 0.85;
   }
@@ -284,7 +287,10 @@ export class GameScene {
   }
 
   public resetCameraToPlayerView(isPlayerBatting: boolean): void {
-    if (this.pitchBatterRoot) this.pitchBatterRoot.parent = null;
+    if (this.batterRoot) {
+      this.batterRoot.parent = null;
+      this.batterRoot.position.set(0.4, 0.0, -8.8);
+    }
     const targetMode: CameraMode = isPlayerBatting ? 'batter_eye' : 'bowler_eye';
     this.setCameraMode(targetMode);
   }
@@ -336,131 +342,86 @@ export class GameScene {
     this.bowlerMesh = bowlerContainer;
 
     // --------------------------------------------------------
-    // HUD Avatar (Pink, remains in viewport / UI space)
+    // Unified Batter (Physical presence at crease)
     // --------------------------------------------------------
-    const hudAvatarRoot = new BABYLON.TransformNode('hudAvatarRoot', this.scene);
-    hudAvatarRoot.position = new BABYLON.Vector3(0.4, 0.0, -17.8);
-    hudAvatarRoot.parent = null;
+    const batterRoot = new BABYLON.TransformNode("batterRoot", this.scene);
+    batterRoot.position.set(0.4, 0.0, -8.8);
+    batterRoot.parent = null;
 
-    const hudBatterMat = new BABYLON.StandardMaterial('hudBatterMat', this.scene);
-    hudBatterMat.diffuseColor = new BABYLON.Color3(0.9, 0.2, 0.4); // Pink
-    hudBatterMat.alpha = 1.0;
+    const batterMat = new BABYLON.StandardMaterial('batterMat', this.scene);
+    batterMat.diffuseColor = new BABYLON.Color3(0.8, 0.9, 1.0); // Clean white/blue standard cricket jersey
+    batterMat.alpha = 1.0;
 
-    const hudAvatarTorso = BABYLON.MeshBuilder.CreateCylinder('hudAvatarTorso', { height: 1.2, diameter: 0.4 }, this.scene);
-    hudAvatarTorso.parent = hudAvatarRoot;
-    hudAvatarTorso.position = new BABYLON.Vector3(0, 1.2, 0);
-    hudAvatarTorso.material = hudBatterMat;
-    hudAvatarTorso.visibility = 1.0;
+    const bTorso = BABYLON.MeshBuilder.CreateCylinder('batterTorso', { height: 1.2, diameter: 0.4 }, this.scene);
+    bTorso.parent = batterRoot;
+    bTorso.position = new BABYLON.Vector3(0, 1.2, 0);
+    bTorso.material = batterMat;
 
-    const hudAvatarHead = BABYLON.MeshBuilder.CreateSphere('hudAvatarHead', { diameter: 0.35 }, this.scene);
-    hudAvatarHead.parent = hudAvatarRoot;
-    hudAvatarHead.position = new BABYLON.Vector3(0, 1.9, 0);
-    hudAvatarHead.material = hudBatterMat;
-    hudAvatarHead.visibility = 1.0;
-
-    // HUD Bat
-    const hudBatMat = new BABYLON.StandardMaterial('hudBatMat', this.scene);
-    hudBatMat.diffuseColor = new BABYLON.Color3(0.65, 0.5, 0.3);
-    const hudBat = BABYLON.MeshBuilder.CreateBox('hudBat', { width: 0.08, height: 0.9, depth: 0.04 }, this.scene);
-    hudBat.parent = hudAvatarRoot;
-    hudBat.position.set(0, 0.7, 0);
-    hudBat.rotation.z = -0.4;
-    hudBat.material = hudBatMat;
-
-    hudAvatarRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
-    hudAvatarRoot.rotation = new BABYLON.Vector3(0, 0, 0);
-    hudAvatarRoot.parent = null;
-    hudAvatarRoot.position.copyFrom(GameScene.CREASE_ANCHOR.add(this.playerCreaseOffset));
-    hudAvatarRoot.setEnabled(true);
+    const bHead = BABYLON.MeshBuilder.CreateSphere('batterHead', { diameter: 0.35 }, this.scene);
+    bHead.parent = batterRoot;
+    bHead.position = new BABYLON.Vector3(0, 1.9, 0);
+    bHead.material = batterMat;
     
-    this.hudAvatarRoot = hudAvatarRoot;
-    this.hudAvatarTorso = hudAvatarTorso;
-
-    // --------------------------------------------------------
-    // True Pitch Batter (White/Blue, physical presence at crease)
-    // --------------------------------------------------------
-    const pitchBatterRoot = new BABYLON.TransformNode('pitchBatterRoot', this.scene);
-    pitchBatterRoot.position = new BABYLON.Vector3(0.4, 0.1, -17.6);
-    pitchBatterRoot.parent = null;
-
-    const pitchBatterMat = new BABYLON.StandardMaterial('pitchBatterMat', this.scene);
-    pitchBatterMat.diffuseColor = new BABYLON.Color3(0.8, 0.9, 1.0); // Clean white/blue standard cricket jersey
-    pitchBatterMat.alpha = 1.0;
-
-    const pitchTorso = BABYLON.MeshBuilder.CreateCylinder('pitchBatterTorso', { height: 1.2, diameter: 0.4 }, this.scene);
-    pitchTorso.parent = pitchBatterRoot;
-    pitchTorso.position = new BABYLON.Vector3(0, 1.2, 0);
-    pitchTorso.material = pitchBatterMat;
-    pitchTorso.visibility = 1.0;
-    pitchTorso.isVisible = true;
-    pitchTorso.setEnabled(true);
-
-    const pitchHead = BABYLON.MeshBuilder.CreateSphere('pitchBatterHead', { diameter: 0.35 }, this.scene);
-    pitchHead.parent = pitchBatterRoot;
-    pitchHead.position = new BABYLON.Vector3(0, 1.9, 0);
-    pitchHead.material = pitchBatterMat;
-    pitchHead.visibility = 1.0;
-    pitchHead.isVisible = true;
-    pitchHead.setEnabled(true);
-    
-    const pitchLeftLeg = BABYLON.MeshBuilder.CreateCylinder('pitchBatterLeftLeg', { height: 0.6, diameter: 0.15 }, this.scene);
-    pitchLeftLeg.parent = pitchBatterRoot;
-    pitchLeftLeg.position = new BABYLON.Vector3(-0.1, 0.3, 0);
-    pitchLeftLeg.material = pitchBatterMat;
-    pitchLeftLeg.visibility = 1.0;
-    pitchLeftLeg.isVisible = true;
-    pitchLeftLeg.setEnabled(true);
-    
-    const pitchRightLeg = BABYLON.MeshBuilder.CreateCylinder('pitchBatterRightLeg', { height: 0.6, diameter: 0.15 }, this.scene);
-    pitchRightLeg.parent = pitchBatterRoot;
-    pitchRightLeg.position = new BABYLON.Vector3(0.1, 0.3, 0);
-    pitchRightLeg.material = pitchBatterMat;
-    pitchRightLeg.visibility = 1.0;
-    pitchRightLeg.isVisible = true;
-    pitchRightLeg.setEnabled(true);
+    const bArms = BABYLON.MeshBuilder.CreateCylinder('batterArms', { height: 0.6, diameter: 0.15 }, this.scene);
+    bArms.parent = batterRoot;
+    bArms.position = new BABYLON.Vector3(0, 0.8, 0); // zero x/z
+    bArms.material = batterMat;
 
     // True Pitch Bat
-    const pitchBat = BABYLON.MeshBuilder.CreateBox('batMesh', { width: 0.08, height: 0.9, depth: 0.04 }, this.scene);
-    pitchBat.parent = pitchBatterRoot;
-    pitchBat.position.set(0, 0.7, 0);
-    pitchBat.rotation.z = -0.4;
-    pitchBat.material = hudBatMat; // Share bat material
-    pitchBat.visibility = 1.0;
-    pitchBat.isVisible = true;
-    pitchBat.setEnabled(true);
+    const batMat = new BABYLON.StandardMaterial('batMat', this.scene);
+    batMat.diffuseColor = new BABYLON.Color3(0.65, 0.5, 0.3);
+
+    const bBat = BABYLON.MeshBuilder.CreateBox('batMesh', { width: 0.08, height: 0.9, depth: 0.04 }, this.scene);
+    bBat.parent = batterRoot;
+    bBat.position.set(0, 0.7, 0); // zero x/z
+    bBat.rotation.z = -0.4;
+    bBat.material = batMat;
     
-    this.pitchBatMesh = pitchBat;
+    this.batMesh = bBat;
 
-    pitchBatterRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
-    pitchBatterRoot.rotation = new BABYLON.Vector3(0, 0, 0);
-    pitchBatterRoot.parent = null;
-    pitchBatterRoot.position.copyFrom(GameScene.CREASE_ANCHOR.add(this.playerCreaseOffset));
-    pitchBatterRoot.setEnabled(true);
+    batterRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
+    batterRoot.rotation = new BABYLON.Vector3(0, 0, 0);
 
-    this.pitchBatterRoot = pitchBatterRoot;
-    this.updateBatterPosition();
+    this.batterRoot = batterRoot;
+    // We do NOT set position here again to keep it ONCE as instructed, 
+    // but the prompt says: Set its position ONCE at initialization: batterRoot.position.set(0.4, 0.0, -8.8);
+        this.updateBatterPosition();
+
+    // Isolate HUD Avatar
+    const hudAvatarRoot = new BABYLON.TransformNode("hudAvatarRoot", this.scene);
+    hudAvatarRoot.parent = this.primaryCamera;
+    hudAvatarRoot.position = new BABYLON.Vector3(1.5, -1.0, 3.0); // bottom-right corner relative to camera
+    
+    // Add a simple representation for the avatar so it is visible
+    const avatarMesh = BABYLON.MeshBuilder.CreateBox("hudAvatarMesh", { size: 0.3 }, this.scene);
+    avatarMesh.parent = hudAvatarRoot;
+    const avatarMat = new BABYLON.StandardMaterial('avatarMat', this.scene);
+    avatarMat.diffuseColor = new BABYLON.Color3(1.0, 0.5, 0.0);
+    avatarMesh.material = avatarMat;
+    
+    this.hudAvatarRoot = hudAvatarRoot;
   }
 
   public setBatterHandedness(hand: 'RHB' | 'LHB'): void {
     this.batterHand = hand;
-    if (!this.pitchBatterRoot) return;
+    if (!this.batterRoot) return;
     
-    this.pitchBatterRoot.parent = null;
-    this.pitchBatterRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
-    this.pitchBatterRoot.rotation = new BABYLON.Vector3(0, 0, 0);
-    this.pitchBatterRoot.setEnabled(true);
+    this.batterRoot.parent = null;
+    this.batterRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
+    this.batterRoot.rotation = new BABYLON.Vector3(0, 0, 0);
+    this.batterRoot.setEnabled(true);
 
     this.updateBatterPosition();
   }
 
   public updateBatterPosition(): void {
-    if (!this.pitchBatterRoot) return;
-    this.pitchBatterRoot.parent = null;
+    if (!this.batterRoot) return;
+    this.batterRoot.parent = null;
     const pos = GameScene.CREASE_ANCHOR.add(this.playerCreaseOffset);
-    this.pitchBatterRoot.position.copyFrom(pos);
-    this.pitchBatterRoot.setAbsolutePosition(pos);
-    this.pitchBatterRoot.setEnabled(true);
-    const childMeshes = this.pitchBatterRoot.getChildMeshes();
+    this.batterRoot.position.copyFrom(pos);
+    this.batterRoot.setAbsolutePosition(pos);
+    this.batterRoot.setEnabled(true);
+    const childMeshes = this.batterRoot.getChildMeshes();
     childMeshes.forEach(m => {
       m.isVisible = true;
       m.visibility = 1.0;
@@ -589,8 +550,8 @@ export class GameScene {
     }
     
     this.timingRing?.setEnabled(true);
-    if (this.timingRing && this.pitchBatterRoot) {
-      this.timingRing.position.set(this.pitchBatterRoot.position.x, 0.1, 9.4);
+    if (this.timingRing && this.batterRoot) {
+      this.timingRing.position.set(this.batterRoot.position.x, 0.1, -8.8);
       this.timingRing.scaling.set(3.0, 3.0, 3.0);
     }
 
@@ -601,7 +562,7 @@ export class GameScene {
       this.predictionPath = null;
     }
     if (!this.isBotBatting && assistMultiplier >= 0.7) {
-      const visiblePoints = this.ballTrajectoryPoints.filter(p => p.z <= 8.2);
+      const visiblePoints = this.ballTrajectoryPoints.filter(p => p.z >= -16.0);
       if (visiblePoints.length > 1) {
         this.predictionPath = BABYLON.MeshBuilder.CreateDashedLines('predictionPath', {
           points: visiblePoints,
@@ -653,7 +614,7 @@ export class GameScene {
       let currentSpeedScale = speedScale;
       let fov = 75;
 
-      if (this.ballMesh && this.ballMesh.position.z >= 6.9) {
+      if (this.ballMesh && this.ballMesh.position.z <= -14.0) {
         // Time Dilation
         if (!this.isBotBatting) {
           if (assistMultiplier >= 0.7) { // Rookie
@@ -665,7 +626,7 @@ export class GameScene {
 
         // Camera FOV Zoom
         if (this.activeCameraMode === 'batter_eye' && this.scene.activeCamera) {
-          const progress = Math.min(1, Math.max(0, (this.ballMesh.position.z - 6.9) / (10 - 6.9)));
+          const progress = Math.min(1, Math.max(0, (-14.0 - this.ballMesh.position.z) / 3.8));
           fov = BABYLON.Scalar.Lerp(75, 50, progress);
           (this.scene.activeCamera as BABYLON.TargetCamera).fov = fov * (Math.PI / 180);
         }
@@ -675,10 +636,10 @@ export class GameScene {
       const index = Math.floor(this.ballAnimationTime);
 
       if (this.timingRing && this.ballMesh) {
-        const startZ = -11.5;
-        const creaseZ = 9.4;
+        const startZ = 16.5;
+        const creaseZ = -8.8;
         const currentZ = this.ballMesh.position.z;
-        const progress = Math.max(0, Math.min(1, (currentZ - startZ) / (creaseZ - startZ)));
+        const progress = Math.max(0, Math.min(1, (startZ - currentZ) / (startZ - creaseZ)));
         const ringScale = 3.0 - (2.0 * progress);
         this.timingRing.scaling.set(ringScale, ringScale, ringScale);
 
@@ -719,8 +680,8 @@ export class GameScene {
 
       this.ballMesh?.position.copyFrom(this.ballTrajectoryPoints[index]);
       
-      // Check if ball crossed the crease (z = 8.2 approx)
-      if (!this.creaseCrossedFired && this.ballMesh && this.ballMesh.position.z >= 8.2) {
+      // Check if ball crossed the crease (z = -17.0 approx)
+      if (!this.creaseCrossedFired && this.ballMesh && this.ballMesh.position.z <= -17.0) {
         this.creaseCrossedFired = true;
         if (this.onBallCreaseCrossedCallback) {
           this.onBallCreaseCrossedCallback();
@@ -757,11 +718,11 @@ export class GameScene {
   }
 
   public animateBatterSwing(_directionAngle: number, successCallback: () => void): void {
-    if (this.pitchBatMesh && this.pitchBatterRoot) {
+    if (this.batMesh && this.batterRoot) {
       // Temporarily rotate batter and bat to swing (9 frames at 60fps = 0.15s)
       const swingAnim = BABYLON.Animation.CreateAndStartAnimation(
         'batterSwing',
-        this.pitchBatMesh,
+        this.batMesh,
         'rotation.y',
         60,
         9,
@@ -772,7 +733,7 @@ export class GameScene {
       
       swingAnim?.onAnimationEndObservable.add(() => {
         // Return bat
-        this.pitchBatMesh!.rotation.y = 0;
+        this.batMesh!.rotation.y = 0;
         this.setCameraMode('follow_shot');
         successCallback();
       });
@@ -958,8 +919,11 @@ export class GameScene {
     // Transition active camera to follow_shot trajectory view immediately upon bat contact
     this.setCameraMode('follow_shot');
     
-    const angle = (direction * Math.PI) / 4 - Math.PI / 2;
-    const startPoint = new BABYLON.Vector3(this.pitchBatterRoot?.position.x || 0, 0.4, 9.4);
+    // Set startPoint to the actual batter's position (crease anchor Z = -8.8)
+    const startPoint = new BABYLON.Vector3(this.batterRoot?.position.x || 0, 0.4, this.batterRoot?.position.z || -8.8);
+    
+    // Fix angle so that direction 0 (straight) maps to +Z, and 2 (right/off-side) maps to +X
+    const angle = Math.PI / 2 - (direction * Math.PI) / 4;
     
     let currentVelocity = V_out 
       ? new BABYLON.Vector3(V_out.x, V_out.y, V_out.z) 
@@ -986,11 +950,11 @@ export class GameScene {
     this.isAnimatingBall = false;
     this.ballMesh?.setEnabled(false);
     
-    if (isWicket && this.pitchBatterRoot) {
+    if (isWicket && this.batterRoot) {
       // Trigger a dramatic slump animation or knock over stumps
       BABYLON.Animation.CreateAndStartAnimation(
         'batterDrop',
-        this.pitchBatterRoot,
+        this.batterRoot,
         'rotation.x',
         30,
         15,
@@ -1001,7 +965,7 @@ export class GameScene {
     }
     
     setTimeout(() => {
-      if (this.pitchBatterRoot) this.pitchBatterRoot.rotation.x = 0;
+      if (this.batterRoot) this.batterRoot.rotation.x = 0;
       if (this.onBallResolvedCallback) this.onBallResolvedCallback();
     }, 1500);
   }
