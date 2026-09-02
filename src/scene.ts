@@ -21,7 +21,7 @@ export class GameScene {
   
   // Characters (Procedural low-poly)
   public static CREASE_ANCHOR = new BABYLON.Vector3(0.0, 0.0, -8.8);
-  public playerCreaseOffset = new BABYLON.Vector3(0.4, 0.0, 0.0);
+  public playerCreaseOffset = new BABYLON.Vector3(-0.35, 0.0, 0.0);
   private bowlerMesh: BABYLON.TransformNode | null = null;
         public batterRoot: BABYLON.TransformNode | null = null;
         public hudAvatarRoot: BABYLON.TransformNode | null = null;
@@ -292,7 +292,7 @@ export class GameScene {
   public resetCameraToPlayerView(isPlayerBatting: boolean): void {
     if (this.batterRoot) {
       this.batterRoot.parent = null;
-      this.batterRoot.position.set(0.4, 0.0, -8.8);
+      this.batterRoot.position.set(-0.35, 0.0, -8.8);
     }
     const targetMode: CameraMode = isPlayerBatting ? 'batter_eye' : 'bowler_eye';
     this.setCameraMode(targetMode);
@@ -326,49 +326,35 @@ export class GameScene {
     const batterTransforms = this.scene.transformNodes.filter(t => purgeNames.some(pn => t.name.toLowerCase().includes(pn)));
     batterTransforms.forEach(t => t.dispose());
 
-    // Bowler placeholder shape (Blue)
-    const bowlerContainer = new BABYLON.TransformNode('bowlerContainer', this.scene);
-    const bodyMat = new BABYLON.StandardMaterial('bowlerMat', this.scene);
-    bodyMat.diffuseColor = new BABYLON.Color3(0.2, 0.4, 0.9);
-    
-    const torso = BABYLON.MeshBuilder.CreateCylinder('bowlerTorso', { height: 1.2, diameter: 0.4 }, this.scene);
-    torso.position = new BABYLON.Vector3(0, 1.2, 0);
-    torso.parent = bowlerContainer;
-    torso.material = bodyMat;
-
-    const head = BABYLON.MeshBuilder.CreateSphere('bowlerHead', { diameter: 0.35 }, this.scene);
-    head.position = new BABYLON.Vector3(0, 1.9, 0);
-    head.parent = bowlerContainer;
-    head.material = bodyMat;
-    
-    bowlerContainer.position.set(0, 0, -11.5);
-    this.bowlerMesh = bowlerContainer;
+    // Purged Bowler Phantom Model
+    // (Secondary player mesh near bowler end removed as requested)
+    this.bowlerMesh = null;
 
     // --------------------------------------------------------
     // Unified Batter (Physical presence at crease)
     // --------------------------------------------------------
     const batterRoot = new BABYLON.TransformNode("batterRoot", this.scene);
-    batterRoot.position.set(0.4, 0.0, -8.8);
+    batterRoot.position.set(-0.35, 0.0, -8.8);
     batterRoot.parent = null;
 
-    const batterMat = new BABYLON.StandardMaterial('batterMat', this.scene);
-    batterMat.diffuseColor = new BABYLON.Color3(0.8, 0.9, 1.0); // Clean white/blue standard cricket jersey
-    batterMat.alpha = 1.0;
+    const batterBlueMat = new BABYLON.StandardMaterial('batterBlueMat', this.scene);
+    batterBlueMat.diffuseColor = new BABYLON.Color3(0.1, 0.3, 0.85); // Blue jersey
+    batterBlueMat.alpha = 1.0;
 
     const bTorso = BABYLON.MeshBuilder.CreateCylinder('batterTorso', { height: 1.2, diameter: 0.4 }, this.scene);
     bTorso.parent = batterRoot;
     bTorso.position = new BABYLON.Vector3(0, 1.2, 0);
-    bTorso.material = batterMat;
+    bTorso.material = batterBlueMat;
 
     const bHead = BABYLON.MeshBuilder.CreateSphere('batterHead', { diameter: 0.35 }, this.scene);
     bHead.parent = batterRoot;
     bHead.position = new BABYLON.Vector3(0, 1.9, 0);
-    bHead.material = batterMat;
+    bHead.material = batterBlueMat;
     
     const bArms = BABYLON.MeshBuilder.CreateCylinder('batterArms', { height: 0.6, diameter: 0.15 }, this.scene);
     bArms.parent = batterRoot;
     bArms.position = new BABYLON.Vector3(0, 0.8, 0); // zero x/z
-    bArms.material = batterMat;
+    bArms.material = batterBlueMat;
 
     // True Pitch Bat
     const batMat = new BABYLON.StandardMaterial('batMat', this.scene);
@@ -383,11 +369,11 @@ export class GameScene {
     this.batMesh = bBat;
 
     batterRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
-    batterRoot.rotation = new BABYLON.Vector3(0, 0, 0);
+    batterRoot.rotation = new BABYLON.Vector3(0, Math.PI, 0);
 
     this.batterRoot = batterRoot;
     // We do NOT set position here again to keep it ONCE as instructed, 
-    // but the prompt says: Set its position ONCE at initialization: batterRoot.position.set(0.4, 0.0, -8.8);
+    // but the prompt says: Set its position ONCE at initialization: batterRoot.position.set(-0.35, 0.0, -8.8);
         this.updateBatterPosition();
 
     // Isolate HUD Avatar (Now used as Contact Marker)
@@ -412,7 +398,7 @@ export class GameScene {
     
     this.batterRoot.parent = null;
     this.batterRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
-    this.batterRoot.rotation = new BABYLON.Vector3(0, 0, 0);
+    this.batterRoot.rotation = new BABYLON.Vector3(0, Math.PI, 0);
     this.batterRoot.setEnabled(true);
 
     this.updateBatterPosition();
