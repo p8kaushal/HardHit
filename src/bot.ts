@@ -37,15 +37,15 @@ export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium
 
   // Use formula utility if available, else approximate
   let baseAimX = 0;
-  if (line === 'off') baseAimX = -0.6;
-  if (line === 'leg') baseAimX = 0.4;
+  if (line === 'off') baseAimX = -0.45;
+  if (line === 'leg') baseAimX = 0.45;
 
-  let aimZ = 10;
-  if (length === 'yorker') aimZ = 18;
-  else if (length === 'full') aimZ = 15;
-  else if (length === 'good') aimZ = 10;
-  else if (length === 'short') aimZ = 6;
-  else if (length === 'bouncer') aimZ = 4;
+  let aimZ = -3.5;
+  if (length === 'yorker') aimZ = -7.5;
+  else if (length === 'full') aimZ = -5.5;
+  else if (length === 'good') aimZ = -3.5;
+  else if (length === 'short') aimZ = -1.5;
+  else if (length === 'bouncer') aimZ = 0.5;
 
   const errorMargin = (100 - bowler.stats.bowling.accuracy) / 100;
   const xWobble = (Math.random() - 0.5) * errorMargin;

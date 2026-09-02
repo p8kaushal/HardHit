@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseShot } from './bot';
-import { checkExtraBall, getLineTypeFromAimX, SIX_THRESHOLD, calculateShotTrajectory, calculateShotDistance, getDirectionName, evaluateFinalOutcome } from './formula';
+import { checkExtraBall, getLineTypeFromAimX, SIX_THRESHOLD, calculateShotTrajectory, calculateShotDistance, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 
 export class UIManager {
@@ -18,12 +18,7 @@ export class UIManager {
   
   // Aiming Target (Bowling Crease Coordinate offsets)
   private currentAimTargetX = 0;
-  private currentAimTargetZ = 12.0; // good length default
-  
-  // Timing Meter
-  private isTimingBarActive = false;
-  private timingCursorVal = 0;
-  private timingDirection = 1;
+  private currentAimTargetZ = -3.5; // good length default
   
   // Active deliveries / shots
   public isBallActive = false;
@@ -49,8 +44,8 @@ export class UIManager {
     this.gameScene = new GameScene('game-canvas');
     this.keyboardInputManager = new KeyboardInputManager(
       () => this.controller.getCurrentInnings().batter.id === this.controller.state.player.id,
-      () => this.startBowlingReleaseMeter(),
-      () => this.triggerReleaseMeter(),
+      () => this.startUserBowlingDelivery(),
+      () => this.endUserBowlingDelivery(),
       (direction, type) => this.executeBattingSwingGesture(direction, type),
       () => this.controller.getCurrentInnings().batter.batterHand || 'RHB'
     );
@@ -117,19 +112,22 @@ export class UIManager {
         bowlLineButtons.forEach(b => b.classList.remove('active'));
         const target = e.currentTarget as HTMLButtonElement;
         target.classList.add('active');
-        const lineVal = target.getAttribute('data-val');
-        const hand = this.controller.getCurrentInnings().batter.batterHand || 'RHB';
-        let aimX = 0.0;
-        if (lineVal === 'off') {
-          aimX = hand === 'RHB' ? -0.8 : 0.8;
-        } else if (lineVal === 'leg') {
-          aimX = hand === 'RHB' ? 0.8 : -0.8;
-        }
-        this.keyboardInputManager.intent.aimX = aimX;
-        this.currentAimTargetX = this.keyboardInputManager.intent.aimX;
+        const lineVal = target.getAttribute('data-val') || 'middle';
         
-        // Redraw landing shadow disc marker
-        this.gameScene.updateBounceMarker({ x: this.currentAimTargetX, z: this.currentAimTargetZ });
+        const activeLenBtn = document.querySelector('#bowl-length-group .btn.active');
+        const lenVal = activeLenBtn ? activeLenBtn.getAttribute('data-val') || 'good' : 'good';
+        
+        const targetPos = calculateBounceTarget(lineVal, lenVal);
+        if (this.gameScene.bounceMarker) {
+          this.gameScene.bounceMarker.parent = null;
+          this.gameScene.bounceMarker.position.copyFrom(targetPos);
+          this.gameScene.bounceMarker.isVisible = true;
+          this.gameScene.bounceMarker.setEnabled(true);
+        }
+        
+        this.keyboardInputManager.intent.aimX = targetPos.x;
+        this.currentAimTargetX = targetPos.x;
+        
         this.keyboardInputManager.updateFeedbackOverlay();
       });
     });
@@ -141,16 +139,22 @@ export class UIManager {
         bowlLengthButtons.forEach(b => b.classList.remove('active'));
         const target = e.currentTarget as HTMLButtonElement;
         target.classList.add('active');
-        const lenVal = target.getAttribute('data-val');
-        if (lenVal === 'yorker') this.keyboardInputManager.intent.aimZ = 18.0;
-        else if (lenVal === 'full') this.keyboardInputManager.intent.aimZ = 15.0;
-        else if (lenVal === 'good') this.keyboardInputManager.intent.aimZ = 12.0;
-        else if (lenVal === 'short') this.keyboardInputManager.intent.aimZ = 9.0;
-        else if (lenVal === 'bouncer') this.keyboardInputManager.intent.aimZ = 6.0;
-        this.currentAimTargetZ = this.keyboardInputManager.intent.aimZ;
+        const lenVal = target.getAttribute('data-val') || 'good';
+        
+        const activeLineBtn = document.querySelector('#bowl-line-group .btn.active');
+        const lineVal = activeLineBtn ? activeLineBtn.getAttribute('data-val') || 'middle' : 'middle';
+        
+        const targetPos = calculateBounceTarget(lineVal, lenVal);
+        if (this.gameScene.bounceMarker) {
+          this.gameScene.bounceMarker.parent = null;
+          this.gameScene.bounceMarker.position.copyFrom(targetPos);
+          this.gameScene.bounceMarker.isVisible = true;
+          this.gameScene.bounceMarker.setEnabled(true);
+        }
+        
+        this.keyboardInputManager.intent.aimZ = targetPos.z;
+        this.currentAimTargetZ = targetPos.z;
 
-        // Redraw landing shadow disc marker
-        this.gameScene.updateBounceMarker({ x: this.currentAimTargetX, z: this.currentAimTargetZ });
         this.keyboardInputManager.updateFeedbackOverlay();
       });
     });
@@ -171,10 +175,10 @@ export class UIManager {
 
     // Hold/Release execute timing buttons
     const btnBowl = document.getElementById('btn-bowl-pitch')!;
-    btnBowl.addEventListener('mousedown', () => this.startBowlingReleaseMeter());
+    btnBowl.addEventListener('mousedown', () => this.startUserBowlingDelivery());
     btnBowl.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      this.startBowlingReleaseMeter();
+      this.startUserBowlingDelivery();
     });
 
     const btnBat = document.getElementById('btn-bat-swing')!;
@@ -223,8 +227,8 @@ export class UIManager {
     initStatsPopover();
 
     // Global listeners
-    window.addEventListener('mouseup', () => this.triggerReleaseMeter());
-    window.addEventListener('touchend', () => this.triggerReleaseMeter());
+    window.addEventListener('mouseup', () => this.endUserBowlingDelivery());
+    window.addEventListener('touchend', () => this.endUserBowlingDelivery());
   }
 
   // --- Pointer & Aim Gesture Recognition ---
@@ -293,79 +297,72 @@ export class UIManager {
 
     // Map X to Line offset (-1.5 to 1.5 meters)
     this.currentAimTargetX = (relativeX - 0.5) * 3.0;
-    // Map Y to Length offset (Z-axis distance from crease 3m to 19m)
-    this.currentAimTargetZ = 4.0 + (1.0 - relativeY) * 15.0;
+    this.currentAimTargetZ = 0.5 - (1.0 - relativeY) * 8.0;
 
     // Redraw landing shadow disc marker
     this.gameScene.updateBounceMarker({ x: this.currentAimTargetX, z: this.currentAimTargetZ });
   }
 
-  // --- Release Meter Animations ---
-
-  private startBowlingReleaseMeter(): void {
+  public startUserBowlingDelivery(): void {
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
-    if (isPlayerBatting || this.isTimingBarActive || this.isBallActive) return;
+    if (isPlayerBatting || this.isBallActive || globalAutoAssistConfig.isRunUpActive) return;
 
-    this.isBallActive = true;
-    this.isTimingBarActive = true;
-    this.timingCursorVal = 0;
-    this.timingDirection = 1;
+    this.isBallActive = true; 
+    globalAutoAssistConfig.isRunUpActive = true;
+    globalAutoAssistConfig.runUpStartTime = performance.now();
 
-    // Auto-hide panels to clear pitch view during timing release
+    // Auto-hide panels
     const controlBowling = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
     const controlBatting = document.getElementById('control-batting') || document.getElementById('setup-batting-panel');
     if (controlBowling) controlBowling.classList.add('hidden', 'panel-hidden');
     if (controlBatting) controlBatting.classList.add('hidden', 'panel-hidden');
 
-    const widget = document.getElementById('timing-widget')!;
-    widget.classList.remove('hidden');
-    document.getElementById('timing-instruction')!.innerText = 'Release SPACE or Pointer on perfect zone!';
-
-    this.runTimingMeterLoop();
+    let indicator = document.getElementById('bowler-runup-indicator');
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'bowler-runup-indicator';
+      indicator.style.position = 'absolute';
+      indicator.style.top = '10%';
+      indicator.style.left = '50%';
+      indicator.style.transform = 'translateX(-50%)';
+      indicator.style.fontSize = '2rem';
+      indicator.style.color = 'white';
+      indicator.style.backgroundColor = 'rgba(0,0,0,0.7)';
+      indicator.style.padding = '10px';
+      indicator.style.zIndex = '9999';
+      document.body.appendChild(indicator);
+    }
+    indicator.innerText = 'BOWLING... RELEASE SPACE TO PITCH';
   }
 
-  private runTimingMeterLoop(): void {
-    if (!this.isTimingBarActive) return;
-
-    this.timingCursorVal += this.timingDirection * 0.035;
-    if (this.timingCursorVal >= 1.0) {
-      this.timingCursorVal = 1.0;
-      this.timingDirection = -1;
-    } else if (this.timingCursorVal <= 0.0) {
-      this.timingCursorVal = 0.0;
-      this.timingDirection = 1;
+  public endUserBowlingDelivery(): void {
+    if (!globalAutoAssistConfig.isRunUpActive) return;
+    
+    globalAutoAssistConfig.isRunUpActive = false;
+    
+    const indicator = document.getElementById('bowler-runup-indicator');
+    if (indicator && indicator.parentNode) {
+      indicator.parentNode.removeChild(indicator);
     }
 
-    const cursor = document.getElementById('timing-bar-cursor')!;
-    cursor.style.left = `${this.timingCursorVal * 100}%`;
+    // calculate timing based on proximity to 1200ms
+    const elapsed = performance.now() - (globalAutoAssistConfig.runUpStartTime || 0);
+    let timing = 1.0 - (Math.abs(elapsed - 1200) / 1200);
+    timing = Math.max(0, Math.min(1, timing));
 
-    requestAnimationFrame(() => this.runTimingMeterLoop());
-  }
-
-  private triggerReleaseMeter(): void {
-    if (!this.isTimingBarActive) return;
-    this.isTimingBarActive = false;
-    document.getElementById('timing-widget')!.classList.add('hidden');
-
-    const finalTiming = this.timingCursorVal;
-    
-    // Sync parameters with keyboard intent
+    // Now pitch the ball
     this.selectedBowlType = this.keyboardInputManager.intent.deliveryType;
     this.currentAimTargetX = this.keyboardInputManager.intent.aimX;
     this.currentAimTargetZ = this.keyboardInputManager.intent.aimZ;
 
-    // Pitch the ball
     this.activeDelivery = {
       aimTarget: { x: this.currentAimTargetX, z: this.currentAimTargetZ },
       line: getLineTypeFromAimX(this.currentAimTargetX, this.controller.getCurrentInnings().batter.batterHand || 'RHB'),
-      length: this.currentAimTargetZ > 16 ? 'yorker' : (this.currentAimTargetZ > 13.5 ? 'full' : (this.currentAimTargetZ > 11 ? 'good' : (this.currentAimTargetZ > 8 ? 'short' : 'bouncer'))),
+      length: this.currentAimTargetZ < -6.5 ? 'yorker' : (this.currentAimTargetZ < -4.5 ? 'full' : (this.currentAimTargetZ < -2.5 ? 'good' : (this.currentAimTargetZ < -0.5 ? 'short' : 'bouncer'))),
       type: this.selectedBowlType,
-      releaseTiming: finalTiming
+      releaseTiming: timing
     };
     globalAutoAssistConfig.currentDelivery = this.activeDelivery;
-
-    // Hide bowler setup panel
-    document.getElementById('control-bowling')!.classList.add('hidden');
 
     // Bot decides batting response
     this.pendingBotShot = botChooseShot(
@@ -1152,7 +1149,6 @@ export class UIManager {
     // 3. Clear active in-flight balls and timing meter
     this.activeDelivery = null;
     this.activeShot = null;
-    this.isTimingBarActive = false;
     this.isBallActive = false;
     if (this.botDeliveryTimer) {
       clearTimeout(this.botDeliveryTimer);

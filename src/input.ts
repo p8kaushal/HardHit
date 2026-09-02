@@ -7,34 +7,34 @@ export class KeyboardInputManager {
   public intent: InputIntent;
   private isPlayerBatting: () => boolean;
   private getBatterHandedness: () => 'RHB' | 'LHB';
-  private onReleaseMeterStart: () => void;
-  private onReleaseMeterEnd: (timing: number) => void;
-  private onBatSwing: (direction: number, type: ShotType) => void;
+    private onStartBowling: () => void;
+    private onEndBowling: () => void;
+    private onBatSwing: (direction: number, type: ShotType) => void;
 
-  // Track key hold state
-  private spacePressed = false;
+    // Track key hold state
+    private spacePressed = false;
 
-  // Lists of options for arrow key cycling
-  // We will dynamically compute the aimX based on handedness, so we just track line index 0,1,2 for Leg, Middle, Off
-  private currentLineIdx = 1; // Start middle
+    // Lists of options for arrow key cycling
+    // We will dynamically compute the aimX based on handedness, so we just track line index 0,1,2 for Leg, Middle, Off
+    private currentLineIdx = 1; // Start middle
 
-  private bowlingLengths: number[] = [7.0, 9.5, 12.0, 15.0, 17.5]; // Bouncer, Short, Good, Full, Yorker
-  private bowlingLengthLabels: string[] = ['Bouncer', 'Short', 'Good Length', 'Full', 'Yorker'];
-  private currentLengthIdx = 2; // Start Good Length
+    private bowlingLengths: number[] = [0.5, -1.5, -3.5, -5.5, -7.5]; // Bouncer, Short, Good, Full, Yorker
+    private bowlingLengthLabels: string[] = ['Bouncer', 'Short', 'Good Length', 'Full', 'Yorker'];
+    private currentLengthIdx = 2; // Start Good Length
 
-  constructor(
-    isPlayerBatting: () => boolean,
-    onReleaseMeterStart: () => void,
-    onReleaseMeterEnd: (timing: number) => void,
-    onBatSwing: (direction: number, type: ShotType) => void,
-    getBatterHandedness: () => 'RHB' | 'LHB'
-  ) {
-    activeInputManager = this;
-    this.isPlayerBatting = isPlayerBatting;
-    this.getBatterHandedness = getBatterHandedness;
-    this.onReleaseMeterStart = onReleaseMeterStart;
-    this.onReleaseMeterEnd = onReleaseMeterEnd;
-    this.onBatSwing = onBatSwing;
+    constructor(
+      isPlayerBatting: () => boolean,
+      onStartBowling: () => void,
+      onEndBowling: () => void,
+      onBatSwing: (direction: number, type: ShotType) => void,
+      getBatterHandedness: () => 'RHB' | 'LHB'
+    ) {
+      activeInputManager = this;
+      this.isPlayerBatting = isPlayerBatting;
+      this.getBatterHandedness = getBatterHandedness;
+      this.onStartBowling = onStartBowling;
+      this.onEndBowling = onEndBowling;
+      this.onBatSwing = onBatSwing;
 
     this.intent = {
       aimX: 0.0,
@@ -158,7 +158,7 @@ export class KeyboardInputManager {
       const batting = this.isPlayerBatting();
       if (!batting) {
         // End release meter on bowling release
-        this.onReleaseMeterEnd(this.intent.releaseTiming);
+        this.onEndBowling();
       }
     }
   }
@@ -209,7 +209,7 @@ export class KeyboardInputManager {
     // 3. Spacebar Meter
     if (e.code === 'Space' && !this.spacePressed) {
       this.spacePressed = true;
-      this.onReleaseMeterStart();
+      this.onStartBowling();
     }
   }
 

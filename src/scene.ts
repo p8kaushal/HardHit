@@ -16,7 +16,7 @@ export class GameScene {
   private ballMesh: BABYLON.Mesh | null = null;
   private ballTrail: BABYLON.LinesMesh | null = null;
   private predictionPath: BABYLON.LinesMesh | null = null;
-  private bounceMarker: BABYLON.Mesh | null = null;
+  public bounceMarker: BABYLON.Mesh | null = null;
   private timingRing: BABYLON.Mesh | null = null;
   
   // Characters (Procedural low-poly)
@@ -216,7 +216,9 @@ export class GameScene {
     markerMat.alpha = 0.6;
     this.bounceMarker = BABYLON.MeshBuilder.CreateDisc('bounceMarker', { radius: 0.25 }, this.scene);
     this.bounceMarker.rotation.x = Math.PI / 2;
-    this.bounceMarker.position.y = 0.04;
+    this.bounceMarker.position.y = 0.08;
+    this.bounceMarker.isPickable = false;
+    this.bounceMarker.renderingGroupId = 1;
     this.bounceMarker.setEnabled(false);
     this.bounceMarker.material = markerMat;
 
@@ -279,8 +281,8 @@ export class GameScene {
   }
 
   public setBowlingCameraView(): void {
-    this.primaryCamera.position = new BABYLON.Vector3(0.0, 2.5, 14.0);
-    this.primaryCamera.setTarget(new BABYLON.Vector3(0.4, 1.0, -8.8));
+    this.primaryCamera.position = new BABYLON.Vector3(0.0, 2.6, 13.5);
+    this.primaryCamera.setTarget(new BABYLON.Vector3(0.0, 0.5, -8.8));
     this.primaryCamera.lockedTarget = null;
     this.primaryCamera.fov = 0.85;
   }
@@ -330,7 +332,7 @@ export class GameScene {
     // Dedicated Bowler Mesh Hierarchy
     // --------------------------------------------------------
     const bowlerRoot = new BABYLON.TransformNode("bowlerRoot", this.scene);
-    bowlerRoot.position.set(0.0, 0.0, 16.0);
+    bowlerRoot.position.set(0.6, 0.0, 11.5);
     bowlerRoot.parent = null;
 
     const bowlerMat = new BABYLON.StandardMaterial('bowlerMat', this.scene);
@@ -497,7 +499,7 @@ export class GameScene {
     const targetX = aimTarget.x;
     // We get targetZ from the same marker logic. For bot, it's bounceMarker Z.
     // We will just use the bounce marker Z or compute it.
-    const bounceZ = this.bounceMarker ? this.bounceMarker.position.z : -10 + aimTarget.z;
+    const bounceZ = this.bounceMarker ? this.bounceMarker.position.z : aimTarget.z;
     
     const startX = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
     const release = { x: startX, y: 1.9, z: 10.0 };
@@ -514,13 +516,35 @@ export class GameScene {
     return points;
   }
 
+  public updateBounceMarkerDirect(line: string, length: string): void {
+    if (this.bounceMarker) {
+      this.bounceMarker.parent = null;
+      this.bounceMarker.isVisible = true;
+      this.bounceMarker.setEnabled(true);
+      
+      let x = 0.0;
+      if (line.toLowerCase() === 'off') x = -0.45;
+      if (line.toLowerCase() === 'leg') x = 0.45;
+      if (line.toLowerCase() === 'middle') x = 0.0;
+
+      let z = -4.2;
+      switch (length.toLowerCase()) {
+        case 'yorker': z = -8.2; break;
+        case 'full': z = -6.2; break;
+        case 'good': z = -4.2; break;
+        case 'short': z = -2.2; break;
+        case 'bouncer': z = -0.2; break;
+      }
+      this.bounceMarker.position.copyFrom(new BABYLON.Vector3(x, 0.08, z));
+    }
+  }
+
   public updateBounceMarker(aimTarget: { x: number; z: number }): void {
     if (this.bounceMarker) {
+      this.bounceMarker.parent = null;
+      this.bounceMarker.isVisible = true;
       this.bounceMarker.setEnabled(true);
-      // Let's keep the existing marker Z mapping logic if the user didn't change it, 
-      // but wait, if the pitch is from 16.5 to -18.5, then maybe aimTarget.z should be mapped differently?
-      // "synced with the landing bounce coordinates" - so we use whatever the marker is set to.
-      this.bounceMarker.position.set(aimTarget.x, 0.04, -10 + aimTarget.z);
+      this.bounceMarker.position.set(aimTarget.x, 0.08, aimTarget.z);
     }
   }
 
@@ -556,8 +580,12 @@ export class GameScene {
     this.setCameraMode(preContactCam);
 
     // Position bounce marker indicator on pitch
-    this.bounceMarker?.setEnabled(true);
-    this.bounceMarker!.position.set(aimTarget.x, 0.04, -10 + aimTarget.z);
+    if (this.bounceMarker) {
+      this.bounceMarker.parent = null;
+      this.bounceMarker.isVisible = true;
+      this.bounceMarker.setEnabled(true);
+      this.bounceMarker.position.set(aimTarget.x, 0.08, aimTarget.z);
+    }
 
     const lengthColors: Record<string, BABYLON.Color3> = {
       'good': BABYLON.Color3.FromHexString('#22c55e'),
@@ -803,7 +831,7 @@ export class GameScene {
     this.bowlerRoot.setEnabled(true);
     this.bowlerRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
     this.bowlerRoot.rotation = new BABYLON.Vector3(0, Math.PI, 0);
-    this.bowlerRoot.position = new BABYLON.Vector3(0.0, 0.0, 16.0);
+    this.bowlerRoot.position = new BABYLON.Vector3(0.6, 0.0, 11.5);
     
     // Ensure no ball meshes or other unintended geometries are parented
     const children = this.bowlerRoot.getChildren();
@@ -829,8 +857,8 @@ export class GameScene {
     const duration = 1200;
     const progress = Math.min(1.0, elapsed / duration);
     
-    // Smoothly interpolate from +16.0m to +10.0m (release crease)
-    const z = BABYLON.Scalar.Lerp(16.0, 10.0, progress);
+    // Smoothly interpolate from +12.0m to +10.0m (release crease)
+    const z = BABYLON.Scalar.Lerp(12.0, 10.0, progress);
     const bounce = Math.sin(progress * Math.PI * 8) * 0.15;
     
     this.bowlerRoot.position.z = z;

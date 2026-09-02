@@ -300,12 +300,12 @@ export class MatchController {
         let autoFootwork: 'front_foot' | 'back_foot' = 'front_foot';
         let autoDirection = 0;
         
-        if (length < 11.0) { // short/bouncer
+        if (length > -2.5) { // short/bouncer
           autoFootwork = 'back_foot';
           autoDirection = hand === 'RHB' ? (line < 0 ? 3 : 5) : (line > 0 ? 3 : 5);
         } else { // good/full/yorker
           autoFootwork = 'front_foot';
-          autoDirection = hand === 'RHB' ? (line < -0.3 ? 1 : (line > 0.3 ? 7 : 0)) : (line > 0.3 ? 1 : (line < -0.3 ? 7 : 0));
+          autoDirection = hand === 'RHB' ? (line < -0.2 ? 1 : (line > 0.2 ? 7 : 0)) : (line > 0.2 ? 1 : (line < -0.2 ? 7 : 0));
         }
 
         shot.direction = autoDirection;

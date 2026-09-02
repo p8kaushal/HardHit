@@ -1,4 +1,22 @@
 import { Player, DeliveryChoice, ShotChoice, ShotType } from './types';
+import * as BABYLON from 'babylonjs';
+
+export function calculateBounceTarget(line: string, length: string): BABYLON.Vector3 {
+  let x = 0.0;
+  if (line.toLowerCase() === 'off') x = -0.45;
+  if (line.toLowerCase() === 'leg') x = 0.45;
+  if (line.toLowerCase() === 'middle') x = 0.0;
+
+  let z = -4.2;
+  switch (length.toLowerCase()) {
+    case 'yorker': z = -8.2; break;
+    case 'full': z = -6.2; break;
+    case 'good': z = -4.2; break;
+    case 'short': z = -2.2; break;
+    case 'bouncer': z = -0.2; break;
+  }
+  return new BABYLON.Vector3(x, 0.08, z);
+}
 
 export const SIX_THRESHOLD = 70;
 export const BAT_ANIMATION_LEAD_TIME = 0.15; // 150ms swing apex delay
@@ -279,11 +297,11 @@ export function getLineTypeFromAimX(aimX: number, batterHand: 'RHB' | 'LHB' = 'R
   }
 }
 
-export function getAimXFromLineType(line: import('./types').LineType, batterHand: 'RHB' | 'LHB' = 'RHB'): number {
+export function getAimXFromLineType(line: import('./types').LineType, _batterHand: 'RHB' | 'LHB' = 'RHB'): number {
   let target = 0;
-  if (line === 'off') target = -0.6;
-  if (line === 'leg') target = 0.4;
-  return batterHand === 'LHB' ? -target : target;
+  if (line === 'off') target = -0.45;
+  if (line === 'leg') target = 0.45;
+  return target;
 }
 
 export function verifyFormulas(): void {
@@ -553,5 +571,16 @@ export function getDirectionName(dir: number): string {
     case 6: return "On-side sweep";
     case 7: return "Leg-side On Drive / Pull";
     default: return "Unknown Direction";
+  }
+}
+
+export function getAimZFromLength(length: import('./types').LengthType): number {
+  switch (length) {
+    case 'yorker': return -8.2;
+    case 'full': return -6.5;
+    case 'good': return -4.5;
+    case 'short': return -2.5;
+    case 'bouncer': return -0.5;
+    default: return -4.5;
   }
 }
