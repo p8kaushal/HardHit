@@ -32,30 +32,36 @@ coverage
 # Bower dependency directory
 bower_components
 
-# node-modules
+# Dependency directories
 node_modules/
 jspm_packages/
-
-# Snowpack dependency directory
 web_modules/
 
-# TypeScript cache
+# Python virtual environments (safety guard)
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+__pycache__/
+*.py[cod]
+
+# TypeScript / Build cache
 *.tsbuildinfo
-
-# Optional npm cache directory
 .npm
-
-# Optional eslint cache
 .eslintcache
+.cache/
+.turbo/
+.parcel-cache/
 
-# Microbundle cache
-.eslintcache
-
-# Output directory for Vite
+# Output directory for Vite & builds
 dist/
 dist-ssr/
+build/
+out/
 
-# IDE / Editor folders
+# IDE / Editor folders & OS files
 .idea/
 .vscode/
 *.suo
@@ -64,13 +70,26 @@ dist-ssr/
 *.sln
 *.sw?
 .DS_Store
+Thumbs.db
 
-# Local env files
+# Secrets & Environment variables (never push to VCS)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+*.env
+*.env.*
+*.local
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+secrets.*
+*secret*
+*credentials*
+credentials.json
+serviceAccountKey*.json
 
 # Antigravity & AI directories
 .gemini/
