@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBotPlayer, MatchController } from '../src/game';
+import { KeyboardInputManager } from '../src/input';
 import { BALL_AIR_DAMPING, BATTER_CREASE_Z, bowlingReleaseTiming, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, evaluateFinalOutcome, frameIndependentDamping, getParabolicFlightPosition } from '../src/formula';
 import type { BallOutcome, DeliveryChoice } from '../src/types';
 
@@ -33,6 +34,33 @@ test('bowling meter maps its midpoint to ideal release and clamps extremes', () 
   assert.equal(bowlingReleaseTiming(-100), 0);
   assert.equal(bowlingReleaseTiming(1200), 0.5);
   assert.equal(bowlingReleaseTiming(3000), 1);
+});
+
+test('keyboard bowling starts at good length and updates the aim marker', () => {
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+  const listeners: Record<string, (event: any) => void> = {};
+  const positions: Array<[number, number]> = [];
+  Object.assign(globalThis, {
+    window: {
+      addEventListener: (name: string, listener: (event: any) => void) => { listeners[name] = listener; },
+      removeEventListener: () => {}
+    },
+    document: {
+      getElementById: (id: string) => id === 'screen-gameplay' ? { classList: { contains: () => true } } : null,
+      querySelectorAll: () => []
+    }
+  });
+  try {
+    const input = new KeyboardInputManager(() => false, () => {}, () => {}, () => {}, () => 'RHB', (x, z) => positions.push([x, z]));
+    assert.equal(input.intent.aimZ, -3.5);
+    listeners.keydown({ key: 'ArrowLeft', code: 'ArrowLeft' });
+    listeners.keydown({ key: 'ArrowUp', code: 'ArrowUp' });
+    assert.deepEqual(positions, [[-0.8, -3.5], [-0.8, -5.5]]);
+    input.destroy();
+  } finally {
+    Object.assign(globalThis, { window: originalWindow, document: originalDocument });
+  }
 });
 
 test('extras do not consume a legal ball and only no-balls start a free hit', () => {

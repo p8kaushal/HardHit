@@ -47,7 +47,8 @@ export class UIManager {
       () => this.startUserBowlingDelivery(),
       () => this.endUserBowlingDelivery(),
       (direction, type) => this.executeBattingSwingGesture(direction, type),
-      () => this.controller.getCurrentInnings().batter.batterHand || 'RHB'
+      () => this.controller.getCurrentInnings().batter.batterHand || 'RHB',
+      (x, z) => this.gameScene.updateBounceMarker({ x, z })
     );
     this.initEventListeners();
     this.updateHUD();

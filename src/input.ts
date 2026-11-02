@@ -10,6 +10,7 @@ export class KeyboardInputManager {
     private onStartBowling: () => void;
     private onEndBowling: () => void;
     private onBatSwing: (direction: number, type: ShotType) => void;
+    private onBowlingAim: (x: number, z: number) => void;
 
     // Track key hold state
     private spacePressed = false;
@@ -27,18 +28,20 @@ export class KeyboardInputManager {
       onStartBowling: () => void,
       onEndBowling: () => void,
       onBatSwing: (direction: number, type: ShotType) => void,
-      getBatterHandedness: () => 'RHB' | 'LHB'
+      getBatterHandedness: () => 'RHB' | 'LHB',
+      onBowlingAim: (x: number, z: number) => void
     ) {
       activeInputManager = this;
       this.isPlayerBatting = isPlayerBatting;
       this.getBatterHandedness = getBatterHandedness;
+      this.onBowlingAim = onBowlingAim;
       this.onStartBowling = onStartBowling;
       this.onEndBowling = onEndBowling;
       this.onBatSwing = onBatSwing;
 
     this.intent = {
       aimX: 0.0,
-      aimZ: 12.0,
+      aimZ: -3.5,
       aimDirection: 0,
       deliveryType: 'fast',
       shotType: 'grounded',
@@ -271,19 +274,7 @@ export class KeyboardInputManager {
   }
 
   private triggerBowlingAimUpdate(): void {
-    // Direct position setting is cleaner, but let's fire custom dispatch
-    const canvas = document.getElementById('game-canvas');
-    if (canvas) {
-      const customEvent = {
-        clientX: canvas.getBoundingClientRect().left + (this.intent.aimX / 3.0 + 0.5) * canvas.getBoundingClientRect().width,
-        clientY: canvas.getBoundingClientRect().top + (1.0 - (this.intent.aimZ - 4.0) / 15.0) * canvas.getBoundingClientRect().height
-      };
-      const e = new PointerEvent('pointermove', {
-        clientX: customEvent.clientX,
-        clientY: customEvent.clientY
-      });
-      canvas.dispatchEvent(e);
-    }
+    this.onBowlingAim(this.intent.aimX, this.intent.aimZ);
   }
 
   private syncBowlTypeDOM(): void {
