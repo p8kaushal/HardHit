@@ -1,11 +1,12 @@
 import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './game';
 import { GameScene } from './scene';
-import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
+import { BallOutcome, DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
 import { battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 import { TouchBattingControls } from './touch-controls';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
+import { addLeaderboardEntry, readLeaderboard } from './leaderboard';
 
 export class UIManager {
   private controller: MatchController;
@@ -229,9 +230,6 @@ export class UIManager {
     if (btnReturnLobby) {
       btnReturnLobby.addEventListener('click', () => this.handleReturnToLobby());
     }
-
-    // Stats Popover Listeners
-    initStatsPopover();
 
     // Global listeners
     window.addEventListener('mouseup', () => this.endUserBowlingDelivery());
@@ -1089,26 +1087,13 @@ export class UIManager {
     this.renderMiniTracker('summary-bot-tracker', botInnings?.balls || []);
 
     // 5. Save personal best to Leaderboard
-    const entries = JSON.parse(localStorage.getItem('six_hitting_contest_leaderboard') || '[]');
-    entries.push({
+    addLeaderboardEntry({
       date: new Date().toLocaleDateString(),
       opponent: state.bot.name,
-      biggestSix: playerInnings ? playerInnings.biggestSix.toFixed(1) : '0.0',
+      biggestSix: playerInnings?.biggestSix ?? 0,
       wicketsLost: playerInnings ? playerInnings.wicketsLost : 0,
       outcome: state.winnerId === state.player.id ? 'WON' : (state.winnerId === state.bot.id ? 'LOST' : 'TIED')
     });
-    // Sort primarily by single biggest six (m) descending and secondarily by fewest wickets lost ascending
-    entries.sort((a: any, b: any) => {
-      const sixA = parseFloat(a.biggestSix) || 0;
-      const sixB = parseFloat(b.biggestSix) || 0;
-      if (Math.abs(sixB - sixA) > 0.001) {
-        return sixB - sixA;
-      }
-      const wA = typeof a.wicketsLost === 'number' ? a.wicketsLost : (parseInt(a.wicketsLost, 10) || 0);
-      const wB = typeof b.wicketsLost === 'number' ? b.wicketsLost : (parseInt(b.wicketsLost, 10) || 0);
-      return wA - wB;
-    });
-    localStorage.setItem('six_hitting_contest_leaderboard', JSON.stringify(entries.slice(0, 10)));
 
     // 6. Show the modal overlay
     const modal = document.getElementById('match-summary-modal');
@@ -1118,7 +1103,7 @@ export class UIManager {
     }
   }
 
-  private renderMiniTracker(containerId: string, balls: any[]): void {
+  private renderMiniTracker(containerId: string, balls: BallOutcome[]): void {
     const container = document.getElementById(containerId);
     if (!container) return;
     container.innerHTML = '';
@@ -1484,69 +1469,41 @@ export function renderLeaderboard(): void {
   const leaderboardBody = document.getElementById('leaderboard-body');
   if (!leaderboardBody) return;
 
-  const key = 'six_hitting_contest_leaderboard';
-  const entries: any[] = JSON.parse(localStorage.getItem(key) || '[]');
-
-  // Sort primarily by single biggest six (m) descending and secondarily by fewest wickets lost ascending
-  entries.sort((a: any, b: any) => {
-    const sixA = parseFloat(a.biggestSix) || 0;
-    const sixB = parseFloat(b.biggestSix) || 0;
-    if (Math.abs(sixB - sixA) > 0.001) {
-      return sixB - sixA;
-    }
-    const wA = typeof a.wicketsLost === 'number' ? a.wicketsLost : (parseInt(a.wicketsLost, 10) || 0);
-    const wB = typeof b.wicketsLost === 'number' ? b.wicketsLost : (parseInt(b.wicketsLost, 10) || 0);
-    return wA - wB;
-  });
+  const entries = readLeaderboard();
 
   if (entries.length > 0) {
     leaderboardBody.innerHTML = '';
-    entries.forEach((entry: any, index: number) => {
+    entries.forEach((entry, index) => {
       const row = document.createElement('tr');
       row.className = `leaderboard-row ${index === 0 ? 'top-rank' : ''}`;
 
       const rankMedal = index === 0 ? '🥇' : (index === 1 ? '🥈' : (index === 2 ? '🥉' : ''));
-      const outcome = (entry.outcome || 'TIED').toUpperCase();
+      const outcome = entry.outcome;
       const outcomeClass = outcome === 'WON' ? 'badge-won' : (outcome === 'LOST' ? 'badge-lost' : 'badge-tied');
-      const wicketsVal = entry.wicketsLost !== undefined ? entry.wicketsLost : 0;
-      const sixVal = parseFloat(entry.biggestSix || '0').toFixed(1);
+      const wicketsVal = entry.wicketsLost;
+      const sixVal = entry.biggestSix.toFixed(1);
 
       row.innerHTML = `
         <td class="col-rank">
           <span class="leaderboard-rank-pill rank-pos-${index + 1}">#${index + 1} ${rankMedal}</span>
         </td>
         <td class="col-opponent">
-          <span class="opponent-name">${entry.opponent || 'Bot'}</span>
+          <span class="opponent-name"></span>
         </td>
         <td class="col-six">
           <strong class="six-stat"><span class="fire-icon">💥</span> ${sixVal}m</strong>
         </td>
         <td class="col-wickets">
-          <span class="wickets-stat ${wicketsVal === 0 ? 'flawless' : 'lost'}">${wicketsVal}/1</span>
+          <span class="wickets-stat ${wicketsVal === 0 ? 'flawless' : 'lost'}">${wicketsVal}/6</span>
         </td>
         <td class="col-outcome">
           <span class="badge ${outcomeClass}">${outcome}</span>
         </td>
       `;
+      row.querySelector('.opponent-name')!.textContent = entry.opponent;
       leaderboardBody.appendChild(row);
     });
   } else {
     leaderboardBody.innerHTML = '<tr class="empty-row"><td colspan="5">No matches played yet. Step onto the pitch to set your high score!</td></tr>';
   }
 }
-
-  export function resetHUD(): void {
-    const recShotHud = document.getElementById('recommended-shot-hud');
-    if (recShotHud) {
-      recShotHud.style.display = 'none';
-      recShotHud.innerText = '';
-    }
-  }
-
-  export function startDelivery(): void {
-    const recShotHud = document.getElementById('recommended-shot-hud');
-    if (recShotHud) {
-      recShotHud.style.display = 'none';
-      recShotHud.innerText = '';
-    }
-  }

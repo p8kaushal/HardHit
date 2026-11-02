@@ -28,6 +28,7 @@ export interface Player {
   rank: 'Bronze' | 'Silver' | 'Gold' | 'Elite' | 'Legend';
   stats: PlayerStats;
   batterHand?: 'RHB' | 'LHB';
+  bowlingArm?: 'Right' | 'Left';
 }
 
 export type LineType = 'off' | 'middle' | 'leg';

@@ -1,6 +1,5 @@
 import { getOrCreatePlayer, MatchController } from './game';
 import { UIManager, renderProfile, renderLeaderboard } from './ui';
-import { verifyFormulas } from './formula';
 import { runBotSimulation } from './simulate';
 
 let controller: MatchController | null = null;
@@ -124,7 +123,6 @@ document.getElementById('btn-toss-tails')!.onclick = () => runToss('tails');
 
 // Init application on load
 window.addEventListener('DOMContentLoaded', () => {
-  verifyFormulas();
   initLobby();
 });
 

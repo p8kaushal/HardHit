@@ -308,8 +308,6 @@ export class GameScene {
   }
 
   private buildCharacters(): void {
-    console.log("SCENE MESHES:", this.scene.meshes.map(m => m.name));
-
     // Scene-Graph Duplicate Audit & Purge
     const purgeNames = ['batter', 'player', 'batsman', 'avatar', 'preview', 'capsule'];
     

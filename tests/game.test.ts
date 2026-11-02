@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createBotPlayer, MatchController } from '../src/game';
+import { createBotPlayer, getOrCreatePlayer, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, TouchBattingControls } from '../src/touch-controls';
 import { stepBall, type BallState } from '../src/ball-physics';
 import { botChooseShot } from '../src/bot';
+import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
 import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliverySwingAtBounce, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getParabolicFlightPosition } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
@@ -52,6 +53,53 @@ function match(): MatchController {
   controller.startMatch();
   return controller;
 }
+
+test('new player defaults are not changed by a previous player profile', () => {
+  storage.clear();
+  const first = getOrCreatePlayer();
+  first.stats.batting.power = 99;
+  first.stats.bowling.accuracy = 99;
+  storage.clear();
+  const second = getOrCreatePlayer();
+  assert.equal(second.stats.batting.power, 50);
+  assert.equal(second.stats.bowling.accuracy, 50);
+});
+
+test('partially saved profiles retain progress while missing stats get defaults', () => {
+  storage.clear();
+  storage.set('six_hitting_contest_player', JSON.stringify({ xp: 120, rank: 'Silver', stats: { batting: { power: 72 } } }));
+  const player = getOrCreatePlayer();
+  assert.equal(player.xp, 120);
+  assert.equal(player.rank, 'Silver');
+  assert.equal(player.stats.batting.power, 72);
+  assert.equal(player.stats.bowling.accuracy, 50);
+});
+
+test('a match can start when browser storage is unavailable', () => {
+  const originalStorage = globalThis.localStorage;
+  Object.assign(globalThis, { localStorage: { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } } });
+  try {
+    const game = new MatchController('Medium');
+    game.setTossResult(game.state.player.id, 'bat');
+    game.startMatch();
+    assert.equal(game.state.status, 'playing');
+  } finally {
+    Object.assign(globalThis, { localStorage: originalStorage });
+  }
+});
+
+test('leaderboard tolerates corrupt storage and sorts old and new scores', () => {
+  storage.clear();
+  storage.set('six_hitting_contest_leaderboard', '{bad json');
+  assert.deepEqual(readLeaderboard(), []);
+  storage.set('six_hitting_contest_leaderboard', JSON.stringify([
+    { opponent: 'Bot', biggestSix: '75.5', wicketsLost: '2', outcome: 'won' },
+    { opponent: 'Bot', biggestSix: '75.5', wicketsLost: '1', outcome: 'lost' },
+    null
+  ]));
+  addLeaderboardEntry({ date: '', opponent: 'Bot', biggestSix: 80, wicketsLost: 3, outcome: 'WON' });
+  assert.deepEqual(readLeaderboard().map(entry => [entry.biggestSix, entry.wicketsLost]), [[80, 3], [75.5, 1], [75.5, 2]]);
+});
 
 test('release timing and line distinguish legal balls, wides and no-balls', () => {
   assert.deepEqual(checkExtraBall(delivery(0.5)), { isExtra: false, type: null });
@@ -475,6 +523,24 @@ test('fully tied innings start one-ball sudden death', () => {
   assert.equal(game.state.status, 'playing');
 });
 
+test('sudden death compares legal hits even when an extra came first', () => {
+  const game = match();
+  game.state.currentInningsIndex = 1;
+  (game as any).resolveMatch();
+  const [first, second] = game.state.innings.slice(2);
+  const outcome = (distance: number, isExtra: boolean): BallOutcome => ({
+    ballNumber: 1, delivery: delivery(isExtra ? 0 : 0.5), shot: null,
+    distance, isWicket: false, wicketReason: '', isFreeHit: false,
+    isExtra, extraType: isExtra ? 'wide' : null
+  });
+  first.balls = [outcome(0, true), outcome(70, false)];
+  second.balls = [outcome(50, false)];
+  game.state.currentInningsIndex = 3;
+  (game as any).resolveMatch();
+  assert.equal(game.state.winnerId, first.batter.id);
+  assert.match(game.state.tieBreakDetails?.marginText ?? '', /70\.0m vs 50\.0m/);
+});
+
 test('a tied match completes both sudden-death innings and awards draw progression', () => {
   const game = match();
   const originalDocument = globalThis.document;
@@ -503,6 +569,31 @@ test('a tied match completes both sudden-death innings and awards draw progressi
     assert.equal(game.state.winnerId, null);
     assert.equal(game.state.tieBreakDetails?.deciderTier, 'draw');
     assert.equal(game.state.progression?.xpGained, 50);
+  } finally {
+    Object.assign(globalThis, { document: originalDocument, setTimeout: originalSetTimeout });
+  }
+});
+
+test('a finished innings schedules only one transition', () => {
+  const game = match();
+  const originalDocument = globalThis.document;
+  const originalSetTimeout = globalThis.setTimeout;
+  const timers: Array<() => void> = [];
+  Object.assign(globalThis, {
+    document: {
+      createElement: () => ({ style: {}, parentNode: { removeChild() {} } }),
+      getElementById: () => null,
+      body: { appendChild() {} }
+    },
+    setTimeout: (callback: () => void) => { timers.push(callback); return 0; }
+  });
+  try {
+    for (let i = 0; i < 6; i++) game.recordBall(delivery(0.5), null);
+    game.handleInningsCompletion();
+    game.handleInningsCompletion();
+    assert.equal(timers.length, 1);
+    timers[0]();
+    assert.equal(game.state.currentInningsIndex, 1);
   } finally {
     Object.assign(globalThis, { document: originalDocument, setTimeout: originalSetTimeout });
   }

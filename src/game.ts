@@ -61,31 +61,65 @@ const DEFAULT_STATS: PlayerStats = {
   bowling: { pace: 50, swing: 50, spin: 50, accuracy: 50, stamina: 50, variation: 50 }
 };
 
-export function getOrCreatePlayer(): Player {
-  const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      console.error("Failed to parse player from localStorage", e);
+let sessionPlayer: Player | null = null;
+
+function defaultPlayer(): Player {
+  return {
+    id: 'player_1', name: 'You (All-Rounder)', isBot: false, xp: 0, rank: 'Bronze',
+    stats: { batting: { ...DEFAULT_STATS.batting }, bowling: { ...DEFAULT_STATS.bowling } }
+  };
+}
+
+function normalizePlayer(value: unknown): Player {
+  const player = defaultPlayer();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return player;
+  const data = value as Record<string, unknown>;
+  if (typeof data.id === 'string' && data.id) player.id = data.id;
+  if (typeof data.name === 'string' && data.name) player.name = data.name;
+  if (typeof data.xp === 'number' && Number.isFinite(data.xp)) player.xp = Math.max(0, data.xp);
+  if (data.rank === 'Bronze' || data.rank === 'Silver' || data.rank === 'Gold' || data.rank === 'Elite' || data.rank === 'Legend') player.rank = data.rank;
+  if (data.batterHand === 'RHB' || data.batterHand === 'LHB') player.batterHand = data.batterHand;
+  if (data.bowlingArm === 'Right' || data.bowlingArm === 'Left') player.bowlingArm = data.bowlingArm;
+  const stats = data.stats && typeof data.stats === 'object' ? data.stats as Record<string, unknown> : {};
+  for (const group of ['batting', 'bowling'] as const) {
+    const source = stats[group] && typeof stats[group] === 'object' ? stats[group] as Record<string, unknown> : {};
+    const target = player.stats[group] as unknown as Record<string, number>;
+    for (const key of Object.keys(target)) {
+      const stat = source[key];
+      if (typeof stat === 'number' && Number.isFinite(stat)) target[key] = Math.max(0, Math.min(100, stat));
     }
   }
-  
-  const defaultPlayer: Player = {
-    id: 'player_1',
-    name: 'You (All-Rounder)',
-    isBot: false,
-    xp: 0,
-    rank: 'Bronze',
-    stats: DEFAULT_STATS
-  };
-  
-  savePlayer(defaultPlayer);
-  return defaultPlayer;
+  return player;
+}
+
+export function getOrCreatePlayer(): Player {
+  let data: string | null;
+  try {
+    data = localStorage.getItem(LOCAL_STORAGE_KEY);
+  } catch {
+    return sessionPlayer ?? (sessionPlayer = defaultPlayer());
+  }
+  if (data) {
+    try {
+      return normalizePlayer(JSON.parse(data));
+    } catch {
+      // Do not overwrite unreadable data merely by opening the lobby.
+      return sessionPlayer ?? (sessionPlayer = defaultPlayer());
+    }
+  }
+
+  const player = defaultPlayer();
+  savePlayer(player);
+  return player;
 }
 
 export function savePlayer(player: Player): void {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(player));
+  sessionPlayer = player;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(player));
+  } catch {
+    // Continue with the current session if browser storage is unavailable.
+  }
 }
 
 export function createBotPlayer(difficulty: 'Rookie' | 'Medium' | 'Hard'): Player {
@@ -131,6 +165,7 @@ export function createBotPlayer(difficulty: 'Rookie' | 'Medium' | 'Hard'): Playe
 export class MatchController {
   public state!: MatchState;
   public readonly botDifficulty: 'Rookie' | 'Medium' | 'Hard';
+  private transitionPending = false;
 
   constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard') {
     this.botDifficulty = botDifficulty;
@@ -140,6 +175,7 @@ export class MatchController {
 
   public reset(): void {
     if (globalAutoAssistConfig.isBallInPlay) return;
+    this.transitionPending = false;
     const player = getOrCreatePlayer();
     const bot = createBotPlayer(this.botDifficulty);
     this.state = this.createInitialMatchState(player, bot);
@@ -237,7 +273,7 @@ export class MatchController {
   public recordDeliveryStart(): void {
     globalAutoAssistConfig.deliveryStartTime = performance.now();
     const innings = this.getCurrentInnings();
-    globalAutoAssistConfig.bowlerArm = (innings.bowler as any).bowlingArm || 'Right';
+    globalAutoAssistConfig.bowlerArm = innings.bowler.bowlingArm || 'Right';
   }
 
   public recordBall(delivery: DeliveryChoice, shot: ShotChoice | null): BallOutcome {
@@ -404,7 +440,8 @@ export class MatchController {
 
   public handleInningsCompletion(): void {
     const currentInnings = this.getCurrentInnings();
-    if (currentInnings.finished) {
+    if (currentInnings.finished && !this.transitionPending) {
+      this.transitionPending = true;
       globalAutoAssistConfig.isBallInPlay = false;
       globalAutoAssistConfig.isDeliveryActive = false;
       
@@ -445,6 +482,7 @@ export class MatchController {
         if (overlay.parentNode) {
           overlay.parentNode.removeChild(overlay);
         }
+        this.transitionPending = false;
         
         // If we are at an even index (0, 2, 4), move to the next innings
         if (this.state.currentInningsIndex % 2 === 0) {
@@ -472,8 +510,8 @@ export class MatchController {
     let tieBreakDetails: TieBreakDetails | undefined;
 
     if (isSuddenDeath) {
-      const dist1 = inn1.balls[0]?.distance || 0;
-      const dist2 = inn2.balls[0]?.distance || 0;
+      const dist1 = inn1.balls.find(ball => !ball.isExtra)?.distance || 0;
+      const dist2 = inn2.balls.find(ball => !ball.isExtra)?.distance || 0;
       const wicket1 = inn1.wicketsLost > 0;
       const wicket2 = inn2.wicketsLost > 0;
 
@@ -493,8 +531,8 @@ export class MatchController {
       const loserInn = winnerId === inn1.batter.id ? inn2 : (winnerId === inn2.batter.id ? inn1 : null);
 
       if (winnerInn && loserInn) {
-        const winDist = winnerInn.balls[0]?.distance || 0;
-        const loseDist = loserInn.balls[0]?.distance || 0;
+        const winDist = winnerInn.balls.find(ball => !ball.isExtra)?.distance || 0;
+        const loseDist = loserInn.balls.find(ball => !ball.isExtra)?.distance || 0;
         tieBreakDetails = {
           deciderTier: 'sudden_death',
           tierLabel: '1-Ball Sudden Death Decider',
