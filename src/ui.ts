@@ -659,7 +659,8 @@ export class UIManager {
       this.showResultToast(title, desc);
     } else if (outcome.shot) {
       const theta_shot = (outcome.shot.direction * Math.PI) / 4 - Math.PI / 2;
-      const vOut = calculateShotTrajectory(1, 0.5, 0.5, theta_shot, {x:0, y:0, z:0}, {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type);
+      const quality = Math.max(0, 1 - Math.abs(outcome.shot.timing - 0.5) * 2 - Math.abs(outcome.shot.contactZone - 0.5));
+      const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, {x:0, y:0, z:0}, {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type);
       
       this.gameScene.animateHitPath(outcome.distance, outcome.shot.direction, vOut);
       this.controller.setCameraMode('follow_shot');

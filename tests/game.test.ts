@@ -79,6 +79,14 @@ test('shot trajectory follows all four cardinal directions with finite speed', (
   }
 });
 
+test('shot quality affects exit speed without changing direction', () => {
+  const zero = { x: 0, y: 0, z: 0 };
+  const clean = calculateShotTrajectory(1, 0.5, 0.5, -Math.PI / 4, zero, zero);
+  const mistimed = calculateShotTrajectory(0, 0.5, 0.5, -Math.PI / 4, zero, zero);
+  assert.ok(Math.hypot(clean.x, clean.y, clean.z) > Math.hypot(mistimed.x, mistimed.y, mistimed.z));
+  assert.ok(Math.abs(clean.x / clean.z - mistimed.x / mistimed.z) < 1e-9);
+});
+
 test('ball drag produces the same damping over time at 30 and 60 fps', () => {
   const at30 = frameIndependentDamping(BALL_AIR_DAMPING, 1 / 30) ** 30;
   const at60 = frameIndependentDamping(BALL_AIR_DAMPING, 1 / 60) ** 60;

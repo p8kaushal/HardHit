@@ -462,7 +462,7 @@ export function getContactQualityTier(Q: number): string {
 }
 
 export function calculateShotTrajectory(
-  _Q: number,
+  Q: number,
   _t_input: number,
   _t_ideal: number,
   theta_shot: number,
@@ -516,6 +516,14 @@ export function calculateShotTrajectory(
     Vy *= scale;
     Vz *= scale;
   }
+
+  // Imperfect timing/contact reduces exit speed instead of producing the
+  // same flight for every successful shot of a given type.
+  const quality = Math.max(0, Math.min(1, Number.isFinite(Q) ? Q : 0));
+  const speedFactor = 0.55 + 0.45 * quality;
+  Vx *= speedFactor;
+  Vy *= speedFactor;
+  Vz *= speedFactor;
   
   return { x: Vx, y: Vy, z: Vz };
 }
