@@ -131,7 +131,7 @@ export function createBotPlayer(difficulty: 'Rookie' | 'Medium' | 'Hard'): Playe
 
 export class MatchController {
   public state!: MatchState;
-  private botDifficulty: 'Rookie' | 'Medium' | 'Hard';
+  public readonly botDifficulty: 'Rookie' | 'Medium' | 'Hard';
 
   constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard') {
     this.botDifficulty = botDifficulty;
@@ -326,7 +326,7 @@ export class MatchController {
 
     if (extra.isExtra) {
       innings.score += 1; // +1 run penalty
-      innings.isNextFreeHit = true; // next ball is free hit
+      innings.isNextFreeHit = isFreeHit || extra.type === 'noball';
       
       if (extra.type === 'wide') {
         wicketReason = 'Penalty - Wide ball!';
@@ -334,7 +334,7 @@ export class MatchController {
         wicketReason = 'Penalty - No ball! (Free Hit next)';
       }
       distance = 0;
-      console.log(`[GAME EVENT] Extra ball penalty: ${extra.type?.toUpperCase()}. Innings score: ${innings.score}. Next is Free Hit.`);
+      console.log(`[GAME EVENT] Extra ball penalty: ${extra.type?.toUpperCase()}. Innings score: ${innings.score}.`);
     } else if (shot === null) {
       wicketReason = 'Missed delivery!';
       distance = 0;
@@ -416,11 +416,6 @@ export class MatchController {
       console.log(`[GAME EVENT] Innings completed. Legal balls: ${innings.ballsBowled}. Wickets: ${innings.wicketsLost}. Biggest Six: ${innings.biggestSix}m.`);
     }
 
-    // In case of wicket or extra, we can transition immediately, but we will rely on ui.ts delayed reset.
-    // So we can still evaluate it here. But we will remove checkInningsTransitions from here for hits.
-    if (isWicket || distance === 0) {
-      this.handleInningsCompletion();
-    }
     return outcome;
   }
 
@@ -459,9 +454,6 @@ export class MatchController {
   public handleInningsCompletion(): void {
     const currentInnings = this.getCurrentInnings();
     if (currentInnings.finished) {
-      if (globalAutoAssistConfig.removeTrajectoryObserver) {
-        globalAutoAssistConfig.removeTrajectoryObserver();
-      }
       globalAutoAssistConfig.isBallInPlay = false;
       globalAutoAssistConfig.isDeliveryActive = false;
       
@@ -485,7 +477,7 @@ export class MatchController {
       overlay.style.fontSize = '3rem';
       overlay.style.fontWeight = 'bold';
       overlay.style.zIndex = '9999';
-      overlay.innerText = 'INNINGS OVER - PREPARING TO BOWL';
+      overlay.innerText = 'INNINGS OVER';
       document.body.appendChild(overlay);
 
       // Ensure all UI panels from the batting phase are cleanly hidden/unmounted.
@@ -493,10 +485,9 @@ export class MatchController {
       if (controlBatting) {
         controlBatting.classList.add('hidden', 'panel-hidden');
       }
-      // Restore bowling panel controls immediately
       const controlBowling = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
       if (controlBowling) {
-        controlBowling.classList.remove('hidden', 'panel-hidden');
+        controlBowling.classList.add('hidden', 'panel-hidden');
       }
 
       setTimeout(() => {

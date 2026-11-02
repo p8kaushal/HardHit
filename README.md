@@ -85,6 +85,7 @@ Ensure you have the following installed locally:
 
 - `npm run dev` &mdash; Starts the Vite local development server with hot module replacement (HMR).
 - `npm run build` &mdash; Runs TypeScript compiler checks (`tsc`) and builds the production bundle into `/dist`.
+- `npm test` &mdash; Runs the automated match-rule checks.
 - `npm run preview` &mdash; Locally previews the generated production build.
 
 ---

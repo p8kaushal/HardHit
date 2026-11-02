@@ -655,11 +655,6 @@ export class GameScene {
 
     const animateFrame = () => {
       if (!this.isAnimatingBall) return;
-      if (globalAutoAssistConfig.isDeliveryActive === false) {
-        this.isAnimatingBall = false;
-        return;
-      }
-
       let currentSpeedScale = speedScale;
       let fov = 75;
 

@@ -1,7 +1,7 @@
 import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './game';
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
-import { botChooseShot } from './bot';
+import { botChooseDelivery, botChooseShot } from './bot';
 import { checkExtraBall, getLineTypeFromAimX, SIX_THRESHOLD, calculateShotTrajectory, calculateShotDistance, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 
@@ -347,8 +347,7 @@ export class UIManager {
 
     // calculate timing based on proximity to 1200ms
     const elapsed = performance.now() - (globalAutoAssistConfig.runUpStartTime || 0);
-    let timing = 1.0 - (Math.abs(elapsed - 1200) / 1200);
-    timing = Math.max(0, Math.min(1, timing));
+    const timing = Math.max(0, Math.min(1, elapsed / 2400));
 
     // Now pitch the ball
     this.selectedBowlType = this.keyboardInputManager.intent.deliveryType;
@@ -574,7 +573,7 @@ export class UIManager {
       let shotDistanceMeters = 0;
       let hasBounced = false;
 
-      if (lastBall && lastBall.shot && !lastBall.isWicket) {
+      if (lastBall && lastBall.shot && !lastBall.isWicket && !lastBall.isExtra) {
         const currentPos = (this.gameScene as any).currentBallPos;
         shotDistanceMeters = currentPos ? calculateShotDistance({ position: currentPos }) : (lastBall.distance || 0);
         hasBounced = globalAutoAssistConfig.hasBounced || false;
@@ -597,15 +596,16 @@ export class UIManager {
         this.showResultToast(title, desc);
       }
 
+      if (lastBall && lastBall.shot && !lastBall.isWicket && !lastBall.isExtra) {
+        this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced);
+        this.updateHUD();
+      } else if (lastBall) {
+        this.controller.handleInningsCompletion();
+      }
+
       setTimeout(() => {
         // Step 3: Fade out and hide the result banner overlay completely
         this.hideResultToast();
-
-        if (lastBall && lastBall.shot && !lastBall.isWicket) {
-          // Step 4: Add points/update active scoreboard HUD scores
-          this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced);
-          this.updateHUD();
-        }
 
         // Step 5: LERP the camera back to crease setup view coordinates and unlock control panels for next delivery
         if (this.controller.state.status === 'playing') {
@@ -618,6 +618,7 @@ export class UIManager {
           (this as any).setupActiveTurn();
         }
       }, 2000);
+
     };
 
     if (isPlayerBatting) {
@@ -880,13 +881,8 @@ export class UIManager {
       }
       
       // Auto trigger bot delivery
-      this.activeDelivery = {
-        aimTarget: { x: (Math.random() - 0.5) * 1.5, z: 6.0 + Math.random() * 11.5 },
-        line: 'middle',
-        length: 'good',
-        type: 'fast',
-        releaseTiming: 0.5
-      };
+      this.activeDelivery = botChooseDelivery(state.bot, this.controller.botDifficulty);
+      this.gameScene.updateBounceMarker(this.activeDelivery.aimTarget);
       globalAutoAssistConfig.currentDelivery = this.activeDelivery;
 
       if (this.botDeliveryTimer) clearTimeout(this.botDeliveryTimer);
