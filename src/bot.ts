@@ -107,24 +107,20 @@ export function botChooseShot(
     direction = [0, 4, 1, 7][Math.floor(Math.random() * 4)];
   }
 
-  // Adjust bot timing standard deviation based on difficulty
-  // Calibrated to hit GDD targets:
-  // Rookie: ~40% contact, ~6-10 runs/over
-  let timingStdDev = 0.04;
-  let timingOffset = -0.21; 
+  // Timing is normalised to the same 0..1 scale as player input. A zero
+  // offset centres decisions on arrival; difficulty changes consistency.
+  let timingStdDev = 0.12;
   
   if (difficulty === 'Medium') {
     // Medium: ~75% contact, ~14-20 runs/over
-    timingStdDev = 0.03;
-    timingOffset = -0.13;
+    timingStdDev = 0.075;
   } else if (difficulty === 'Hard') {
     // Hard: ~92% contact, ~26-34 runs/over
-    timingStdDev = 0.02;
-    timingOffset = -0.07;
+    timingStdDev = 0.045;
   }
   
   const arrivalFrame = 50;
-  const swingFrame = randomNormal(arrivalFrame + (timingOffset * 40), timingStdDev * 40);
+  const swingFrame = randomNormal(arrivalFrame, timingStdDev * 40);
   const timing = clamp(0.5 + (swingFrame - arrivalFrame) / 40, 0.15, 0.85);
   
   // Contact execution scales dynamically with batter Timing stat

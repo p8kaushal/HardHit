@@ -4,6 +4,7 @@ import { createBotPlayer, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, TouchBattingControls } from '../src/touch-controls';
 import { stepBall, type BallState } from '../src/ball-physics';
+import { botChooseShot } from '../src/bot';
 import { BALL_AIR_DAMPING, BATTER_CREASE_Z, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getParabolicFlightPosition } from '../src/formula';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
 
@@ -332,6 +333,27 @@ test('bot skill increases across the three difficulty tiers', () => {
   assert.deepEqual(bots.map(bot => bot.stats.bowling.accuracy), [35, 50, 65]);
   assert.deepEqual(bots.map(bot => bot.stats.batting.timing), [35, 50, 65]);
   assert.deepEqual(bots.map(bot => bot.rank), ['Bronze', 'Gold', 'Legend']);
+});
+
+test('harder bot batting is more consistent around the arrival time', () => {
+  const originalRandom = Math.random;
+  const averageDeviation = (tier: 'Rookie' | 'Hard'): number => {
+    let seed = 12345;
+    Math.random = () => { seed = (1664525 * seed + 1013904223) >>> 0; return seed / 4294967296; };
+    const batter = createBotPlayer(tier);
+    const bowler = createBotPlayer('Medium');
+    let total = 0;
+    for (let i = 0; i < 500; i++) total += Math.abs(botChooseShot(batter, bowler, delivery(0.5), tier).timing - 0.5);
+    return total / 500;
+  };
+  try {
+    const rookie = averageDeviation('Rookie');
+    const hard = averageDeviation('Hard');
+    assert.ok(rookie > hard);
+    assert.ok(rookie < 0.15);
+  } finally {
+    Math.random = originalRandom;
+  }
 });
 
 test('recording a bot delivery preserves the line the batter actually saw', () => {
