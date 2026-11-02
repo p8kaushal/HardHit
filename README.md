@@ -12,19 +12,17 @@ Face off against intelligent AI bot tiers in a high-stakes, rapid-fire cricket e
 - **Physics-Driven Ball Trajectory**: Two-phase delivery simulation featuring trajectory aerodynamics, pitch bounce, friction drag, and realistic ball exit speeds.
 - **Delivery Variations**:
   - `Fast` (Raw pace)
-  - `In-swinger` (Curving in toward the stumps)
-  - `Out-swinger` (Drifting away outside off)
-  - `Off-cutter` (Sharp finger spin)
-  - `Leg-cutter` (Sudden grip and turn)
+  - `Medium` and `Slow Ball`
+  - `Off Spin` and `Leg Spin`
 - **Dynamic Batting Archetypes**:
   - `Defensive Block` (Safely deaden dangerous deliveries)
   - `Ground Drive` (High control, safe boundary chasing through the gaps)
   - `Lofted / Power Shot` (Risk-reward high-exit-angle stroke for maximums)
   - `Sweep / Cut` (Directional cross-bat strokes targeting square boundaries)
-- **Precision Timing & Placement**: Real-time swing timing windows (Early, Perfect, Late, Missed) paired with directional shot placement controls.
-- **Fielding AI & Stumps Physics**: Fielders track ball movement, calculate interception paths, and return throws to dislodge bails.
+- **Precision Timing & Placement**: Swing timing paired with directional shot placement controls.
+- **Ball Flight and Boundary Scoring**: Watch the ball travel across the field; a shot that clears the boundary before bouncing scores six.
 - **AI Difficulty Tiers**: Challenge **Rookie**, **Pro**, and **Master** AI bots with specialized bowling accuracy, shot selection algorithms, and aggression metrics.
-- **Match State & Rules Engine**: Authentic 1-over cricket match lifecycle with 1-wicket forfeit rules, a 4-tier tie-break system (wickets lost &rarr; boundary count &rarr; dot balls bowled &rarr; spin), and persistent LocalStorage leaderboard tracking.
+- **Match State & Rules Engine**: One-wicket innings, biggest-six scoring, tie-breaks and a one-ball sudden death, plus a personal leaderboard stored in the browser.
 
 ---
 
@@ -45,8 +43,8 @@ Face off against intelligent AI bot tiers in a high-stakes, rapid-fire cricket e
 | Action | Key / Control |
 |---|---|
 | **Aim / Placement** | `W`, `A`, `S`, `D` or `Arrow Keys` (Adjust pitch target marker or shot angle) |
-| **Bowling Delivery Selection** | `1`–`5` (`1`: Fast, `2`: In-swinger, `3`: Out-swinger, `4`: Off-cutter, `5`: Leg-cutter) |
-| **Batting Shot Selection** | `1`–`4` (`1`: Defensive, `2`: Ground Drive, `3`: Lofted/Power, `4`: Sweep/Cut) |
+| **Bowling Delivery Selection** | `1`–`5` (Fast, Medium, Slow Ball, Off Spin, Leg Spin) |
+| **Batting Shot Selection** | `1`–`4` (Lofted, Power, Grounded, Defensive) |
 | **Action Execution** | `Spacebar` (Stop bowling release point meter / Trigger bat swing timing) |
 | **Shortcuts Modal** | Press `?` or click the HUD shortcuts button |
 
@@ -77,7 +75,7 @@ Ensure you have the following installed locally:
    ```bash
    npm run dev
    ```
-   Open your browser and navigate to `http://localhost:5173` (or the port displayed in your terminal).
+   Open your browser and navigate to `http://localhost:3000` (or the port displayed in your terminal).
 
 ---
 
