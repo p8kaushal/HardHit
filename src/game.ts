@@ -183,7 +183,7 @@ export class MatchController {
       balls: [],
       ballsBowled: 0,
       wicketsLost: 0,
-      maxWickets: 1,
+      maxWickets: 6,
       biggestSix: 0,
       score: 0,
       isNextFreeHit: false,
@@ -196,7 +196,7 @@ export class MatchController {
       balls: [],
       ballsBowled: 0,
       wicketsLost: 0,
-      maxWickets: 1,
+      maxWickets: 6,
       biggestSix: 0,
       score: 0,
       isNextFreeHit: false,
@@ -355,14 +355,13 @@ export class MatchController {
     }
 
     if (isWicket) {
-      innings.wicketsLost = innings.maxWickets; // Forfeit remaining balls by maximizing wickets
-      innings.finished = true;
-      console.log(`[GAME EVENT] WICKET! Batter dismissed: ${wicketReason}. Innings finished.`);
+      innings.wicketsLost += 1;
+      console.log(`[GAME EVENT] WICKET! Batter dismissed: ${wicketReason}.`);
     }
 
-    // Check if innings is finished (6 legal balls or 1 wicket)
+    // A regular contest always gives each batter six legal deliveries.
     const maxBalls = this.state.tieBreakerActive ? 1 : 6;
-    if (innings.ballsBowled >= maxBalls || innings.wicketsLost >= innings.maxWickets) {
+    if (innings.ballsBowled >= maxBalls) {
       innings.finished = true;
       console.log(`[GAME EVENT] Innings completed. Legal balls: ${innings.ballsBowled}. Wickets: ${innings.wicketsLost}. Biggest Six: ${innings.biggestSix}m.`);
     }

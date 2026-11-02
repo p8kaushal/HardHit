@@ -1159,7 +1159,7 @@ export class UIManager {
     if (scoreCountEl) scoreCountEl.innerText = '0';
 
     const wicketsCountEl = document.getElementById('hud-wickets-count');
-    if (wicketsCountEl) wicketsCountEl.innerText = '0/1';
+    if (wicketsCountEl) wicketsCountEl.innerText = '0/6';
 
     const ballsCountEl = document.getElementById('hud-balls-count');
     if (ballsCountEl) ballsCountEl.innerText = '0/6';

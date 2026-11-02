@@ -79,7 +79,7 @@ export interface Innings {
   balls: BallOutcome[];
   ballsBowled: number;
   wicketsLost: number;
-  maxWickets: number; // MVP always 1
+  maxWickets: number; // Maximum dismissals in this innings (six, or one in sudden death)
   biggestSix: number;
   score: number;       // total runs (including +1 for extra balls)
   isNextFreeHit: boolean;

@@ -22,7 +22,7 @@ Face off against intelligent AI bot tiers in a high-stakes, rapid-fire cricket e
 - **Precision Timing & Placement**: Swing timing paired with directional shot placement controls.
 - **Ball Flight and Boundary Scoring**: Watch the ball travel across the field; a shot that clears the boundary before bouncing scores six.
 - **AI Difficulty Tiers**: Challenge **Rookie**, **Pro**, and **Master** AI bots with specialized bowling accuracy, shot selection algorithms, and aggression metrics.
-- **Match State & Rules Engine**: One-wicket innings, biggest-six scoring, tie-breaks and a one-ball sudden death, plus a personal leaderboard stored in the browser.
+- **Match State & Rules Engine**: Six legal balls per innings, biggest-six scoring, tie-breaks and a one-ball sudden death, plus a personal leaderboard stored in the browser.
 
 ---
 

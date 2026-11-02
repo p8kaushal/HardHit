@@ -145,6 +145,20 @@ test('six legal deliveries finish the innings without counting extras', () => {
   assert.equal(innings.finished, true);
 });
 
+test('dismissals do not cut a regular innings short', () => {
+  const game = new MatchController('Hard');
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  const innings = game.getCurrentInnings();
+  for (let i = 0; i < 6; i++) {
+    const outcome = game.recordBall(delivery(0.5), { direction: 0, type: 'power', timing: 0, contactZone: 0.5 });
+    assert.equal(outcome.isWicket, true);
+    assert.equal(innings.finished, i === 5);
+    assert.equal(innings.wicketsLost, i + 1);
+  }
+  assert.equal(innings.ballsBowled, 6);
+});
+
 test('shot trajectory follows all four cardinal directions with finite speed', () => {
   const zero = { x: 0, y: 0, z: 0 };
   const trajectory = (direction: number) => calculateShotTrajectory(
