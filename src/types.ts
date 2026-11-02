@@ -46,6 +46,8 @@ export interface DeliveryChoice {
   length: LengthType;
   type: DeliveryType;
   releaseTiming: number; // 0.0 to 1.0 (0.5 is perfect)
+  pace?: number;         // 0.0 to 1.0 (0.5 is the delivery type's standard pace)
+  turn?: number;         // 0.0 to 1.0 (spin strength; ignored for pace deliveries)
   overTheWicket?: boolean;
 }
 

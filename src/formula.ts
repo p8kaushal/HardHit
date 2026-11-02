@@ -23,19 +23,21 @@ export function calculateBounceTarget(line: string, length: string, hand: 'RHB' 
 export function bowlingTargetFromScreen(x: number, y: number): { x: number; z: number } {
   const horizontal = Math.max(0, Math.min(1, x));
   const vertical = Math.max(0, Math.min(1, y));
-  return { x: (0.5 - horizontal) * 3, z: -7.5 + vertical * 8 };
+  return { x: (0.5 - horizontal) * 3, z: -8.2 + vertical * 8.7 };
 }
 
 export const BAT_ANIMATION_LEAD_TIME = 0.15; // 150ms swing apex delay
 export const BATTER_CREASE_Z = -8.8;
 export const BALL_AIR_DAMPING = 0.9985;
 
-export function deliveryDurationMs(type: DeliveryType): number {
-  return { fast: 1200, medium: 1400, slow: 1650, offspin: 1550, legspin: 1550 }[type];
+export function deliveryDurationMs(type: DeliveryType, pace = 0.5): number {
+  const base = { fast: 1200, medium: 1400, slow: 1650, offspin: 1550, legspin: 1550 }[type];
+  return base * (1.2 - Math.max(0, Math.min(1, pace)) * 0.4);
 }
 
-export function deliveryTurn(type: DeliveryType): number {
-  return type === 'offspin' ? 0.2 : type === 'legspin' ? -0.2 : 0;
+export function deliveryTurn(type: DeliveryType, turn = 0.5): number {
+  const strength = Math.max(0, Math.min(1, turn)) * 0.4;
+  return type === 'offspin' ? strength : type === 'legspin' ? -strength : 0;
 }
 
 /** Approximate the ball's height at the crease from its bounce location. */
@@ -281,7 +283,7 @@ export function checkExtraBall(delivery: DeliveryChoice, _batterHand: 'RHB' | 'L
     return { isExtra: true, type: 'noball' };
   }
 
-  const x = delivery.aimTarget.x + deliveryTurn(delivery.type);
+  const x = delivery.aimTarget.x + deliveryTurn(delivery.type, delivery.turn);
   // Measure strictly relative to absolute pitch center line (X=0.0m) bypassing stance offsets
   if (Math.abs(x) > 0.89) {
     return { isExtra: true, type: 'wide' };
@@ -557,12 +559,13 @@ export function getDeliveryFlightPosition(
   release: { x: number; y: number; z: number },
   bounce: { x: number; y: number; z: number },
   end: { x: number; y: number; z: number },
-  type: DeliveryType
+  type: DeliveryType,
+  turn = 0.5
 ): { x: number; y: number; z: number } {
   const position = getParabolicFlightPosition(progress, release, bounce, end);
   const bounceProgress = (bounce.z - release.z) / (end.z - release.z);
   if (progress > bounceProgress && bounceProgress < 1) {
-    position.x += deliveryTurn(type) * Math.min(1, (progress - bounceProgress) / (1 - bounceProgress));
+    position.x += deliveryTurn(type, turn) * Math.min(1, (progress - bounceProgress) / (1 - bounceProgress));
   }
   return position;
 }

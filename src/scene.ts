@@ -482,7 +482,8 @@ export class GameScene {
   public generateTrajectoryPoints(
     aimTarget: { x: number; z: number },
     type: DeliveryType,
-    _overTheWicket: boolean = true
+    _overTheWicket: boolean = true,
+    turn = 0.5
   ): BABYLON.Vector3[] {
     const points: BABYLON.Vector3[] = [];
     const steps = 60;
@@ -500,7 +501,7 @@ export class GameScene {
     
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
-      const pos = getDeliveryFlightPosition(progress, release, bounce, end, type);
+      const pos = getDeliveryFlightPosition(progress, release, bounce, end, type, turn);
       points.push(new BABYLON.Vector3(pos.x, pos.y, pos.z));
     }
 
@@ -570,7 +571,9 @@ export class GameScene {
     overTheWicket: boolean = true,
     onCreaseCrossed?: () => void,
     isSlowMotion: boolean = false,
-    assistMultiplier: number = 0
+    assistMultiplier: number = 0,
+    pace = 0.5,
+    turn = 0.5
   ): void {
     this.onBallArrivedCallback = onArrived;
     this.onBallResolvedCallback = onResolved;
@@ -607,7 +610,7 @@ export class GameScene {
       this.timingRing.scaling.set(3.0, 3.0, 3.0);
     }
 
-    this.ballTrajectoryPoints = this.generateTrajectoryPoints(aimTarget, deliveryType, overTheWicket);
+    this.ballTrajectoryPoints = this.generateTrajectoryPoints(aimTarget, deliveryType, overTheWicket, turn);
     
     if (this.predictionPath) {
       this.predictionPath.dispose();
@@ -651,7 +654,7 @@ export class GameScene {
     }
 
     // Flight loop runner
-    let speedScale = 1000 / deliveryDurationMs(deliveryType);
+    let speedScale = 1000 / deliveryDurationMs(deliveryType, pace);
     if (isSlowMotion) {
       speedScale *= 0.35; // Reduce by 65% for bullet-time
     }
@@ -881,7 +884,7 @@ export class GameScene {
     if (globalAutoAssistConfig.deliveryStartTime) {
       const elapsed = performance.now() - globalAutoAssistConfig.deliveryStartTime;
       const delivery = globalAutoAssistConfig.currentDelivery;
-      const duration = deliveryDurationMs(delivery?.type ?? 'medium');
+      const duration = deliveryDurationMs(delivery?.type ?? 'medium', delivery?.pace);
       let progress = elapsed / duration;
       
       if (progress >= 1.0) {
@@ -898,7 +901,7 @@ export class GameScene {
       const seamDrift = 0;
       const end = { x: targetX + seamDrift, y: deliveryArrivalHeight(targetZ), z: BATTER_CREASE_Z };
       
-      const pos = getDeliveryFlightPosition(progress, release, bounce, end, delivery?.type ?? 'medium');
+      const pos = getDeliveryFlightPosition(progress, release, bounce, end, delivery?.type ?? 'medium', delivery?.turn);
       ball.position.set(pos.x, pos.y, pos.z);
       if (progress >= 1.0 && this.onBallArrivedCallback) this.onBallArrivedCallback();
     }

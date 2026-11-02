@@ -415,6 +415,8 @@
                 <button class="btn" data-val="off">Off Side</button>
                 <button class="btn" data-val="leg">Leg Side</button>
               </div>
+              <div class="pitch-map-label">Drag to aim</div>
+              <div id="bowling-pitch-map" class="bowling-pitch-map" role="img" aria-label="Bowling target map: far end at top, bowler at bottom"><span id="bowling-map-marker" class="bowling-map-marker"></span></div>
             </div>
           </div>
 
@@ -444,6 +446,9 @@
                 <button class="btn" data-val="legspin">Leg Spin</button>
               </div>
             </div>
+
+            <label class="bowling-adjustment">PACE <input id="bowl-pace" type="range" min="0" max="100" value="50" aria-label="Bowling pace"><span>LOW &nbsp; · &nbsp; HIGH</span></label>
+            <label class="bowling-adjustment">SPIN TURN <input id="bowl-turn" type="range" min="0" max="100" value="50" aria-label="Spin amount, applies to spin deliveries"><span>LOW &nbsp; · &nbsp; HIGH</span></label>
 
             <div class="action-btn-row">
               <button id="btn-bowl-pitch" class="btn primary-btn size-large">Hold & Release SPACE / Touch</button>

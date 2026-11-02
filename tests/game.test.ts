@@ -95,6 +95,9 @@ test('keyboard bowling starts at good length and updates the aim marker', () => 
     listeners.keydown({ key: 'ArrowLeft', code: 'ArrowLeft' });
     listeners.keydown({ key: 'ArrowUp', code: 'ArrowUp' });
     assert.deepEqual(positions, [[0.8, -3.5], [0.8, -5.5]]);
+    input.setBowlingAim(-0.8, 0.5);
+    listeners.keydown({ key: 'ArrowLeft', code: 'ArrowLeft' });
+    assert.deepEqual(positions[2], [0, 0.5]);
     input.destroy();
   } finally {
     Object.assign(globalThis, { window: originalWindow, document: originalDocument });
@@ -105,6 +108,8 @@ test('bowler camera screen directions map to the correct pitch coordinates', () 
   assert.ok(bowlingTargetFromScreen(0, 0.5).x > 0);
   assert.ok(bowlingTargetFromScreen(1, 0.5).x < 0);
   assert.ok(bowlingTargetFromScreen(0.5, 0).z < bowlingTargetFromScreen(0.5, 1).z);
+  assert.deepEqual(bowlingTargetFromScreen(0.5, 0), { x: 0, z: -8.2 });
+  assert.ok(Math.abs(bowlingTargetFromScreen(0.5, 1).z - 0.5) < 1e-9);
   assert.equal(calculateBounceTarget('off', 'good', 'RHB').x, -0.45);
   assert.equal(calculateBounceTarget('off', 'good', 'LHB').x, 0.45);
 });
@@ -267,16 +272,20 @@ test('delivery trajectory reaches the bounce point and the batter crease', () =>
 
 test('delivery variations affect pace and turn only after pitching', () => {
   assert.ok(deliveryDurationMs('fast') < deliveryDurationMs('slow'));
+  assert.ok(deliveryDurationMs('fast', 1) < deliveryDurationMs('fast', 0));
   const release = { x: 0, y: 1.9, z: 10 };
   const bounce = { x: 0, y: 0.06, z: -3.5 };
   const end = { x: 0, y: 0.85, z: BATTER_CREASE_Z };
   const bounceProgress = (bounce.z - release.z) / (end.z - release.z);
   assert.ok(Math.abs(getDeliveryFlightPosition(bounceProgress, release, bounce, end, 'offspin').x) < 1e-9);
   assert.ok(getDeliveryFlightPosition(1, release, bounce, end, 'offspin').x > 0);
+  assert.equal(getDeliveryFlightPosition(1, release, bounce, end, 'offspin', 0).x, 0);
+  assert.ok(getDeliveryFlightPosition(1, release, bounce, end, 'offspin', 1).x > getDeliveryFlightPosition(1, release, bounce, end, 'offspin', 0.5).x);
   assert.ok(getDeliveryFlightPosition(1, release, bounce, end, 'legspin').x < 0);
   assert.equal(getDeliveryFlightPosition(1, release, bounce, end, 'fast').x, 0);
   const spinner = { ...delivery(0.5, 0.8), type: 'offspin' as const };
   assert.equal(checkExtraBall(spinner).type, 'wide');
+  assert.equal(checkExtraBall({ ...spinner, turn: 0 }).isExtra, false);
 });
 
 test('a yorker reaches the batter lower than a short delivery', () => {

@@ -170,6 +170,15 @@ export class KeyboardInputManager {
     return [0.8, 0.0, -0.8][idx];
   }
 
+  public setBowlingAim(x: number, z: number): void {
+    this.intent.aimX = x;
+    this.intent.aimZ = z;
+    this.currentLineIdx = x > 0.4 ? 0 : x < -0.4 ? 2 : 1;
+    this.currentLengthIdx = this.bowlingLengths.reduce(
+      (best, length, index) => Math.abs(length - z) < Math.abs(this.bowlingLengths[best] - z) ? index : best, 0
+    );
+  }
+
   public getBowlingLineLabel(idx: number): string {
     const hand = this.getBatterHandedness();
     if (idx === 0) return hand === 'RHB' ? 'Leg Side' : 'Off Side';
