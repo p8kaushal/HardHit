@@ -1,7 +1,7 @@
 import * as BABYLON from 'babylonjs';
 import { CameraMode } from './types';
 import { globalAutoAssistConfig } from './game';
-import { frameIndependentDamping, getParabolicFlightPosition } from './formula';
+import { deliveryAnimationStep, frameIndependentDamping, getParabolicFlightPosition } from './formula';
 
 export class GameScene {
   public scene: BABYLON.Scene;
@@ -678,7 +678,7 @@ export class GameScene {
         }
       }
 
-      this.ballAnimationTime += 1.0 * currentSpeedScale;
+      this.ballAnimationTime += deliveryAnimationStep(this.engine.getDeltaTime(), currentSpeedScale);
       const index = Math.floor(this.ballAnimationTime);
 
       if (this.timingRing && this.ballMesh) {

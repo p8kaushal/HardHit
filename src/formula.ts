@@ -26,6 +26,10 @@ export function frameIndependentDamping(perFrame: number, elapsedSeconds: number
   return Math.pow(perFrame, Math.max(0, elapsedSeconds) * 60);
 }
 
+export function deliveryAnimationStep(elapsedMs: number, speedScale: number): number {
+  return Math.min(Math.max(elapsedMs, 0), 50) * 60 / 1000 * speedScale;
+}
+
 /**
  * Predicted Arrival Z Timestamp Solver
  */

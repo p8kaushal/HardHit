@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBotPlayer, MatchController } from '../src/game';
-import { calculateShotDistance, calculateShotTrajectory, checkExtraBall, evaluateFinalOutcome, frameIndependentDamping } from '../src/formula';
+import { calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, evaluateFinalOutcome, frameIndependentDamping } from '../src/formula';
 import type { BallOutcome, DeliveryChoice } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -77,6 +77,13 @@ test('ball drag produces the same damping over time at 30 and 60 fps', () => {
   const at30 = frameIndependentDamping(0.985, 1 / 30) ** 30;
   const at60 = frameIndependentDamping(0.985, 1 / 60) ** 60;
   assert.ok(Math.abs(at30 - at60) < 1e-12);
+});
+
+test('delivery animation advances at the same speed at 30 and 60 fps', () => {
+  const at30 = deliveryAnimationStep(1000 / 30, 1) * 30;
+  const at60 = deliveryAnimationStep(1000 / 60, 1) * 60;
+  assert.ok(Math.abs(at30 - at60) < 1e-9);
+  assert.equal(deliveryAnimationStep(500, 1), 3);
 });
 
 test('boundary scoring uses the rope crossing and bounce, not carry distance alone', () => {
