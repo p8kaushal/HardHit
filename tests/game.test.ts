@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBotPlayer, MatchController } from '../src/game';
 import { calculateShotDistance, calculateShotTrajectory, checkExtraBall, evaluateFinalOutcome } from '../src/formula';
-import type { DeliveryChoice } from '../src/types';
+import type { BallOutcome, DeliveryChoice } from '../src/types';
 
 const storage = new Map<string, string>();
 Object.assign(globalThis, { localStorage: {
@@ -97,4 +97,29 @@ test('bot skill increases across the three difficulty tiers', () => {
   assert.deepEqual(bots.map(bot => bot.stats.bowling.accuracy), [35, 50, 65]);
   assert.deepEqual(bots.map(bot => bot.stats.batting.timing), [35, 50, 65]);
   assert.deepEqual(bots.map(bot => bot.rank), ['Bronze', 'Gold', 'Legend']);
+});
+
+test('tie breaks compare second sixes before total carry and exclude fours', () => {
+  const game = match();
+  const [first, second] = game.state.innings;
+  const hit = (distance: number, runs: number): BallOutcome => ({
+    ballNumber: 1, delivery: delivery(0.5), shot: null, distance, runs,
+    isWicket: false, wicketReason: '', isFreeHit: false, isExtra: false, extraType: null
+  });
+  first.biggestSix = second.biggestSix = 80;
+  first.balls = [hit(80, 6), hit(60, 6)];
+  second.balls = [hit(80, 6), hit(59, 4), hit(50, 4)];
+  (game as any).resolveMatch();
+  assert.equal(game.state.winnerId, first.batter.id);
+  assert.equal(game.state.tieBreakDetails?.deciderTier, 'second_biggest_six');
+});
+
+test('fully tied innings start one-ball sudden death', () => {
+  const game = match();
+  game.state.currentInningsIndex = 1;
+  (game as any).resolveMatch();
+  assert.equal(game.state.tieBreakerActive, true);
+  assert.equal(game.state.innings.length, 4);
+  assert.equal(game.state.currentInningsIndex, 2);
+  assert.equal(game.state.status, 'playing');
 });

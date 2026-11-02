@@ -585,46 +585,35 @@ export class MatchController {
             marginText: `Won via Fewer Wickets Lost: ${winWickets} vs ${loseWickets} wickets lost`
           };
         } else {
-          // Tie-break Tier 2: Total carry distance
-          console.log(`[GAME EVENT] Wickets lost are tied. Applying Tie-break Tier 2 (total carry distance).`);
-          const totalDist1 = inn1.balls.reduce((acc, b) => acc + b.distance, 0);
-          const totalDist2 = inn2.balls.reduce((acc, b) => acc + b.distance, 0);
-          
-          if (Math.abs(totalDist1 - totalDist2) > 0.01) {
-            winnerId = totalDist1 > totalDist2 ? inn1.batter.id : inn2.batter.id;
-            const winDist = Math.max(totalDist1, totalDist2);
-            const loseDist = Math.min(totalDist1, totalDist2);
+          // Compare actual sixes before considering aggregate carry distance.
+          const secondSix = (innings: Innings): number =>
+            innings.balls.filter(ball => ball.runs === 6)
+              .map(ball => ball.distance).sort((a, b) => b - a)[1] || 0;
+          const second1 = secondSix(inn1);
+          const second2 = secondSix(inn2);
+          const total1 = inn1.balls.reduce((sum, ball) => sum + ball.distance, 0);
+          const total2 = inn2.balls.reduce((sum, ball) => sum + ball.distance, 0);
+
+          if (Math.abs(second1 - second2) > 0.01) {
+            winnerId = second1 > second2 ? inn1.batter.id : inn2.batter.id;
+            tieBreakDetails = {
+              deciderTier: 'second_biggest_six',
+              tierLabel: '2nd Biggest Six Decider',
+              description: 'Decided by the second-biggest six',
+              marginText: `Won via 2nd Biggest Six: ${Math.max(second1, second2).toFixed(1)}m vs ${Math.min(second1, second2).toFixed(1)}m`
+            };
+          } else if (Math.abs(total1 - total2) > 0.01) {
+            winnerId = total1 > total2 ? inn1.batter.id : inn2.batter.id;
             tieBreakDetails = {
               deciderTier: 'total_carry',
               tierLabel: 'Total Carry Distance Decider',
-              description: 'Decided via Tie-Break Ladder Tier 2 (Aggregate Distance of All Hits)',
-              marginText: `Won via Total Carry Distance: ${winDist.toFixed(1)}m vs ${loseDist.toFixed(1)}m`
+              description: 'Decided by the combined distance of all hits',
+              marginText: `Won via Total Carry Distance: ${Math.max(total1, total2).toFixed(1)}m vs ${Math.min(total1, total2).toFixed(1)}m`
             };
           } else {
-            // Tie-break Tier 3: Second biggest six
-            console.log(`[GAME EVENT] Total carry distances are tied. Applying Tie-break Tier 3 (second biggest six).`);
-            const sortedDist1 = inn1.balls.map(b => b.distance).sort((a, b) => b - a);
-            const sortedDist2 = inn2.balls.map(b => b.distance).sort((a, b) => b - a);
-            const secBiggest1 = sortedDist1[1] || 0;
-            const secBiggest2 = sortedDist2[1] || 0;
-            
-            if (Math.abs(secBiggest1 - secBiggest2) > 0.01) {
-              winnerId = secBiggest1 > secBiggest2 ? inn1.batter.id : inn2.batter.id;
-              const winSec = Math.max(secBiggest1, secBiggest2);
-              const loseSec = Math.min(secBiggest1, secBiggest2);
-              tieBreakDetails = {
-                deciderTier: 'second_biggest_six',
-                tierLabel: '2nd Biggest Six Decider',
-                description: 'Decided via Tie-Break Ladder Tier 3 (Second Furthest Hit)',
-                marginText: `Won via 2nd Biggest Six: ${winSec.toFixed(1)}m vs ${loseSec.toFixed(1)}m`
-              };
-            } else {
-              // Trigger 1-ball Sudden Death Decider
-              console.log(`[GAME EVENT] Match completely tied across all tiers. Activating 1-ball sudden death decider!`);
-              this.state.tieBreakerActive = true;
-              this.setupSuddenDeath();
-              return;
-            }
+            this.state.tieBreakerActive = true;
+            this.setupSuddenDeath();
+            return;
           }
         }
       }
