@@ -1,5 +1,6 @@
 import { InputIntent, ShotType } from './types';
 import { globalAutoAssistConfig } from './game';
+import { updateBowlingAdjustmentVisibility } from './bowling-controls';
 
 export let activeInputManager: KeyboardInputManager | null = null;
 
@@ -297,6 +298,7 @@ export class KeyboardInputManager {
   }
 
   private syncBowlTypeDOM(): void {
+    updateBowlingAdjustmentVisibility(this.intent.deliveryType);
     const buttons = document.querySelectorAll('#bowl-type-group .btn');
     buttons.forEach(btn => {
       btn.classList.remove('active');

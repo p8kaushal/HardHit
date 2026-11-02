@@ -44,7 +44,7 @@ A mobile-first, cross-device multiplayer cricket game centered on a single duel 
 - Stance/aim direction (drag to aim shot zone, e.g. 8 directions on a clock face)
 - Shot type: lofted / grounded / power / defensive (affects six probability vs risk of miscue)
 - Timing: a timing gesture (tap/hold-release) synced to ball arrival — early/perfect/late, same primitive across devices
-- Bat contact zone: where on a virtual "bat face" the timing gesture lands (sweet spot vs edge) — this is the "hitting spot in bat" mechanic
+- Contact quality is derived from timing and the delivery's line; it is not a separate bat-face control.
 
 **Batter stat block:**
 - Power, Timing (widens the "perfect" window), Placement (shot accuracy toward aimed direction), Technique (reduces miscue chance vs good bowling), Stamina

@@ -31,7 +31,9 @@ export const BATTER_CREASE_Z = -8.8;
 export const BALL_AIR_DAMPING = 0.9985;
 
 export function deliveryDurationMs(type: DeliveryType, pace = 0.5): number {
-  const base = { fast: 1200, medium: 1400, slow: 1650, offspin: 1550, legspin: 1550 }[type];
+  // Approximately 18.8 m from release to the crease: faster balls arrive
+  // sooner, while spin gives the batter more time in flight.
+  const base = { fast: 600, medium: 750, slow: 1050, offspin: 1000, legspin: 1000 }[type];
   return base * (1.2 - Math.max(0, Math.min(1, pace)) * 0.4);
 }
 
@@ -40,9 +42,45 @@ export function deliveryTurn(type: DeliveryType, turn = 0.5): number {
   return type === 'offspin' ? strength : type === 'legspin' ? -strength : 0;
 }
 
-/** Approximate the ball's height at the crease from its bounce location. */
-export function deliveryArrivalHeight(bounceZ: number): number {
-  return Math.max(0.12, Math.min(1.35, 0.08 + (bounceZ - BATTER_CREASE_Z) * 0.15));
+/** Approximate pre-bounce swing, measured in metres in world coordinates. */
+export function deliverySwingAtBounce(type: DeliveryType, swing = 0, bounceZ = -3.5): number {
+  if (type === 'offspin' || type === 'legspin') return 0;
+  const direction = Math.max(-1, Math.min(1, swing));
+  const flightFraction = Math.max(0, Math.min(1, (10 - bounceZ) / (10 - BATTER_CREASE_Z)));
+  // Screen-left is positive X from the bowler's end.
+  return -direction * 0.45 * flightFraction;
+}
+
+export function deliverySwingAtCrease(type: DeliveryType, swing = 0, bounceZ = -3.5): number {
+  const fraction = Math.max(0.01, Math.min(1, (10 - bounceZ) / (10 - BATTER_CREASE_Z)));
+  return deliverySwingAtBounce(type, swing, bounceZ) * (1 + 2 * (1 - fraction) / fraction);
+}
+
+export function deliveryCreaseX(delivery: DeliveryChoice): number {
+  return delivery.aimTarget.x + deliverySwingAtCrease(delivery.type, delivery.swing, delivery.aimTarget.z) + deliveryTurn(delivery.type, delivery.turn);
+}
+
+/** Contact varies with timing and the line the ball actually reaches. */
+export function battingContactZone(delivery: DeliveryChoice, timing: number, baseContact?: number): number {
+  const base = baseContact ?? 0.5 + (timing - 0.5) * 0.4;
+  return Math.max(0, Math.min(1, base + deliveryCreaseX(delivery) * 0.25));
+}
+
+/** Ballistic vertical motion, with a simplified rebound from the pitch. */
+export function deliveryVerticalPosition(progress: number, releaseY: number, bounceY: number, bounceProgress: number, durationSeconds: number): number {
+  const bounceTime = Math.max(0.001, bounceProgress * durationSeconds);
+  const t = Math.max(0, Math.min(1, progress)) * durationSeconds;
+  const initialVelocity = (bounceY - releaseY) / bounceTime + 0.5 * 9.81 * bounceTime;
+  if (t <= bounceTime) return releaseY + initialVelocity * t - 0.5 * 9.81 * t * t;
+  const impactVelocity = initialVelocity - 9.81 * bounceTime;
+  const reboundVelocity = Math.max(0, -impactVelocity) * 0.55;
+  const afterBounce = t - bounceTime;
+  return Math.max(bounceY, bounceY + reboundVelocity * afterBounce - 0.5 * 9.81 * afterBounce * afterBounce);
+}
+
+export function deliveryArrivalHeight(bounceZ: number, type: DeliveryType = 'medium', pace = 0.5): number {
+  const bounceProgress = (bounceZ - 10) / (BATTER_CREASE_Z - 10);
+  return deliveryVerticalPosition(1, 1.9, 0.06, bounceProgress, deliveryDurationMs(type, pace) / 1000);
 }
 
 /** Front foot suits fuller balls; back foot gives more room for shorter balls. */
@@ -293,7 +331,7 @@ export function checkExtraBall(delivery: DeliveryChoice, _batterHand: 'RHB' | 'L
     return { isExtra: true, type: 'noball' };
   }
 
-  const x = delivery.aimTarget.x + deliveryTurn(delivery.type, delivery.turn);
+  const x = deliveryCreaseX(delivery);
   // Measure strictly relative to absolute pitch center line (X=0.0m) bypassing stance offsets
   if (Math.abs(x) > 0.89) {
     return { isExtra: true, type: 'wide' };
@@ -563,17 +601,23 @@ export function getParabolicFlightPosition(
   return { x, y, z };
 }
 
-/** Apply spin after the bounce; the target marks where the ball pitches. */
+/** Apply pace swing in flight and spin turn after the bounce. */
 export function getDeliveryFlightPosition(
   progress: number,
   release: { x: number; y: number; z: number },
   bounce: { x: number; y: number; z: number },
   end: { x: number; y: number; z: number },
   type: DeliveryType,
-  turn = 0.5
+  turn = 0.5,
+  swing = 0,
+  pace = 0.5
 ): { x: number; y: number; z: number } {
   const position = getParabolicFlightPosition(progress, release, bounce, end);
   const bounceProgress = (bounce.z - release.z) / (end.z - release.z);
+  const swingProgress = bounceProgress > 0 ? Math.max(0, progress / bounceProgress) : 1;
+  const swingFactor = swingProgress <= 1 ? swingProgress * swingProgress : 1 + 2 * (swingProgress - 1);
+  position.x += deliverySwingAtBounce(type, swing, bounce.z) * swingFactor;
+  position.y = deliveryVerticalPosition(progress, release.y, bounce.y, bounceProgress, deliveryDurationMs(type, pace) / 1000);
   if (progress > bounceProgress && bounceProgress < 1) {
     position.x += deliveryTurn(type, turn) * Math.min(1, (progress - bounceProgress) / (1 - bounceProgress));
   }

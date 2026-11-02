@@ -48,6 +48,7 @@ export interface DeliveryChoice {
   releaseTiming: number; // 0.0 to 1.0 (0.5 is perfect)
   pace?: number;         // 0.0 to 1.0 (0.5 is the delivery type's standard pace)
   turn?: number;         // 0.0 to 1.0 (spin strength; ignored for pace deliveries)
+  swing?: number;        // -1 to 1, left/right from the bowler's view
   overTheWicket?: boolean;
 }
 

@@ -447,8 +447,9 @@
               </div>
             </div>
 
-            <label class="bowling-adjustment">PACE <input id="bowl-pace" type="range" min="0" max="100" value="50" aria-label="Bowling pace"><span>LOW &nbsp; · &nbsp; HIGH</span></label>
-            <label class="bowling-adjustment">SPIN TURN <input id="bowl-turn" type="range" min="0" max="100" value="50" aria-label="Spin amount, applies to spin deliveries"><span>LOW &nbsp; · &nbsp; HIGH</span></label>
+            <label id="bowl-pace-control" class="bowling-adjustment">SPEED <input id="bowl-pace" type="range" min="0" max="100" value="50" aria-label="Bowling speed"><span>LOW &nbsp; · &nbsp; HIGH</span></label>
+            <label id="bowl-swing-control" class="bowling-adjustment">SWING <input id="bowl-swing" type="range" min="-100" max="100" value="0" aria-label="Swing direction and amount from bowler's view"><span>LEFT &nbsp; · &nbsp; NONE &nbsp; · &nbsp; RIGHT</span></label>
+            <label id="bowl-turn-control" class="bowling-adjustment hidden">SPIN TURN <input id="bowl-turn" type="range" min="0" max="100" value="50" aria-label="Spin turn amount"><span>LOW &nbsp; · &nbsp; HIGH</span></label>
 
             <div class="action-btn-row">
               <button id="btn-bowl-pitch" class="btn primary-btn size-large">Hold & Release SPACE / Touch</button>
@@ -465,7 +466,6 @@
             </div>
             <div class="touch-batting-actions">
               <div class="footwork-control" role="group" aria-label="Batting footwork"><button type="button" class="footwork-choice active" data-footwork="front_foot" aria-pressed="true">FRONT</button><button type="button" class="footwork-choice" data-footwork="back_foot" aria-pressed="false">BACK</button></div>
-              <label class="bat-contact-control">BAT FACE <input class="bat-contact" type="range" min="0" max="100" value="50" aria-label="Bat face contact: edge to middle to edge"><span>EDGE &nbsp; · &nbsp; MIDDLE &nbsp; · &nbsp; EDGE</span></label>
             <div class="touch-shot-buttons" aria-label="Batting shots">
               <button type="button" class="touch-shot loft-shot" data-shot="lofted">LOFT</button>
               <button type="button" class="touch-shot drive-shot" data-shot="grounded">DRIVE</button>
@@ -513,7 +513,6 @@
             </div>
 
             <div class="footwork-control" role="group" aria-label="Batting footwork"><button type="button" class="footwork-choice active" data-footwork="front_foot" aria-pressed="true">FRONT</button><button type="button" class="footwork-choice" data-footwork="back_foot" aria-pressed="false">BACK</button></div>
-            <label class="bat-contact-control">Bat face <input class="bat-contact" type="range" min="0" max="100" value="50" aria-label="Bat face contact: edge to middle to edge"><span>EDGE &nbsp; · &nbsp; MIDDLE &nbsp; · &nbsp; EDGE</span></label>
 
             <div class="action-btn-row">
               <button id="btn-bat-swing" class="btn primary-btn size-large">Hold & Release SPACE / Touch</button>

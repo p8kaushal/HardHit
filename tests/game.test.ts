@@ -5,7 +5,8 @@ import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, TouchBattingControls } from '../src/touch-controls';
 import { stepBall, type BallState } from '../src/ball-physics';
 import { botChooseShot } from '../src/bot';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getParabolicFlightPosition } from '../src/formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliverySwingAtBounce, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getParabolicFlightPosition } from '../src/formula';
+import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -300,6 +301,88 @@ test('delivery variations affect pace and turn only after pitching', () => {
   const spinner = { ...delivery(0.5, 0.8), type: 'offspin' as const };
   assert.equal(checkExtraBall(spinner).type, 'wide');
   assert.equal(checkExtraBall({ ...spinner, turn: 0 }).isExtra, false);
+});
+
+test('pace swing develops in the air and spin turn only after the bounce', () => {
+  const release = { x: 0, y: 1.9, z: 10 };
+  const bounce = { x: 0, y: 0.06, z: -3.5 };
+  const end = { x: 0, y: 0.85, z: BATTER_CREASE_Z };
+  const bounceProgress = (bounce.z - release.z) / (end.z - release.z);
+  const left = deliverySwingAtBounce('fast', -1, bounce.z);
+  const right = deliverySwingAtBounce('fast', 1, bounce.z);
+  assert.ok(left > 0 && right < 0);
+  assert.equal(left, -right);
+  assert.equal(getDeliveryFlightPosition(0, release, bounce, end, 'fast', 0, 1).x, 0);
+  const midway = getDeliveryFlightPosition(bounceProgress / 2, release, bounce, end, 'fast', 0, 1).x;
+  const impact = getDeliveryFlightPosition(bounceProgress, release, bounce, end, 'fast', 0, 1).x;
+  assert.ok(midway < 0 && midway > impact);
+  assert.ok(Math.abs(impact - right) < 1e-9);
+  const atCrease = getDeliveryFlightPosition(1, release, bounce, end, 'fast', 0, 1).x;
+  assert.ok(atCrease < impact);
+  assert.ok(Math.abs(atCrease - deliveryCreaseX({ ...delivery(0.5), swing: 1 })) < 1e-9);
+  assert.equal(deliverySwingAtBounce('offspin', 1, bounce.z), 0);
+  assert.equal(isSpinDelivery('offspin'), true);
+  assert.equal(isSpinDelivery('fast'), false);
+  assert.equal(checkExtraBall({ ...delivery(0.5, -0.7), swing: 1 }).type, 'wide');
+});
+
+test('delivery height is continuous at the pitch and rises after impact', () => {
+  const release = { x: 0, y: 1.9, z: 10 };
+  const bounce = { x: 0, y: 0.06, z: -3.5 };
+  const end = { x: 0, y: 0.85, z: BATTER_CREASE_Z };
+  const at = (bounce.z - release.z) / (end.z - release.z);
+  const before = getDeliveryFlightPosition(at - 0.001, release, bounce, end, 'fast');
+  const impact = getDeliveryFlightPosition(at, release, bounce, end, 'fast');
+  const after = getDeliveryFlightPosition(at + 0.001, release, bounce, end, 'fast');
+  assert.ok(Math.abs(impact.y - bounce.y) < 1e-9);
+  assert.ok(before.y > impact.y && after.y > impact.y);
+  assert.ok(Math.abs(before.y - after.y) < 0.02);
+});
+
+test('delivery type switches between speed and swing or spin controls', () => {
+  const originalDocument = globalThis.document;
+  const hidden: Record<string, boolean> = {};
+  Object.assign(globalThis, { document: { getElementById: (id: string) => ({ classList: { toggle: (_name: string, value: boolean) => { hidden[id] = value; } } }) } });
+  try {
+    updateBowlingAdjustmentVisibility('fast');
+    assert.deepEqual(hidden, { 'bowl-pace-control': false, 'bowl-swing-control': false, 'bowl-turn-control': true });
+    updateBowlingAdjustmentVisibility('offspin');
+    assert.deepEqual(hidden, { 'bowl-pace-control': true, 'bowl-swing-control': true, 'bowl-turn-control': false });
+  } finally {
+    Object.assign(globalThis, { document: originalDocument });
+  }
+});
+
+test('delivery timings correspond to plausible average release-to-crease speeds', () => {
+  const speedKmh = (type: 'fast' | 'offspin') => 18.8 / (deliveryDurationMs(type) / 1000) * 3.6;
+  assert.ok(speedKmh('fast') >= 100 && speedKmh('fast') <= 150);
+  assert.ok(speedKmh('offspin') >= 55 && speedKmh('offspin') <= 90);
+});
+
+test('bat contact and wide decisions use the delivered line at the crease', () => {
+  const straight = delivery(0.5);
+  const swinging = { ...straight, swing: -1 };
+  const turning = { ...straight, type: 'offspin' as const, turn: 1 };
+  assert.equal(battingContactZone(straight, 0.5), 0.5);
+  assert.ok(deliveryCreaseX(swinging) > 0);
+  assert.ok(battingContactZone(swinging, 0.5) > 0.5);
+  assert.ok(battingContactZone(turning, 0.5) > 0.5);
+  assert.ok(battingContactZone(straight, 0) < 0.5);
+});
+
+test('delivery visuals and crease-line scoring agree for pace and spin', () => {
+  const release = { x: -0.6, y: 1.9, z: 10 };
+  const bounce = { x: 0.25, y: 0.06, z: -3.5 };
+  const end = { x: bounce.x, y: 0.85, z: BATTER_CREASE_Z };
+  for (const choice of [
+    { ...delivery(0.5, 0.25), swing: -1 },
+    { ...delivery(0.5, 0.25), swing: 1 },
+    { ...delivery(0.5, 0.25), type: 'offspin' as const, turn: 0.8 },
+    { ...delivery(0.5, 0.25), type: 'legspin' as const, turn: 0.8 }
+  ]) {
+    const visible = getDeliveryFlightPosition(1, release, bounce, end, choice.type, choice.turn, choice.swing, choice.pace);
+    assert.ok(Math.abs(visible.x - deliveryCreaseX(choice)) < 1e-9);
+  }
 });
 
 test('a yorker reaches the batter lower than a short delivery', () => {

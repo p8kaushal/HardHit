@@ -48,7 +48,7 @@ Play a biggest-six duel against a bot. Each batter faces six legal deliveries; t
 | **Action Execution** | `Spacebar` (Stop bowling release point meter / Trigger bat swing timing) |
 | **Shortcuts Modal** | Press `H` or click the HUD shortcuts button |
 
-On a phone, drag the left batting stick to aim, choose front or back foot, set the bat-face contact point with the slider, and tap a shot button with your other thumb as the ball arrives. Front foot suits fuller balls; back foot suits short balls. Aim bowling deliveries on the pitch or the compact pitch map, choose a delivery type, adjust pace and spin turn, then hold and release the delivery button in the green timing zone. Releasing early or late moves the actual bounce point away from the target. Spin turn applies to off-spin and leg-spin deliveries.
+On a phone, drag the left batting stick to aim, choose front or back foot, and tap a shot button with your other thumb as the ball arrives. Front foot suits fuller balls; back foot suits short balls. Aim bowling deliveries on the pitch or the compact pitch map, choose a delivery type, adjust speed and swing for pace or turn for spin, then hold and release the delivery button in the green timing zone. Swing directions are shown from the bowler's view; releasing early or late also moves the bounce point away from the target.
 
 ---
 

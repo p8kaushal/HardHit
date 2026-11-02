@@ -1,7 +1,7 @@
 import * as BABYLON from 'babylonjs';
 import { CameraMode, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BATTER_CREASE_Z, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, getDeliveryFlightPosition } from './formula';
+import { BATTER_CREASE_Z, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
 import { stepBall, type BallState } from './ball-physics';
 
 export class GameScene {
@@ -483,7 +483,9 @@ export class GameScene {
     aimTarget: { x: number; z: number },
     type: DeliveryType,
     _overTheWicket: boolean = true,
-    turn = 0.5
+    turn = 0.5,
+    swing = 0,
+    pace = 0.5
   ): BABYLON.Vector3[] {
     const points: BABYLON.Vector3[] = [];
     const steps = 60;
@@ -497,11 +499,11 @@ export class GameScene {
     const release = { x: startX, y: 1.9, z: 10.0 };
     const bounce = { x: targetX, y: 0.06, z: bounceZ };
     const seamDrift = 0;
-    const end = { x: targetX + seamDrift, y: deliveryArrivalHeight(bounceZ), z: BATTER_CREASE_Z };
+    const end = { x: targetX + seamDrift, y: deliveryArrivalHeight(bounceZ, type, pace), z: BATTER_CREASE_Z };
     
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
-      const pos = getDeliveryFlightPosition(progress, release, bounce, end, type, turn);
+      const pos = getDeliveryFlightPosition(progress, release, bounce, end, type, turn, swing, pace);
       points.push(new BABYLON.Vector3(pos.x, pos.y, pos.z));
     }
 
@@ -573,7 +575,8 @@ export class GameScene {
     isSlowMotion: boolean = false,
     assistMultiplier: number = 0,
     pace = 0.5,
-    turn = 0.5
+    turn = 0.5,
+    swing = 0
   ): void {
     this.onBallArrivedCallback = onArrived;
     this.onBallResolvedCallback = onResolved;
@@ -590,7 +593,7 @@ export class GameScene {
       this.bounceMarker.parent = null;
       this.bounceMarker.isVisible = true;
       this.bounceMarker.setEnabled(true);
-      this.bounceMarker.position.set(aimTarget.x, 0.08, aimTarget.z);
+      this.bounceMarker.position.set(aimTarget.x + deliverySwingAtBounce(deliveryType, swing, aimTarget.z), 0.08, aimTarget.z);
     }
 
     const lengthColors: Record<string, BABYLON.Color3> = {
@@ -610,7 +613,7 @@ export class GameScene {
       this.timingRing.scaling.set(3.0, 3.0, 3.0);
     }
 
-    this.ballTrajectoryPoints = this.generateTrajectoryPoints(aimTarget, deliveryType, overTheWicket, turn);
+    this.ballTrajectoryPoints = this.generateTrajectoryPoints(aimTarget, deliveryType, overTheWicket, turn, swing, pace);
     
     if (this.predictionPath) {
       this.predictionPath.dispose();
@@ -899,9 +902,9 @@ export class GameScene {
       const release = { x: startX, y: 1.9, z: 10.0 };
       const bounce = { x: targetX, y: 0.06, z: targetZ };
       const seamDrift = 0;
-      const end = { x: targetX + seamDrift, y: deliveryArrivalHeight(targetZ), z: BATTER_CREASE_Z };
+      const end = { x: targetX + seamDrift, y: deliveryArrivalHeight(targetZ, delivery?.type, delivery?.pace), z: BATTER_CREASE_Z };
       
-      const pos = getDeliveryFlightPosition(progress, release, bounce, end, delivery?.type ?? 'medium', delivery?.turn);
+      const pos = getDeliveryFlightPosition(progress, release, bounce, end, delivery?.type ?? 'medium', delivery?.turn, delivery?.swing, delivery?.pace);
       ball.position.set(pos.x, pos.y, pos.z);
       if (progress >= 1.0 && this.onBallArrivedCallback) this.onBallArrivedCallback();
     }

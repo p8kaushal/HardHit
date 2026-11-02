@@ -2,9 +2,10 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 import { TouchBattingControls } from './touch-controls';
+import { isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
 
 export class UIManager {
   private controller: MatchController;
@@ -28,7 +29,6 @@ export class UIManager {
   
   // Selections
   private selectedShotType: ShotType = 'grounded';
-  private selectedContactZone = 0.5;
   private selectedBowlType: 'fast' | 'medium' | 'slow' | 'offspin' | 'legspin' = 'fast';
   public isBannerActive: boolean = false;
 
@@ -52,6 +52,7 @@ export class UIManager {
       (x, z) => this.setBowlingTarget({ x, z })
     );
     this.initEventListeners();
+    updateBowlingAdjustmentVisibility(this.keyboardInputManager.intent.deliveryType);
     new TouchBattingControls(
       document.getElementById('touch-stick')!,
       document.querySelectorAll<HTMLButtonElement>('.touch-shot'),
@@ -94,11 +95,6 @@ export class UIManager {
     pitchMap.addEventListener('pointerup', event => { if (event.pointerId === pitchPointer) pitchPointer = null; });
     pitchMap.addEventListener('pointercancel', event => { if (event.pointerId === pitchPointer) pitchPointer = null; });
 
-    const contactInputs = document.querySelectorAll<HTMLInputElement>('.bat-contact');
-    contactInputs.forEach(input => input.addEventListener('input', () => {
-      this.selectedContactZone = Math.max(0, Math.min(1, input.valueAsNumber / 100));
-      contactInputs.forEach(other => { other.value = input.value; });
-    }));
     document.querySelectorAll<HTMLButtonElement>('.footwork-choice').forEach(button => button.addEventListener('click', () => {
       const footwork = button.dataset.footwork;
       if (footwork === 'front_foot' || footwork === 'back_foot') this.keyboardInputManager.setFootwork(footwork);
@@ -127,6 +123,7 @@ export class UIManager {
         target.classList.add('active');
         this.selectedBowlType = target.getAttribute('data-val') as any;
         this.keyboardInputManager.intent.deliveryType = this.selectedBowlType;
+        updateBowlingAdjustmentVisibility(this.selectedBowlType);
         this.keyboardInputManager.updateFeedbackOverlay();
       });
     });
@@ -385,14 +382,16 @@ export class UIManager {
       this.controller.getCurrentInnings().bowler.stats.bowling.accuracy
     );
 
+    const spin = isSpinDelivery(this.selectedBowlType);
     this.activeDelivery = {
       aimTarget: executedTarget,
       line: getLineTypeFromAimX(executedTarget.x, this.controller.getCurrentInnings().batter.batterHand || 'RHB'),
       length: executedTarget.z < -6.5 ? 'yorker' : (executedTarget.z < -4.5 ? 'full' : (executedTarget.z < -2.5 ? 'good' : (executedTarget.z < -0.5 ? 'short' : 'bouncer'))),
       type: this.selectedBowlType,
       releaseTiming: timing,
-      pace: (document.getElementById('bowl-pace') as HTMLInputElement).valueAsNumber / 100,
-      turn: (document.getElementById('bowl-turn') as HTMLInputElement).valueAsNumber / 100
+      pace: spin ? 0.5 : (document.getElementById('bowl-pace') as HTMLInputElement).valueAsNumber / 100,
+      turn: spin ? (document.getElementById('bowl-turn') as HTMLInputElement).valueAsNumber / 100 : 0,
+      swing: spin ? 0 : (document.getElementById('bowl-swing') as HTMLInputElement).valueAsNumber / 100
     };
     globalAutoAssistConfig.currentDelivery = this.activeDelivery;
 
@@ -436,7 +435,7 @@ export class UIManager {
       direction,
       type,
       timing: Math.max(0.0, Math.min(1.0, timing)),
-      contactZone: contactZone ?? this.selectedContactZone,
+      contactZone: battingContactZone(this.activeDelivery, timing, contactZone),
       footwork: isPlayerBatting ? this.keyboardInputManager.intent.footwork : undefined
     };
 
@@ -551,7 +550,8 @@ export class UIManager {
           z = (this.gameScene as any).currentBallPos?.z || 0;
         }
         
-        const reactionTrigger = z <= -5.5;
+        const elapsed = performance.now() - (globalAutoAssistConfig.deliveryStartTime ?? performance.now());
+        const reactionTrigger = elapsed >= Math.max(0, deliveryDurationMs(this.activeDelivery.type, this.activeDelivery.pace) - 300);
         const creaseTrigger = z <= -8.8;
 
         if (creaseTrigger) {
@@ -662,7 +662,8 @@ export class UIManager {
         isSlowMotion,
         0,
         this.activeDelivery.pace,
-        this.activeDelivery.turn
+        this.activeDelivery.turn,
+        this.activeDelivery.swing
       );
     }
   }
