@@ -4,7 +4,7 @@ import { createBotPlayer, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, TouchBattingControls } from '../src/touch-controls';
 import { stepBall, type BallState } from '../src/ball-physics';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, evaluateFinalOutcome, evaluateWicket, frameIndependentDamping, getDeliveryFlightPosition, getParabolicFlightPosition } from '../src/formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getParabolicFlightPosition } from '../src/formula';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -196,6 +196,19 @@ test('shot quality affects exit speed without changing direction', () => {
   const mistimed = calculateShotTrajectory(0, 0.5, 0.5, -Math.PI / 4, zero, zero);
   assert.ok(Math.hypot(clean.x, clean.y, clean.z) > Math.hypot(mistimed.x, mistimed.y, mistimed.z));
   assert.ok(Math.abs(clean.x / clean.z - mistimed.x / mistimed.z) < 1e-9);
+});
+
+test('footwork choice changes the timing window for short and full balls', () => {
+  assert.ok(footworkFactor('front_foot', 'full') > footworkFactor('back_foot', 'full'));
+  assert.ok(footworkFactor('back_foot', 'short') > footworkFactor('front_foot', 'short'));
+  const game = match();
+  const bowler = game.state.bot;
+  const batter = game.state.player;
+  const ball = { ...delivery(0.5), length: 'full' as const };
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
+  const front = evaluateWicket(batter, bowler, ball, { ...shot, footwork: 'front_foot' });
+  const back = evaluateWicket(batter, bowler, ball, { ...shot, footwork: 'back_foot' });
+  assert.ok(front.safeWindowMs > back.safeWindowMs);
 });
 
 test('batter power influences the ball exit speed', () => {

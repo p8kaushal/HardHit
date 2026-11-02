@@ -44,10 +44,11 @@ Play a biggest-six duel against a bot. Each batter faces six legal deliveries; t
 | **Aim / Placement** | `W`, `A`, `S`, `D` or `Arrow Keys` (Adjust pitch target marker or shot angle) |
 | **Bowling Delivery Selection** | `1`–`5` (Fast, Medium, Slow Ball, Off Spin, Leg Spin) |
 | **Batting Shot Selection** | `1`–`4` (Lofted, Power, Grounded, Defensive) |
+| **Batting Footwork** | `Q` for front foot, `E` for back foot |
 | **Action Execution** | `Spacebar` (Stop bowling release point meter / Trigger bat swing timing) |
 | **Shortcuts Modal** | Press `H` or click the HUD shortcuts button |
 
-On a phone, drag the left batting stick to aim, set the bat-face contact point with the slider, and tap a shot button with your other thumb as the ball arrives. Aim bowling deliveries on the pitch or the compact pitch map, choose a delivery type, adjust pace and spin turn, then hold and release the delivery button in the green timing zone. Releasing early or late moves the actual bounce point away from the target. Spin turn applies to off-spin and leg-spin deliveries.
+On a phone, drag the left batting stick to aim, choose front or back foot, set the bat-face contact point with the slider, and tap a shot button with your other thumb as the ball arrives. Front foot suits fuller balls; back foot suits short balls. Aim bowling deliveries on the pitch or the compact pitch map, choose a delivery type, adjust pace and spin turn, then hold and release the delivery button in the green timing zone. Releasing early or late moves the actual bounce point away from the target. Spin turn applies to off-spin and leg-spin deliveries.
 
 ---
 

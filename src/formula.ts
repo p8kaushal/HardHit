@@ -45,6 +45,13 @@ export function deliveryArrivalHeight(bounceZ: number): number {
   return Math.max(0.12, Math.min(1.35, 0.08 + (bounceZ - BATTER_CREASE_Z) * 0.15));
 }
 
+/** Front foot suits fuller balls; back foot gives more room for shorter balls. */
+export function footworkFactor(footwork: ShotChoice['footwork'], length: DeliveryChoice['length']): number {
+  if (!footwork) return 1;
+  const shortBall = length === 'short' || length === 'bouncer';
+  return (footwork === 'back_foot') === shortBall ? 1.08 : 0.8;
+}
+
 /** Apply a 60 Hz damping coefficient consistently at any frame rate. */
 export function frameIndependentDamping(perFrame: number, elapsedSeconds: number): number {
   return Math.pow(perFrame, Math.max(0, elapsedSeconds) * 60);
@@ -130,7 +137,8 @@ export function evaluateWicket(
   const techniqueResist = batter.stats.batting.technique / 100;
   
   const effectiveRisk = shotRisk * ballThreat * (1 - techniqueResist);
-  const safeWindowMs = 180 * (1 - effectiveRisk);
+  const footwork = footworkFactor(shot.footwork, delivery.length);
+  const safeWindowMs = 180 * (1 - effectiveRisk) * footwork;
   
   let outerToleranceMs = safeWindowMs / 2;
   if (!batter.isBot && bowler.isBot) {
@@ -145,6 +153,8 @@ export function evaluateWicket(
   } else if (!batter.isBot && !bowler.isBot) {
     outerToleranceMs = 120; // Default for PvP
   }
+  // The default tolerance is derived from safeWindowMs and is already scaled.
+  if (!batter.isBot) outerToleranceMs *= footwork;
   
   // Map relative shot timing (0.0 to 1.0) to milliseconds deviation
   // Perfect timing is 0.5. Swing window is 500ms total.

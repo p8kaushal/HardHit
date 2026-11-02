@@ -45,6 +45,7 @@ export class KeyboardInputManager {
       aimDirection: 0,
       deliveryType: 'fast',
       shotType: 'grounded',
+      footwork: 'front_foot',
       releaseTiming: 0.5,
       swingTiming: 0.5
     };
@@ -231,8 +232,8 @@ export class KeyboardInputManager {
     this.pressedKeys.add(e.key.toLowerCase());
     
     // Footwork selections
-    if (e.key.toLowerCase() === 'q') (this.intent as any).footwork = 'front';
-    if (e.key.toLowerCase() === 'e') (this.intent as any).footwork = 'back';
+    if (e.key.toLowerCase() === 'q') this.setFootwork('front_foot');
+    if (e.key.toLowerCase() === 'e') this.setFootwork('back_foot');
     
     if (!globalAutoAssistConfig.isDeliveryActive) {
       // Calculate 8-way direction based on WASD or Arrows
@@ -280,6 +281,15 @@ export class KeyboardInputManager {
         this.onBatSwing(this.intent.aimDirection, this.intent.shotType);
       }
     }
+  }
+
+  public setFootwork(footwork: NonNullable<InputIntent['footwork']>): void {
+    this.intent.footwork = footwork;
+    document.querySelectorAll<HTMLButtonElement>('.footwork-choice').forEach(button => {
+      const selected = button.dataset.footwork === footwork;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
   }
 
   private triggerBowlingAimUpdate(): void {

@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 import { TouchBattingControls } from './touch-controls';
 
@@ -98,6 +98,10 @@ export class UIManager {
     contactInputs.forEach(input => input.addEventListener('input', () => {
       this.selectedContactZone = Math.max(0, Math.min(1, input.valueAsNumber / 100));
       contactInputs.forEach(other => { other.value = input.value; });
+    }));
+    document.querySelectorAll<HTMLButtonElement>('.footwork-choice').forEach(button => button.addEventListener('click', () => {
+      const footwork = button.dataset.footwork;
+      if (footwork === 'front_foot' || footwork === 'back_foot') this.keyboardInputManager.setFootwork(footwork);
     }));
 
     // Shot selector
@@ -432,7 +436,8 @@ export class UIManager {
       direction,
       type,
       timing: Math.max(0.0, Math.min(1.0, timing)),
-      contactZone: contactZone ?? this.selectedContactZone
+      contactZone: contactZone ?? this.selectedContactZone,
+      footwork: isPlayerBatting ? this.keyboardInputManager.intent.footwork : undefined
     };
 
     this.gameScene.animateBatterSwing(direction, () => {
@@ -687,7 +692,7 @@ export class UIManager {
       this.showResultToast(title, desc);
     } else if (outcome.shot) {
       const theta_shot = (outcome.shot.direction * Math.PI) / 4 - Math.PI / 2;
-      const quality = Math.max(0, 1 - Math.abs(outcome.shot.timing - 0.5) * 2 - Math.abs(outcome.shot.contactZone - 0.5));
+      const quality = Math.max(0, 1 - Math.abs(outcome.shot.timing - 0.5) * 2 - Math.abs(outcome.shot.contactZone - 0.5)) * footworkFactor(outcome.shot.footwork, outcome.delivery.length);
       const batterPower = this.controller.getCurrentInnings().batter.stats.batting.power;
       const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, {x:0, y:0, z:0}, {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower);
       

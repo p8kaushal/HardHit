@@ -2875,6 +2875,18 @@ kbd {
 
 /* Touch batting: aim with one thumb and strike with the other. */
 .touch-batting-controls { display: none; }
+.footwork-control { display: flex; gap: .3rem; }
+.footwork-choice {
+  flex: 1;
+  min-height: 34px;
+  border: 1px solid rgba(255,255,255,.65);
+  border-radius: 7px;
+  background: rgba(20,30,47,.9);
+  color: white;
+  font-size: .67rem;
+  font-weight: 800;
+}
+.footwork-choice.active { background: #3758a0; border-color: #89dff7; }
 .bat-contact-control {
   display: grid;
   gap: .25rem;
