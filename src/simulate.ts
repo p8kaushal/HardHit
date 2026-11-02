@@ -1,6 +1,6 @@
 import { createBotPlayer } from './game';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { evaluateWicket, checkExtraBall, calculateDeliveryVelocity, calculateProjectedCreaseX } from './formula';
+import { evaluateWicket, checkExtraBall } from './formula';
 
 export function runBotSimulation(matchCount: number = 500, specificTier?: 'Rookie' | 'Medium' | 'Hard', _mode: 'bowling' | 'batting' | 'full' = 'full') {
   const tiersToRun: ('Rookie' | 'Medium' | 'Hard')[] = specificTier ? [specificTier] : ['Rookie', 'Medium', 'Hard'];
@@ -23,28 +23,6 @@ export function runBotSimulation(matchCount: number = 500, specificTier?: 'Rooki
       while (ballsBowled < 6 && wicketsLost < 1) {
         const delivery = botChooseDelivery(bowler, bowlTier);
         
-        if (bowler.isBot) {
-          const stanceMultiplier = batter.batterHand === 'LHB' ? -1 : 1;
-          delivery.aimTarget.x *= stanceMultiplier;
-          
-          let limit = 0.65; // Rookie
-          if (bowlTier === 'Medium') limit = 0.42;
-          else if (bowlTier === 'Hard') limit = 0.20;
-          
-          let X_target_crease = delivery.aimTarget.x;
-          X_target_crease = Math.max(-limit, Math.min(limit, X_target_crease));
-          
-          const X_release = delivery.overTheWicket !== false ? -0.6 : 0.6;
-          const t_flight = 0.6;
-          const Ax_swing = 0;
-          const X_spin = 0;
-          
-          const Vx = calculateDeliveryVelocity(X_release, X_target_crease, t_flight, Ax_swing, X_spin);
-          const X_projected_crease = calculateProjectedCreaseX(X_release, Vx, t_flight, Ax_swing, X_spin);
-          
-          delivery.aimTarget.x = X_projected_crease;
-        }
-
         const absX = Math.abs(delivery.aimTarget.x);
         if (absX > maxCreaseX) {
           maxCreaseX = absX;

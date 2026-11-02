@@ -1,5 +1,5 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { evaluateWicket, calculateDistance, checkExtraBall, calculateDeliveryVelocity, calculateProjectedCreaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
+import { evaluateWicket, calculateDistance, checkExtraBall, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { activeInputManager } from './input';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
@@ -253,31 +253,6 @@ export class MatchController {
     globalAutoAssistConfig.hasBounced = false;
 
     const ballNumber = innings.ballsBowled + 1;
-
-    if (innings.bowler.isBot) {
-      const stanceMultiplier = innings.batter.batterHand === 'LHB' ? -1 : 1;
-      
-      // 1. Batter Stance Normalization
-      delivery.aimTarget.x *= stanceMultiplier;
-
-      // 2. Absolute Center-Clamped Crease Arrival
-      let limit = 0.65; // Easy/Rookie
-      if (innings.bowler.id === 'bot_medium') limit = 0.42;
-      else if (innings.bowler.id === 'bot_hard') limit = 0.20;
-      
-      let X_target_crease = delivery.aimTarget.x;
-      X_target_crease = Math.max(-limit, Math.min(limit, X_target_crease));
-      
-      const X_release = delivery.overTheWicket !== false ? -0.6 : 0.6;
-      const t_flight = 0.6;
-      const Ax_swing = 0;
-      const X_spin = 0;
-      
-      const Vx = calculateDeliveryVelocity(X_release, X_target_crease, t_flight, Ax_swing, X_spin);
-      const X_projected_crease = calculateProjectedCreaseX(X_release, Vx, t_flight, Ax_swing, X_spin);
-      
-      delivery.aimTarget.x = X_projected_crease;
-    }
 
     const extra = checkExtraBall(delivery, innings.batter.batterHand || 'RHB');
     

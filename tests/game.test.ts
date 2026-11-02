@@ -99,6 +99,17 @@ test('bot skill increases across the three difficulty tiers', () => {
   assert.deepEqual(bots.map(bot => bot.rank), ['Bronze', 'Gold', 'Legend']);
 });
 
+test('recording a bot delivery preserves the line the batter actually saw', () => {
+  const game = match();
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  game.state.player.batterHand = 'LHB';
+  const ball = delivery(0.5, 0.7);
+  game.recordBall(ball, null);
+  assert.equal(ball.aimTarget.x, 0.7);
+  assert.equal(game.getCurrentInnings().balls[0].delivery.aimTarget.x, 0.7);
+});
+
 test('tie breaks compare second sixes before total carry and exclude fours', () => {
   const game = match();
   const [first, second] = game.state.innings;
