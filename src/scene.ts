@@ -1,7 +1,7 @@
 import * as BABYLON from 'babylonjs';
 import { CameraMode } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BATTER_CREASE_Z, deliveryAnimationStep, frameIndependentDamping, getParabolicFlightPosition } from './formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, deliveryAnimationStep, frameIndependentDamping, getParabolicFlightPosition } from './formula';
 
 export class GameScene {
   public scene: BABYLON.Scene;
@@ -894,7 +894,7 @@ export class GameScene {
       if (!this.currentBallPos || !this.currentBallVelocity || !this.ballUnitDir || !this.ballSideDir || !this.ballMesh) return;
 
       const dt = Math.min(this.engine.getDeltaTime() / 1000, 0.05);
-      const airDrag = frameIndependentDamping(0.985, dt);
+      const airDrag = frameIndependentDamping(BALL_AIR_DAMPING, dt);
       this.currentBallVelocity.x *= airDrag;
       this.currentBallVelocity.y *= airDrag;
       this.currentBallVelocity.z *= airDrag;

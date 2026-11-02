@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBotPlayer, MatchController } from '../src/game';
-import { BATTER_CREASE_Z, bowlingReleaseTiming, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, evaluateFinalOutcome, frameIndependentDamping, getParabolicFlightPosition } from '../src/formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, bowlingReleaseTiming, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, evaluateFinalOutcome, frameIndependentDamping, getParabolicFlightPosition } from '../src/formula';
 import type { BallOutcome, DeliveryChoice } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -80,9 +80,27 @@ test('shot trajectory follows all four cardinal directions with finite speed', (
 });
 
 test('ball drag produces the same damping over time at 30 and 60 fps', () => {
-  const at30 = frameIndependentDamping(0.985, 1 / 30) ** 30;
-  const at60 = frameIndependentDamping(0.985, 1 / 60) ** 60;
+  const at30 = frameIndependentDamping(BALL_AIR_DAMPING, 1 / 30) ** 30;
+  const at60 = frameIndependentDamping(BALL_AIR_DAMPING, 1 / 60) ** 60;
   assert.ok(Math.abs(at30 - at60) < 1e-12);
+});
+
+test('a well-hit lofted shot can clear the boundary before bouncing', () => {
+  const zero = { x: 0, y: 0, z: 0 };
+  const velocity = calculateShotTrajectory(1, 0.5, 0.5, -Math.PI / 2, zero, zero, true, true, 'Medium', 'lofted');
+  let y = 0.4;
+  let z = BATTER_CREASE_Z;
+  let bounced = false;
+  for (let i = 0; i < 600 && z < 65 && !bounced; i++) {
+    velocity.y *= BALL_AIR_DAMPING;
+    velocity.z *= BALL_AIR_DAMPING;
+    if (y < 0.075) { bounced = true; break; }
+    if (y > 0.075) velocity.y -= 9.81 / 60;
+    y += velocity.y / 60;
+    z += velocity.z / 60;
+  }
+  assert.equal(bounced, false);
+  assert.ok(z >= 65);
 });
 
 test('delivery animation advances at the same speed at 30 and 60 fps', () => {
