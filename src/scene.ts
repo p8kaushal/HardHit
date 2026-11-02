@@ -718,7 +718,6 @@ export class GameScene {
 
       if (index >= this.ballTrajectoryPoints.length) {
         // Ball passed/reached batter stumps
-        this.setCameraMode('follow_shot');
         this.isAnimatingBall = false;
         this.ballMesh?.setEnabled(false);
         this.bounceMarker?.setEnabled(false);
@@ -787,11 +786,9 @@ export class GameScene {
       swingAnim?.onAnimationEndObservable.add(() => {
         // Return bat
         this.batMesh!.rotation.y = 0;
-        this.setCameraMode('follow_shot');
         successCallback();
       });
     } else {
-      this.setCameraMode('follow_shot');
       successCallback();
     }
   }
