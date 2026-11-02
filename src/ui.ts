@@ -55,17 +55,8 @@ export class UIManager {
     this.gameScene.botBattingTriggerCallback = () => {
       const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
       if (!isPlayerBatting && this.pendingBotShot && !this.activeShot) {
-        const difficulty = this.controller.state.bot.rank === 'Legend' ? 'Hard' : (this.controller.state.bot.rank === 'Gold' ? 'Medium' : 'Rookie');
-        let offset = 0;
-        if (difficulty === 'Rookie') {
-          offset = (Math.random() - 0.5) * 0.16;
-        } else if (difficulty === 'Medium') {
-          offset = (Math.random() - 0.5) * 0.08;
-        } else if (difficulty === 'Hard') {
-          offset = (Math.random() - 0.5) * 0.02;
-        }
-        const simulatedTiming = 0.5 + offset;
-        this.executeBattingSwingGesture(this.pendingBotShot.direction, this.pendingBotShot.type, Math.max(0.0, Math.min(1.0, simulatedTiming)));
+        const shot = this.pendingBotShot;
+        this.executeBattingSwingGesture(shot.direction, shot.type, shot.timing, shot.contactZone);
       }
     };
   }
@@ -382,7 +373,7 @@ export class UIManager {
     this.executeBattingSwingGesture(this.keyboardInputManager.intent.aimDirection, this.keyboardInputManager.intent.shotType);
   }
 
-  public executeBattingSwingGesture(direction: number, type: ShotType, simulatedTiming?: number): void {
+  public executeBattingSwingGesture(direction: number, type: ShotType, simulatedTiming?: number, contactZone?: number): void {
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     if ((!isPlayerBatting && simulatedTiming === undefined) || !this.activeDelivery || this.activeShot) return;
     if (isPlayerBatting && !globalAutoAssistConfig.isDeliveryActive) return;
@@ -405,7 +396,7 @@ export class UIManager {
       direction,
       type,
       timing: Math.max(0.0, Math.min(1.0, timing)),
-      contactZone: 0.44 + Math.random() * 0.12 // sweet spot MVP variation
+      contactZone: contactZone ?? (0.44 + Math.random() * 0.12)
     };
 
     this.gameScene.animateBatterSwing(direction, () => {

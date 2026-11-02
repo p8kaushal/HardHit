@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MatchController } from '../src/game';
+import { createBotPlayer, MatchController } from '../src/game';
 import { calculateShotDistance, calculateShotTrajectory, checkExtraBall, evaluateFinalOutcome } from '../src/formula';
 import type { DeliveryChoice } from '../src/types';
 
@@ -90,4 +90,11 @@ test('finalizing a six records its runs and biggest hit consistently', () => {
   assert.equal(innings.biggestSix, 58);
   assert.equal(innings.balls[0].runs, 6);
   assert.equal(innings.balls[0].distance, 58);
+});
+
+test('bot skill increases across the three difficulty tiers', () => {
+  const bots = (['Rookie', 'Medium', 'Hard'] as const).map(createBotPlayer);
+  assert.deepEqual(bots.map(bot => bot.stats.bowling.accuracy), [35, 50, 65]);
+  assert.deepEqual(bots.map(bot => bot.stats.batting.timing), [35, 50, 65]);
+  assert.deepEqual(bots.map(bot => bot.rank), ['Bronze', 'Gold', 'Legend']);
 });

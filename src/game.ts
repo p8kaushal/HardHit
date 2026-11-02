@@ -90,14 +90,14 @@ export function savePlayer(player: Player): void {
 }
 
 export function createBotPlayer(difficulty: 'Rookie' | 'Medium' | 'Hard'): Player {
-  let statsMultiplier = 1.85; // Rookie
+  let statsMultiplier = 0.7; // Rookie: approximately 35
   let botRank: Player['rank'] = 'Bronze';
   
   if (difficulty === 'Medium') {
-    statsMultiplier = 1.95; 
+    statsMultiplier = 1.0;
     botRank = 'Gold';
   } else if (difficulty === 'Hard') {
-    statsMultiplier = 2.1; 
+    statsMultiplier = 1.3;
     botRank = 'Legend';
   }
   
