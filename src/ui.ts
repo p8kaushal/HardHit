@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { bowlingReleaseTiming, checkExtraBall, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 import { TouchBattingControls } from './touch-controls';
 
@@ -14,7 +14,6 @@ export class UIManager {
   // Gesture/Swipe Tracking
   private swipeStartX = 0;
   private swipeStartY = 0;
-  private swipeStartPosTime = 0;
   private isPointerDown = false;
   
   // Aiming Target (Bowling Crease Coordinate offsets)
@@ -116,7 +115,7 @@ export class UIManager {
         const activeLenBtn = document.querySelector('#bowl-length-group .btn.active');
         const lenVal = activeLenBtn ? activeLenBtn.getAttribute('data-val') || 'good' : 'good';
         
-        const targetPos = calculateBounceTarget(lineVal, lenVal);
+        const targetPos = calculateBounceTarget(lineVal, lenVal, this.controller.getCurrentInnings().batter.batterHand || 'RHB');
         if (this.gameScene.bounceMarker) {
           this.gameScene.bounceMarker.parent = null;
           this.gameScene.bounceMarker.position.copyFrom(targetPos);
@@ -125,7 +124,9 @@ export class UIManager {
         }
         
         this.keyboardInputManager.intent.aimX = targetPos.x;
+        this.keyboardInputManager.intent.aimZ = targetPos.z;
         this.currentAimTargetX = targetPos.x;
+        this.currentAimTargetZ = targetPos.z;
         
         this.keyboardInputManager.updateFeedbackOverlay();
       });
@@ -143,7 +144,7 @@ export class UIManager {
         const activeLineBtn = document.querySelector('#bowl-line-group .btn.active');
         const lineVal = activeLineBtn ? activeLineBtn.getAttribute('data-val') || 'middle' : 'middle';
         
-        const targetPos = calculateBounceTarget(lineVal, lenVal);
+        const targetPos = calculateBounceTarget(lineVal, lenVal, this.controller.getCurrentInnings().batter.batterHand || 'RHB');
         if (this.gameScene.bounceMarker) {
           this.gameScene.bounceMarker.parent = null;
           this.gameScene.bounceMarker.position.copyFrom(targetPos);
@@ -152,7 +153,9 @@ export class UIManager {
         }
         
         this.keyboardInputManager.intent.aimZ = targetPos.z;
+        this.keyboardInputManager.intent.aimX = targetPos.x;
         this.currentAimTargetZ = targetPos.z;
+        this.currentAimTargetX = targetPos.x;
 
         this.keyboardInputManager.updateFeedbackOverlay();
       });
@@ -239,7 +242,6 @@ export class UIManager {
     this.isPointerDown = true;
     this.swipeStartX = e.clientX;
     this.swipeStartY = e.clientY;
-    this.swipeStartPosTime = Date.now();
 
     // In bowling phase, tap position directly sets aim target on pitch
     if (!isPlayerBatting) {
@@ -264,7 +266,6 @@ export class UIManager {
       // Resolve batting swipe gesture
       const dx = e.clientX - this.swipeStartX;
       const dy = e.clientY - this.swipeStartY;
-      const dt = Date.now() - this.swipeStartPosTime;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
       if (dist > 30) {
@@ -274,18 +275,7 @@ export class UIManager {
         if (angle < 0) angle += Math.PI * 2;
         const clockDirection = Math.round((angle / (Math.PI * 2)) * 8) % 8;
 
-        // Swipe speed determines lofted/power vs grounded/defensive
-        const speed = dist / dt;
-        let shotType = this.selectedShotType;
-        if (speed > 1.2) {
-          shotType = 'power';
-        } else if (speed > 0.6) {
-          shotType = 'lofted';
-        } else {
-          shotType = 'grounded';
-        }
-
-        this.executeBattingSwingGesture(clockDirection, shotType);
+        this.executeBattingSwingGesture(clockDirection, this.keyboardInputManager.intent.shotType);
       }
     }
   }
@@ -297,8 +287,9 @@ export class UIManager {
     const relativeY = (e.clientY - rect.top) / rect.height; // 0 to 1
 
     // Map X to Line offset (-1.5 to 1.5 meters)
-    this.currentAimTargetX = (relativeX - 0.5) * 3.0;
-    this.currentAimTargetZ = 0.5 - (1.0 - relativeY) * 8.0;
+    const target = this.gameScene.pickBowlingTarget(e.clientX, e.clientY) ?? bowlingTargetFromScreen(relativeX, relativeY);
+    this.currentAimTargetX = target.x;
+    this.currentAimTargetZ = target.z;
     this.keyboardInputManager.intent.aimX = this.currentAimTargetX;
     this.keyboardInputManager.intent.aimZ = this.currentAimTargetZ;
 
@@ -408,9 +399,9 @@ export class UIManager {
     if (simulatedTiming !== undefined) {
       timing = simulatedTiming;
     } else {
-      // The bot delivery takes 1400 ms, with a 150 ms swing animation lead.
+      // A swing begins 150 ms before the selected delivery reaches the crease.
       const elapsed = performance.now() - (globalAutoAssistConfig.deliveryStartTime ?? performance.now());
-      timing = 0.5 + (elapsed - 1250) / 500;
+      timing = 0.5 + (elapsed - (deliveryDurationMs(this.activeDelivery.type) - 150)) / 500;
     }
 
     this.activeShot = {
@@ -632,7 +623,7 @@ export class UIManager {
       this.gameScene.animateDelivery(
         this.activeDelivery.aimTarget,
         this.activeDelivery.length,
-        this.activeDelivery.releaseTiming,
+        this.activeDelivery.type,
         onArrivedCb,
         onResolvedCb,
         true, // overTheWicket

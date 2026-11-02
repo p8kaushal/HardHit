@@ -167,13 +167,13 @@ export class KeyboardInputManager {
   }
 
   public getAimXForIndex(idx: number): number {
-    return [-0.8, 0.0, 0.8][idx];
+    return [0.8, 0.0, -0.8][idx];
   }
 
   public getBowlingLineLabel(idx: number): string {
     const hand = this.getBatterHandedness();
-    if (idx === 0) return hand === 'RHB' ? 'Off Side' : 'Leg Side';
-    if (idx === 2) return hand === 'RHB' ? 'Leg Side' : 'Off Side';
+    if (idx === 0) return hand === 'RHB' ? 'Leg Side' : 'Off Side';
+    if (idx === 2) return hand === 'RHB' ? 'Off Side' : 'Leg Side';
     return 'Middle';
   }
 

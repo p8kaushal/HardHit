@@ -1640,6 +1640,19 @@ body {
   width: 280px;
 }
 
+@media (max-width: 1100px), (max-height: 700px) {
+  #control-bowling .side-dock {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 90px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: .65rem;
+  }
+  #control-bowling .left-dock { left: 8px; width: min(34vw, 220px); }
+  #control-bowling .right-dock { right: 8px; width: min(59vw, 280px); }
+}
+
 .dock-header h3 {
   font-size: 0.9rem;
   color: var(--color-primary);

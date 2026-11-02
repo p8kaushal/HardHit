@@ -1,6 +1,5 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
 import { evaluateWicket, calculateDistance, checkExtraBall, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
-import { activeInputManager } from './input';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
 
@@ -266,31 +265,8 @@ export class MatchController {
       else if (this.botDifficulty === 'Medium') assistMultiplier = 0.40;
       else if (this.botDifficulty === 'Hard') assistMultiplier = 0.00;
 
-      // --- One-Button Auto-Assist for Rookie ---
+      // Preserve the player's chosen shot direction at every difficulty.
       if (this.botDifficulty === 'Rookie' && shot) {
-        const length = delivery.aimTarget.z;
-        const line = delivery.aimTarget.x;
-        const hand = innings.batter.batterHand || 'RHB';
-        
-        let autoFootwork: 'front_foot' | 'back_foot' = 'front_foot';
-        let autoDirection = 0;
-        
-        if (length > -2.5) { // short/bouncer
-          autoFootwork = 'back_foot';
-          autoDirection = hand === 'RHB' ? (line < 0 ? 3 : 5) : (line > 0 ? 3 : 5);
-        } else { // good/full/yorker
-          autoFootwork = 'front_foot';
-          autoDirection = hand === 'RHB' ? (line < -0.2 ? 1 : (line > 0.2 ? 7 : 0)) : (line > 0.2 ? 1 : (line < -0.2 ? 7 : 0));
-        }
-
-        shot.direction = autoDirection;
-        shot.footwork = autoFootwork;
-        
-        if (activeInputManager && activeInputManager.intent) {
-          activeInputManager.intent.aimDirection = autoDirection;
-          activeInputManager.intent.footwork = autoFootwork;
-        }
-
         // Apply buffered timing from scene Spacebar press
         if (globalAutoAssistConfig.bufferedTiming !== null && globalAutoAssistConfig.bufferedTiming !== undefined) {
           shot.timing = globalAutoAssistConfig.bufferedTiming;

@@ -4,8 +4,8 @@ import { createBotPlayer, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, TouchBattingControls } from '../src/touch-controls';
 import { stepBall, type BallState } from '../src/ball-physics';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, bowlingReleaseTiming, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, evaluateFinalOutcome, frameIndependentDamping, getParabolicFlightPosition } from '../src/formula';
-import type { BallOutcome, DeliveryChoice } from '../src/types';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, evaluateFinalOutcome, evaluateWicket, frameIndependentDamping, getDeliveryFlightPosition, getParabolicFlightPosition } from '../src/formula';
+import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
 
 const storage = new Map<string, string>();
 Object.assign(globalThis, { localStorage: {
@@ -84,10 +84,36 @@ test('keyboard bowling starts at good length and updates the aim marker', () => 
     assert.equal(input.intent.aimZ, -3.5);
     listeners.keydown({ key: 'ArrowLeft', code: 'ArrowLeft' });
     listeners.keydown({ key: 'ArrowUp', code: 'ArrowUp' });
-    assert.deepEqual(positions, [[-0.8, -3.5], [-0.8, -5.5]]);
+    assert.deepEqual(positions, [[0.8, -3.5], [0.8, -5.5]]);
     input.destroy();
   } finally {
     Object.assign(globalThis, { window: originalWindow, document: originalDocument });
+  }
+});
+
+test('bowler camera screen directions map to the correct pitch coordinates', () => {
+  assert.ok(bowlingTargetFromScreen(0, 0.5).x > 0);
+  assert.ok(bowlingTargetFromScreen(1, 0.5).x < 0);
+  assert.ok(bowlingTargetFromScreen(0.5, 0).z < bowlingTargetFromScreen(0.5, 1).z);
+  assert.equal(calculateBounceTarget('off', 'good', 'RHB').x, -0.45);
+  assert.equal(calculateBounceTarget('off', 'good', 'LHB').x, 0.45);
+});
+
+test('well-timed shots retain their selected direction on every bot tier', () => {
+  for (const tier of ['Rookie', 'Medium', 'Hard'] as const) {
+    for (let direction = 0; direction < 8; direction++) {
+      for (const type of ['defensive', 'grounded', 'lofted', 'power'] as ShotType[]) {
+        const game = new MatchController(tier);
+        game.setTossResult(game.state.player.id, 'bat');
+        game.startMatch();
+        const shot = { direction, type, timing: 0.5, contactZone: 0.5 };
+        const ball = delivery(0.5);
+        assert.equal(evaluateWicket(game.state.player, game.state.bot, ball, shot).isWicket, false);
+        const outcome = game.recordBall(ball, shot);
+        assert.equal(outcome.shot?.direction, direction);
+        assert.equal(outcome.isWicket, false);
+      }
+    }
   }
 });
 
@@ -205,6 +231,25 @@ test('delivery trajectory reaches the bounce point and the batter crease', () =>
   assert.ok(Math.abs(atCrease.x - crease.x) < 1e-9);
   assert.ok(Math.abs(atCrease.y - crease.y) < 1e-9);
   assert.ok(Math.abs(atCrease.z - crease.z) < 1e-9);
+});
+
+test('delivery variations affect pace and turn only after pitching', () => {
+  assert.ok(deliveryDurationMs('fast') < deliveryDurationMs('slow'));
+  const release = { x: 0, y: 1.9, z: 10 };
+  const bounce = { x: 0, y: 0.06, z: -3.5 };
+  const end = { x: 0, y: 0.85, z: BATTER_CREASE_Z };
+  const bounceProgress = (bounce.z - release.z) / (end.z - release.z);
+  assert.ok(Math.abs(getDeliveryFlightPosition(bounceProgress, release, bounce, end, 'offspin').x) < 1e-9);
+  assert.ok(getDeliveryFlightPosition(1, release, bounce, end, 'offspin').x > 0);
+  assert.ok(getDeliveryFlightPosition(1, release, bounce, end, 'legspin').x < 0);
+  assert.equal(getDeliveryFlightPosition(1, release, bounce, end, 'fast').x, 0);
+  const spinner = { ...delivery(0.5, 0.8), type: 'offspin' as const };
+  assert.equal(checkExtraBall(spinner).type, 'wide');
+});
+
+test('a yorker reaches the batter lower than a short delivery', () => {
+  assert.ok(deliveryArrivalHeight(-8.2) < deliveryArrivalHeight(-2.2));
+  assert.ok(deliveryArrivalHeight(-2.2) < deliveryArrivalHeight(0.5));
 });
 
 test('boundary scoring uses the rope crossing and bounce, not carry distance alone', () => {

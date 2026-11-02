@@ -1,7 +1,7 @@
 import * as BABYLON from 'babylonjs';
-import { CameraMode } from './types';
+import { CameraMode, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BATTER_CREASE_Z, deliveryAnimationStep, getParabolicFlightPosition } from './formula';
+import { BATTER_CREASE_Z, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, getDeliveryFlightPosition } from './formula';
 import { stepBall, type BallState } from './ball-physics';
 
 export class GameScene {
@@ -57,6 +57,8 @@ export class GameScene {
   constructor(canvasElementId: string) {
     this.canvas = document.getElementById(canvasElementId) as unknown as HTMLCanvasElement;
     this.engine = new BABYLON.Engine(this.canvas, true);
+    // The canvas starts hidden in the lobby; it must be sized again when the
+    // gameplay screen becomes visible before its camera and picking are used.
     this.scene = new BABYLON.Scene(this.engine);
     
     this.setupLights();
@@ -263,6 +265,7 @@ export class GameScene {
   }
 
   public setCameraMode(mode: CameraMode): void {
+    this.engine.resize();
     this.activeCameraMode = mode;
     if (this.batterRoot) this.batterRoot.parent = null;
     
@@ -478,7 +481,7 @@ export class GameScene {
 
   public generateTrajectoryPoints(
     aimTarget: { x: number; z: number },
-    _type: string,
+    type: DeliveryType,
     _overTheWicket: boolean = true
   ): BABYLON.Vector3[] {
     const points: BABYLON.Vector3[] = [];
@@ -493,11 +496,11 @@ export class GameScene {
     const release = { x: startX, y: 1.9, z: 10.0 };
     const bounce = { x: targetX, y: 0.06, z: bounceZ };
     const seamDrift = 0;
-    const end = { x: targetX + seamDrift, y: 0.85, z: BATTER_CREASE_Z };
+    const end = { x: targetX + seamDrift, y: deliveryArrivalHeight(bounceZ), z: BATTER_CREASE_Z };
     
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
-      const pos = getParabolicFlightPosition(progress, release, bounce, end);
+      const pos = getDeliveryFlightPosition(progress, release, bounce, end, type);
       points.push(new BABYLON.Vector3(pos.x, pos.y, pos.z));
     }
 
@@ -536,6 +539,18 @@ export class GameScene {
     }
   }
 
+  public pickBowlingTarget(clientX: number, clientY: number): { x: number; z: number } | null {
+    const rect = this.canvas.getBoundingClientRect();
+    const ray = this.scene.createPickingRay(clientX - rect.left, clientY - rect.top, BABYLON.Matrix.Identity(), this.primaryCamera);
+    const distance = ray.intersectsPlane(new BABYLON.Plane(0, 1, 0, 0));
+    if (distance === null) return null;
+    const point = ray.origin.add(ray.direction.scale(distance));
+    return {
+      x: Math.max(-1.5, Math.min(1.5, point.x)),
+      z: Math.max(-8.2, Math.min(0.5, point.z))
+    };
+  }
+
   public hideBounceMarker(): void {
     this.bounceMarker?.setEnabled(false);
     this.timingRing?.setEnabled(false);
@@ -549,7 +564,7 @@ export class GameScene {
   public animateDelivery(
     aimTarget: { x: number; z: number },
     type: string,
-    releaseSpeed: number, // 0.0 to 1.0 (faster/slower)
+    deliveryType: DeliveryType,
     onArrived: () => void,
     onResolved: () => void,
     overTheWicket: boolean = true,
@@ -586,13 +601,13 @@ export class GameScene {
       (this.bounceMarker.material as BABYLON.StandardMaterial).diffuseColor = lengthColors[type.toLowerCase()] || new BABYLON.Color3(1, 1, 1);
     }
     
-    this.timingRing?.setEnabled(true);
+    this.timingRing?.setEnabled(!this.isBotBatting);
     if (this.timingRing && this.batterRoot) {
       this.timingRing.position.set(this.batterRoot.position.x, 0.1, -8.8);
       this.timingRing.scaling.set(3.0, 3.0, 3.0);
     }
 
-    this.ballTrajectoryPoints = this.generateTrajectoryPoints(aimTarget, type, overTheWicket);
+    this.ballTrajectoryPoints = this.generateTrajectoryPoints(aimTarget, deliveryType, overTheWicket);
     
     if (this.predictionPath) {
       this.predictionPath.dispose();
@@ -636,7 +651,7 @@ export class GameScene {
     }
 
     // Flight loop runner
-    let speedScale = 1.0 + releaseSpeed * 0.5; // modifier
+    let speedScale = 1000 / deliveryDurationMs(deliveryType);
     if (isSlowMotion) {
       speedScale *= 0.35; // Reduce by 65% for bullet-time
     }
@@ -865,30 +880,27 @@ export class GameScene {
 
     if (globalAutoAssistConfig.deliveryStartTime) {
       const elapsed = performance.now() - globalAutoAssistConfig.deliveryStartTime;
-      const duration = 1400; // 1.4 seconds
+      const delivery = globalAutoAssistConfig.currentDelivery;
+      const duration = deliveryDurationMs(delivery?.type ?? 'medium');
       let progress = elapsed / duration;
       
       if (progress >= 1.0) {
         progress = 1.0;
         globalAutoAssistConfig.isDeliveryActive = false;
-        if (this.onBallArrivedCallback) {
-          this.onBallArrivedCallback();
-        }
       }
       
       const targetX = globalAutoAssistConfig.currentDelivery ? globalAutoAssistConfig.currentDelivery.aimTarget.x : 0;
-      const targetZ = this.bounceMarker && this.bounceMarker.isEnabled() 
-        ? this.bounceMarker.position.z 
-        : (globalAutoAssistConfig.currentDelivery ? -10 + globalAutoAssistConfig.currentDelivery.aimTarget.z : 0);
+      const targetZ = delivery?.aimTarget.z ?? -3.5;
         
       const startX = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
       const release = { x: startX, y: 1.9, z: 10.0 };
       const bounce = { x: targetX, y: 0.06, z: targetZ };
       const seamDrift = 0;
-      const end = { x: targetX + seamDrift, y: 0.85, z: BATTER_CREASE_Z };
+      const end = { x: targetX + seamDrift, y: deliveryArrivalHeight(targetZ), z: BATTER_CREASE_Z };
       
-      const pos = getParabolicFlightPosition(progress, release, bounce, end);
+      const pos = getDeliveryFlightPosition(progress, release, bounce, end, delivery?.type ?? 'medium');
       ball.position.set(pos.x, pos.y, pos.z);
+      if (progress >= 1.0 && this.onBallArrivedCallback) this.onBallArrivedCallback();
     }
   }
 

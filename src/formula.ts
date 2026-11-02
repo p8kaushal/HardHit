@@ -1,11 +1,12 @@
-import { Player, DeliveryChoice, ShotChoice, ShotType } from './types';
+import { Player, DeliveryChoice, DeliveryType, ShotChoice, ShotType } from './types';
 import * as BABYLON from 'babylonjs';
 
-export function calculateBounceTarget(line: string, length: string): BABYLON.Vector3 {
+export function calculateBounceTarget(line: string, length: string, hand: 'RHB' | 'LHB' = 'RHB'): BABYLON.Vector3 {
   let x = 0.0;
   if (line.toLowerCase() === 'off') x = -0.45;
   if (line.toLowerCase() === 'leg') x = 0.45;
   if (line.toLowerCase() === 'middle') x = 0.0;
+  if (hand === 'LHB') x = -x;
 
   let z = -4.2;
   switch (length.toLowerCase()) {
@@ -18,9 +19,29 @@ export function calculateBounceTarget(line: string, length: string): BABYLON.Vec
   return new BABYLON.Vector3(x, 0.08, z);
 }
 
+/** Map screen coordinates from the bowler's camera to the pitch. */
+export function bowlingTargetFromScreen(x: number, y: number): { x: number; z: number } {
+  const horizontal = Math.max(0, Math.min(1, x));
+  const vertical = Math.max(0, Math.min(1, y));
+  return { x: (0.5 - horizontal) * 3, z: -7.5 + vertical * 8 };
+}
+
 export const BAT_ANIMATION_LEAD_TIME = 0.15; // 150ms swing apex delay
 export const BATTER_CREASE_Z = -8.8;
 export const BALL_AIR_DAMPING = 0.9985;
+
+export function deliveryDurationMs(type: DeliveryType): number {
+  return { fast: 1200, medium: 1400, slow: 1650, offspin: 1550, legspin: 1550 }[type];
+}
+
+export function deliveryTurn(type: DeliveryType): number {
+  return type === 'offspin' ? 0.2 : type === 'legspin' ? -0.2 : 0;
+}
+
+/** Approximate the ball's height at the crease from its bounce location. */
+export function deliveryArrivalHeight(bounceZ: number): number {
+  return Math.max(0.12, Math.min(1.35, 0.08 + (bounceZ - BATTER_CREASE_Z) * 0.15));
+}
 
 /** Apply a 60 Hz damping coefficient consistently at any frame rate. */
 export function frameIndependentDamping(perFrame: number, elapsedSeconds: number): number {
@@ -126,48 +147,8 @@ export function evaluateWicket(
   let isEdgeFallback = !isCleanHit && isWithinTolerance;
   let reason = '';
 
-  // 1. Difficulty Sweeping Collision Cones
-  const batX = batter.batterHand === 'LHB' ? -0.45 : 0.45;
-  const ballX = delivery.aimTarget.x;
-  const deltaX = ballX - batX;
-  const deltaZ = -1.0; 
-  const ballAngle = Math.atan2(deltaZ, deltaX);
-  
-  const baseAngle = (shot.direction * Math.PI) / 4 - Math.PI / 2;
-  const swingAngle = Math.atan2(Math.sin(baseAngle), (batter.batterHand === 'RHB' ? -1 : 1) * Math.cos(baseAngle));
-  
-  let angleDiff = Math.abs(ballAngle - swingAngle);
-  while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-  angleDiff = Math.abs(angleDiff);
-  const angleDiffDeg = angleDiff * (180 / Math.PI);
-  
-  let coneWidth = 10; // Hard Bot (or no assist)
-  if (assistMultiplier >= 0.7) {
-    // Generous spatial raycast frustum sweeping on Easy mode
-    if (Math.abs(ballX) <= 0.89) {
-      coneWidth = 360; // Guarantee bat contact for balls inside pitch bounds
-    } else {
-      coneWidth = 45; // Rookie Bot default
-    }
-  } else if (assistMultiplier >= 0.3) {
-    coneWidth = 25; // Medium Bot
-  }
-  
-  const isInsideCone = angleDiffDeg <= coneWidth / 2;
-
-  if (!isInsideCone) {
-    isWicket = true;
-    reason = 'Play and miss! Swung down the wrong line.';
-  } else {
-    // 2. Safe Edge Deflection System (resolveShot physics)
-    if (!isCleanHit && coneWidth > 10) {
-      isWicket = false; // Force 0% dismissal probability
-      isEdgeFallback = true;
-      // Override trajectory vector to vacant outfield (Third Man = 3, Fine Leg = 5)
-      shot.direction = deltaX < 0 ? 3 : 5; 
-      // Shot type will be processed safely in calculateDistance
-    }
-  }
+  // Shot direction is the intended outgoing direction, not the incoming
+  // ball's contact angle. Timing determines contact and must not rewrite aim.
   
   if (!batter.isBot && bowler.isBot && bowler.rank === 'Bronze') {
     isWicket = false;
@@ -290,7 +271,7 @@ export function checkExtraBall(delivery: DeliveryChoice, _batterHand: 'RHB' | 'L
     return { isExtra: true, type: 'noball' };
   }
 
-  const x = delivery.aimTarget.x;
+  const x = delivery.aimTarget.x + deliveryTurn(delivery.type);
   // Measure strictly relative to absolute pitch center line (X=0.0m) bypassing stance offsets
   if (Math.abs(x) > 0.89) {
     return { isExtra: true, type: 'wide' };
@@ -311,11 +292,11 @@ export function getLineTypeFromAimX(aimX: number, batterHand: 'RHB' | 'LHB' = 'R
   }
 }
 
-export function getAimXFromLineType(line: import('./types').LineType, _batterHand: 'RHB' | 'LHB' = 'RHB'): number {
+export function getAimXFromLineType(line: import('./types').LineType, batterHand: 'RHB' | 'LHB' = 'RHB'): number {
   let target = 0;
   if (line === 'off') target = -0.45;
   if (line === 'leg') target = 0.45;
-  return target;
+  return batterHand === 'LHB' ? -target : target;
 }
 
 export function verifyFormulas(): void {
@@ -556,6 +537,22 @@ export function getParabolicFlightPosition(
   }
   
   return { x, y, z };
+}
+
+/** Apply spin after the bounce; the target marks where the ball pitches. */
+export function getDeliveryFlightPosition(
+  progress: number,
+  release: { x: number; y: number; z: number },
+  bounce: { x: number; y: number; z: number },
+  end: { x: number; y: number; z: number },
+  type: DeliveryType
+): { x: number; y: number; z: number } {
+  const position = getParabolicFlightPosition(progress, release, bounce, end);
+  const bounceProgress = (bounce.z - release.z) / (end.z - release.z);
+  if (progress > bounceProgress && bounceProgress < 1) {
+    position.x += deliveryTurn(type) * Math.min(1, (progress - bounceProgress) / (1 - bounceProgress));
+  }
+  return position;
 }
 
 export function evaluateFinalOutcome(distance: number, hasBounced: boolean, reachedBoundary = distance >= 65): number {
