@@ -112,6 +112,8 @@ test('finalizing a six records its runs and biggest hit consistently', () => {
   const game = match();
   const innings = game.getCurrentInnings();
   game.recordBall(delivery(0.5), null);
+  innings.balls[0].shot = { direction: 0, type: 'power', timing: 0.5, contactZone: 0.5 };
+  assert.equal(game.finalizeBallOutcome(58, false, true), 6);
   assert.equal(game.finalizeBallOutcome(58, false, true), 6);
   assert.equal(innings.score, 6);
   assert.equal(innings.biggestSix, 58);

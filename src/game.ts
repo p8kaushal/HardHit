@@ -403,6 +403,9 @@ export class MatchController {
       distance = Math.min(distance, 130.0);
 
       const innings = this.getCurrentInnings();
+      const lastBall = innings.balls[innings.balls.length - 1];
+      if (!lastBall || !lastBall.shot || lastBall.isWicket || lastBall.isExtra) return 0;
+      if (lastBall.runs !== undefined) return lastBall.runs;
       
       // Evaluate outcome using formula
       const runs = evaluateFinalOutcome(distance, hasBounced, reachedBoundary);
@@ -412,11 +415,8 @@ export class MatchController {
         innings.biggestSix = Math.max(innings.biggestSix, distance);
       }
       
-      const lastBall = innings.balls[innings.balls.length - 1];
-      if (lastBall) {
-        lastBall.distance = distance;
-        lastBall.runs = runs;
-      }
+      lastBall.distance = distance;
+      lastBall.runs = runs;
       
       console.log(`[GAME EVENT] Dynamic resolution: ${distance.toFixed(1)}m, bounced: ${hasBounced} => ${runs} runs. Score: ${innings.score}`);
       this.handleInningsCompletion();
