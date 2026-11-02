@@ -2,14 +2,14 @@
 
 > **HardHit** is an immersive, physics-driven 3D single-over (6-ball) cricket duel game built on modern web standards with **Babylon.js**, **TypeScript**, and **Vite**.
 
-Face off against intelligent AI bot tiers in a high-stakes, rapid-fire cricket encounter. Test your batting reflexes against swinging deliveries or hit your spots with the ball using precise timing, bowling variations, and strategic field play.
+Play a biggest-six duel against a bot. Each batter faces six legal deliveries; the longest six wins, with wickets and further tie-breaks when needed. Real-player 1v1 is planned but is not yet implemented.
 
 ---
 
 ## 🎮 Key Features
 
-- **Realistic 3D Stadium & Pitch**: Fully interactive 3D cricket arena rendered using Babylon.js with boundary ropes, pitch crease markings, and dynamic camera angles.
-- **Physics-Driven Ball Trajectory**: Two-phase delivery simulation featuring trajectory aerodynamics, pitch bounce, friction drag, and realistic ball exit speeds.
+- **3D Pitch**: A simple Babylon.js scene with boundary rope, crease markings, and camera angles for batting and bowling.
+- **Ball Trajectory**: An approximated delivery path and fixed-step shot simulation with bounce, drag and turf friction.
 - **Delivery Variations**:
   - `Fast` (Raw pace)
   - `Medium` and `Slow Ball`
@@ -18,10 +18,9 @@ Face off against intelligent AI bot tiers in a high-stakes, rapid-fire cricket e
   - `Defensive Block` (Safely deaden dangerous deliveries)
   - `Ground Drive` (High control, safe boundary chasing through the gaps)
   - `Lofted / Power Shot` (Risk-reward high-exit-angle stroke for maximums)
-  - `Sweep / Cut` (Directional cross-bat strokes targeting square boundaries)
 - **Precision Timing & Placement**: Swing timing paired with directional shot placement controls.
 - **Ball Flight and Boundary Scoring**: Watch the ball travel across the field; a shot that clears the boundary before bouncing scores six.
-- **AI Difficulty Tiers**: Challenge **Rookie**, **Pro**, and **Master** AI bots with specialized bowling accuracy, shot selection algorithms, and aggression metrics.
+- **AI Difficulty Tiers**: Challenge Rookie, Medium and Hard bots.
 - **Match State & Rules Engine**: Six legal balls per innings, biggest-six scoring, tie-breaks and a one-ball sudden death, plus a personal leaderboard stored in the browser.
 
 ---
@@ -46,7 +45,7 @@ Face off against intelligent AI bot tiers in a high-stakes, rapid-fire cricket e
 | **Bowling Delivery Selection** | `1`–`5` (Fast, Medium, Slow Ball, Off Spin, Leg Spin) |
 | **Batting Shot Selection** | `1`–`4` (Lofted, Power, Grounded, Defensive) |
 | **Action Execution** | `Spacebar` (Stop bowling release point meter / Trigger bat swing timing) |
-| **Shortcuts Modal** | Press `?` or click the HUD shortcuts button |
+| **Shortcuts Modal** | Press `H` or click the HUD shortcuts button |
 
 On a phone, drag the left batting stick to aim, set the bat-face contact point with the slider, and tap a shot button with your other thumb as the ball arrives. Aim bowling deliveries by dragging on the pitch, choose a delivery type, then hold and release the delivery button in the green timing zone. Releasing early or late moves the actual bounce point away from the target.
 

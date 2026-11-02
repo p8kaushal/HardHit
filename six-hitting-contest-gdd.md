@@ -1,9 +1,9 @@
 # Six Hitting Contest — Game & Build Plan
 
 ## 0. Status (read this first)
-- **Done**: a 2D prototype exists (top-down flat pitch view, button-grid controls for bowling/batting, text-based ball outcomes). This version is **deprecated and being replaced**, not extended — it validated the underlying data/stat flow (which works correctly) but the presentation is the wrong direction (Section 8 explains why and what replaces it).
-- **Not started**: everything in Section 8 (3D scene/camera/controls) and everything downstream of it.
-- **This document is written to be self-sufficient** — every formula has concrete default constants (Sections 4–5), every open design question has a locked MVP default (Section 12), and Section 14 is an ordered, literal task checklist with definitions of done. Building the MVP (Sections 8–10) should not require further clarifying prompts; adjust numeric constants during playtesting, but don't stop to ask what a value should be — ship the default, tune after it's playable.
+- **Current build**: a 3D single-player prototype against a bot, with batting, bowling, progression and a browser-local leaderboard. It is a work in progress; the original checklist below is a design guide rather than a verified completion report.
+- **Direction**: a mobile-first biggest-six contest with a full six legal balls per batter. Real-player 1v1 is planned after the offline game and controls are ready.
+- The formula constants below are design starting points; the implementation and playtesting determine the current behavior.
 
 ## 1. Concept summary
 A mobile-first, cross-device multiplayer cricket game centered on a single duel format: **one over (6 balls), no fielders, no teams.** Two players each get a customizable all-rounder character with independent batting and bowling stats. Toss decides who bats first. Each ball's outcome (six distance, miss, wicket) is computed from batter stat vs bowler stat vs timing vs bat contact zone vs shot choice. Progression is FIFA-style (XP, training, rank tiers). Late-game unlock: player-created franchises (no license needed) and a story/career mode.
@@ -22,8 +22,8 @@ A mobile-first, cross-device multiplayer cricket game centered on a single duel 
 - **Innings 2**: Roles swap, same 6-ball structure.
 - **Win condition (locked): Biggest single six, with wickets as risk/tie-break.**
   - **Primary metric**: the single largest six hit across a player's innings wins the match.
-  - **Single-wicket innings**: each batter has exactly **one wicket**. Get dismissed (badly mistimed/edged contact below a miscue threshold) and the innings ends immediately — remaining balls in that over are forfeited. This is the core tension: keep swinging for a bigger six and risk zero further attempts, or bank a good six and go defensive for the rest of the over.
-  - **Bowler's win condition**: since there are no fielders, the bowler's main lever is (a) suppressing distance via line/length/accuracy, and (b) forcing an early dismissal to cap the batter's number of attempts. Both matter.
+  - **Full-over innings**: each batter receives six legal deliveries. A dismissal counts as a wicket but does not forfeit the remaining deliveries.
+  - **Bowler's win condition**: suppress the batter's biggest six through line, length, variation and release execution. Wickets remain a tie-break factor.
   - **Tie-break ladder** (in order): 1) higher single biggest six, 2) fewer wickets lost, 3) higher second-biggest six / total distance, 4) sudden-death decider — one ball each, biggest hit wins.
   - This also gives you a natural highlight-reel share moment ("360m six!") and a clean leaderboard sort key (biggest six, wickets as secondary sort).
 
@@ -57,7 +57,7 @@ timing_modifier = f(timing_accuracy)      // perfect > early/late, steep falloff
 contact_modifier = f(bat_zone_hit)         // sweet spot = 1.0, edge = 0.3–0.6
 bowling_resistance = f(bowler_Accuracy, line/length difficulty, bowler_Variation)
 distance = base_distance * timing_modifier * contact_modifier - bowling_resistance
-if distance < miscue_threshold -> WICKET: innings ends immediately, remaining balls forfeited
+if distance < miscue_threshold -> WICKET: count the dismissal and continue the over
 ```
 
 **MVP default constants:**
@@ -132,7 +132,7 @@ The original flat top-down 2D view + menu-button controls is deprecated and repl
 - **Single-player vs bot**, 1 over, toss, full bat+bowl control both innings.
 - Simple 3D stadium/pitch scene with bowler's-eye/batter's-eye cameras, visible ball trail, slow-mo.
 - Gesture-based bowling controls & batting controls with keyboard/mouse fallback.
-- Biggest-single-six win condition with single-wicket-per-innings risk mechanic.
+- Biggest-single-six win condition with wickets as a tie-break and a full over per batter.
 - 2–3 bot difficulty tiers.
 - Global leaderboard (mock/local).
 
@@ -162,7 +162,7 @@ The original flat top-down 2D view + menu-button controls is deprecated and repl
 8. **Batting controls** — swipe-to-aim-and-shot-type, timing window, keyboard/mouse fallback.
 9. **Contact + result animation** — bat-ball collision, ball flight arc tracking camera, slow-mo.
 10. **HUD** — slim corner score/state overlay, bottom gesture-control overlays, brief result toast.
-11. **Full over loop** — toss, 6-ball over, single-wicket-ends-innings, innings swap, win-condition + tie-break.
+11. **Full over loop** — toss, 6 legal balls per batter, innings swap, win-condition + tie-break.
 12. **Bot opponent** — bot bowling/batting decisions using GDD presets.
 13. **Leaderboard** — score submission + read-only global leaderboard.
 14. **Basic progression** — XP-to-rank tied to performance.
