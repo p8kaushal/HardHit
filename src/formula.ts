@@ -31,6 +31,10 @@ export function deliveryAnimationStep(elapsedMs: number, speedScale: number): nu
   return Math.min(Math.max(elapsedMs, 0), 50) * 60 / 1000 * speedScale;
 }
 
+export function bowlingReleaseTiming(elapsedMs: number): number {
+  return Math.max(0, Math.min(1, elapsedMs / 2400));
+}
+
 /**
  * Predicted Arrival Z Timestamp Solver
  */

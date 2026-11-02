@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { checkExtraBall, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { bowlingReleaseTiming, checkExtraBall, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 
 export class UIManager {
@@ -325,7 +325,18 @@ export class UIManager {
       indicator.style.zIndex = '9999';
       document.body.appendChild(indicator);
     }
-    indicator.innerText = 'BOWLING... RELEASE SPACE TO PITCH';
+    indicator.innerHTML = '<div>RELEASE IN THE GREEN ZONE</div><div class="release-meter" role="progressbar" aria-label="Bowling release timing" aria-valuemin="0" aria-valuemax="100"><span class="release-meter-target"></span><span class="release-meter-marker"></span></div>';
+    const meter = indicator.querySelector<HTMLElement>('.release-meter')!;
+    const marker = indicator.querySelector<HTMLElement>('.release-meter-marker')!;
+    const updateMeter = () => {
+      if (!globalAutoAssistConfig.isRunUpActive || !indicator?.isConnected) return;
+      const elapsed = performance.now() - (globalAutoAssistConfig.runUpStartTime ?? performance.now());
+      const progress = bowlingReleaseTiming(elapsed);
+      marker.style.left = `${progress * 100}%`;
+      meter.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
+      requestAnimationFrame(updateMeter);
+    };
+    updateMeter();
   }
 
   public endUserBowlingDelivery(): void {
@@ -340,7 +351,7 @@ export class UIManager {
 
     // calculate timing based on proximity to 1200ms
     const elapsed = performance.now() - (globalAutoAssistConfig.runUpStartTime || 0);
-    const timing = Math.max(0, Math.min(1, elapsed / 2400));
+    const timing = bowlingReleaseTiming(elapsed);
 
     // Now pitch the ball
     this.selectedBowlType = this.keyboardInputManager.intent.deliveryType;

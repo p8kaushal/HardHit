@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBotPlayer, MatchController } from '../src/game';
-import { BATTER_CREASE_Z, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, evaluateFinalOutcome, frameIndependentDamping, getParabolicFlightPosition } from '../src/formula';
+import { BATTER_CREASE_Z, bowlingReleaseTiming, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, evaluateFinalOutcome, frameIndependentDamping, getParabolicFlightPosition } from '../src/formula';
 import type { BallOutcome, DeliveryChoice } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -27,6 +27,12 @@ test('release timing and line distinguish legal balls, wides and no-balls', () =
   assert.equal(checkExtraBall(delivery(0)).type, 'wide');
   assert.equal(checkExtraBall(delivery(1)).type, 'noball');
   assert.equal(checkExtraBall(delivery(0.5, 1)).type, 'wide');
+});
+
+test('bowling meter maps its midpoint to ideal release and clamps extremes', () => {
+  assert.equal(bowlingReleaseTiming(-100), 0);
+  assert.equal(bowlingReleaseTiming(1200), 0.5);
+  assert.equal(bowlingReleaseTiming(3000), 1);
 });
 
 test('extras do not consume a legal ball and only no-balls start a free hit', () => {

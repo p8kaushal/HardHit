@@ -2789,3 +2789,28 @@ kbd {
     gap: 0.75rem;
   }
 }
+.release-meter {
+  position: relative;
+  width: min(55vw, 260px);
+  height: 14px;
+  margin: 12px auto 4px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #ef4444, #facc15 35%, #facc15 65%, #ef4444);
+}
+
+.release-meter-target {
+  position: absolute;
+  left: 43%;
+  width: 14%;
+  height: 100%;
+  background: #22c55e;
+}
+
+.release-meter-marker {
+  position: absolute;
+  top: -5px;
+  width: 4px;
+  height: 24px;
+  background: white;
+  transform: translateX(-50%);
+}
