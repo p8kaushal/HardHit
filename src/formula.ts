@@ -484,7 +484,10 @@ export function calculateShotTrajectory(
       break;
   }
   
-  let Vx = Vz * Math.tan(theta_shot);
+  // Use a unit direction vector: tangent loses the sign of the forward
+  // component and becomes unbounded for straight and backward shots.
+  let Vx = Vz * Math.cos(theta_shot);
+  Vz *= -Math.sin(theta_shot);
   
   let mag = Math.sqrt(Vx * Vx + Vy * Vy + Vz * Vz);
   let cap = 40.0;

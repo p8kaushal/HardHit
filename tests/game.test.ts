@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MatchController } from '../src/game';
-import { checkExtraBall } from '../src/formula';
+import { calculateShotTrajectory, checkExtraBall } from '../src/formula';
 import type { DeliveryChoice } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -55,4 +55,20 @@ test('six legal deliveries finish the innings without counting extras', () => {
   assert.equal(innings.ballsBowled, 6);
   assert.equal(innings.balls.length, 7);
   assert.equal(innings.finished, true);
+});
+
+test('shot trajectory follows all four cardinal directions with finite speed', () => {
+  const zero = { x: 0, y: 0, z: 0 };
+  const trajectory = (direction: number) => calculateShotTrajectory(
+    1, 0.5, 0.5, direction * Math.PI / 4 - Math.PI / 2, zero, zero
+  );
+  const [straight, right, back, left] = [0, 2, 4, 6].map(trajectory);
+  assert.ok(straight.z > 0 && Math.abs(straight.x) < 1e-10);
+  assert.ok(right.x > 0 && Math.abs(right.z) < 1e-10);
+  assert.ok(back.z < 0 && Math.abs(back.x) < 1e-10);
+  assert.ok(left.x < 0 && Math.abs(left.z) < 1e-10);
+  for (const velocity of [straight, right, back, left]) {
+    assert.ok(Object.values(velocity).every(Number.isFinite));
+    assert.ok(Math.hypot(velocity.x, velocity.y, velocity.z) <= 38.000001);
+  }
 });

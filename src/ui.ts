@@ -298,6 +298,8 @@ export class UIManager {
     // Map X to Line offset (-1.5 to 1.5 meters)
     this.currentAimTargetX = (relativeX - 0.5) * 3.0;
     this.currentAimTargetZ = 0.5 - (1.0 - relativeY) * 8.0;
+    this.keyboardInputManager.intent.aimX = this.currentAimTargetX;
+    this.keyboardInputManager.intent.aimZ = this.currentAimTargetZ;
 
     // Redraw landing shadow disc marker
     this.gameScene.updateBounceMarker({ x: this.currentAimTargetX, z: this.currentAimTargetZ });
@@ -377,24 +379,13 @@ export class UIManager {
   // --- Batting Swings ---
 
   private executeKeyboardBatSwing(): void {
-    const recShotHud = document.getElementById('recommended-shot-hud');
-    if (recShotHud) {
-      recShotHud.style.display = 'none';
-      recShotHud.innerText = '';
-    }
-    if (this.isBannerActive) {
-      this.executeBattingSwingGesture(0, this.selectedShotType, 0.5);
-      this.hideAssistedPrompt();
-    } else {
-      // Keyboard fallback swing
-      const clockDirection = 0; // Straight up
-      this.executeBattingSwingGesture(clockDirection, this.selectedShotType);
-    }
+    this.executeBattingSwingGesture(this.keyboardInputManager.intent.aimDirection, this.keyboardInputManager.intent.shotType);
   }
 
   public executeBattingSwingGesture(direction: number, type: ShotType, simulatedTiming?: number): void {
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     if ((!isPlayerBatting && simulatedTiming === undefined) || !this.activeDelivery || this.activeShot) return;
+    if (isPlayerBatting && !globalAutoAssistConfig.isDeliveryActive) return;
 
     this.hideAssistedPrompt();
     // Auto-hide panels to clear view
@@ -405,14 +396,9 @@ export class UIManager {
     if (simulatedTiming !== undefined) {
       timing = simulatedTiming;
     } else {
-      // Calculate relative timing of swing based on how far the ball has traveled.
-      // Ball triggers arrived callback at frame 60.
-      const currentFrame = (Date.now() - this.deliveryStartFrame) / (1000 / 60);
-      const arrivalFrame = 50; // Sweet spot of ball crossing the crease
-      
-      // Convert to relative ratio centered at 0.5
-      const diff = currentFrame - arrivalFrame;
-      timing = 0.5 + (diff / 40); // bounds mapped
+      // The bot delivery takes 1400 ms, with a 150 ms swing animation lead.
+      const elapsed = performance.now() - (globalAutoAssistConfig.deliveryStartTime ?? performance.now());
+      timing = 0.5 + (elapsed - 1250) / 500;
     }
 
     this.activeShot = {
@@ -520,6 +506,10 @@ export class UIManager {
       // Start polling for flight progression
       const checkFlight = () => {
         if (!this.isBallActive || !this.activeDelivery) return;
+        if (!globalAutoAssistConfig.isDeliveryActive) {
+          requestAnimationFrame(checkFlight);
+          return;
+        }
         
         let z = 0;
         const ballMesh = this.gameScene.scene.getMeshByName('cricketBall');
