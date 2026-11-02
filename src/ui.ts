@@ -69,6 +69,7 @@ export class UIManager {
     canvas.addEventListener('pointerdown', (e) => this.handlePointerDown(e));
     canvas.addEventListener('pointermove', (e) => this.handlePointerMove(e));
     canvas.addEventListener('pointerup', (e) => this.handlePointerUp(e));
+    canvas.addEventListener('pointercancel', () => { this.isPointerDown = false; });
 
     // Shot selector
     const batTypeButtons = document.querySelectorAll('#bat-type-group .btn');
@@ -226,6 +227,8 @@ export class UIManager {
   // --- Pointer & Aim Gesture Recognition ---
 
   private handlePointerDown(e: PointerEvent): void {
+    if (!e.isPrimary) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     this.isPointerDown = true;
     this.swipeStartX = e.clientX;
@@ -239,7 +242,7 @@ export class UIManager {
   }
 
   private handlePointerMove(e: PointerEvent): void {
-    if (!this.isPointerDown) return;
+    if (!e.isPrimary || !this.isPointerDown) return;
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     if (!isPlayerBatting) {
       this.updateBowlingAim(e);
@@ -247,7 +250,7 @@ export class UIManager {
   }
 
   private handlePointerUp(e: PointerEvent): void {
-    if (!this.isPointerDown) return;
+    if (!e.isPrimary || !this.isPointerDown) return;
     this.isPointerDown = false;
     
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
