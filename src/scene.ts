@@ -47,6 +47,8 @@ export class GameScene {
   
   private currentBallVelocity: BABYLON.Vector3 | null = null;
   private currentBallPos: BABYLON.Vector3 | null = null;
+  private shotOrigin: BABYLON.Vector3 | null = null;
+  public shotReachedBoundary = false;
   private ballPathPoints: BABYLON.Vector3[] = [];
   private ballUnitDir: BABYLON.Vector3 | null = null;
   private ballSideDir: BABYLON.Vector3 | null = null;
@@ -927,6 +929,7 @@ export class GameScene {
       const currentSpeed = Math.sqrt(this.currentBallVelocity.x ** 2 + this.currentBallVelocity.z ** 2);
       const distanceToOrigin = Math.sqrt(this.currentBallPos.x ** 2 + this.currentBallPos.z ** 2);
       const isAtBoundary = distanceToOrigin >= 65;
+      this.shotReachedBoundary = isAtBoundary;
 
       if ((currentSpeed < 0.3 && this.currentBallPos.y <= 0.2) || isAtBoundary) {
         this.endDeliveryCycle();
@@ -1001,6 +1004,8 @@ export class GameScene {
 
     this.ballPathPoints = [startPoint.clone()];
     this.currentBallPos = startPoint.clone();
+    this.shotOrigin = startPoint.clone();
+    this.shotReachedBoundary = false;
     this.currentBallVelocity = currentVelocity;
 
     // Flight direction for camera
@@ -1010,6 +1015,11 @@ export class GameScene {
     this.ballUnitDir = unitDir;
     
     globalAutoAssistConfig.isBallInPlay = true;
+  }
+
+  public getShotDistance(): number {
+    if (!this.currentBallPos || !this.shotOrigin) return 0;
+    return Math.hypot(this.currentBallPos.x - this.shotOrigin.x, this.currentBallPos.z - this.shotOrigin.z);
   }
 
   public animateMissWicket(isWicket: boolean): void {

@@ -64,6 +64,7 @@ export interface BallOutcome {
   delivery: DeliveryChoice;
   shot: ShotChoice | null;
   distance: number;
+  runs?: number; // Set when a hit has finished travelling.
   isWicket: boolean;
   wicketReason: string;
   isFreeHit: boolean;

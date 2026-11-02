@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { checkExtraBall, getLineTypeFromAimX, SIX_THRESHOLD, calculateShotTrajectory, calculateShotDistance, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { checkExtraBall, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 
 export class UIManager {
@@ -564,11 +564,10 @@ export class UIManager {
       let hasBounced = false;
 
       if (lastBall && lastBall.shot && !lastBall.isWicket && !lastBall.isExtra) {
-        const currentPos = (this.gameScene as any).currentBallPos;
-        shotDistanceMeters = currentPos ? calculateShotDistance({ position: currentPos }) : (lastBall.distance || 0);
+        shotDistanceMeters = this.gameScene.getShotDistance();
         hasBounced = globalAutoAssistConfig.hasBounced || false;
         
-        const runs = evaluateFinalOutcome(shotDistanceMeters, hasBounced);
+        const runs = evaluateFinalOutcome(shotDistanceMeters, hasBounced, this.gameScene.shotReachedBoundary);
         
         let title = `${runs} RUNS`;
         let desc = `Shot yielded ${runs} runs.`;
@@ -587,7 +586,7 @@ export class UIManager {
       }
 
       if (lastBall && lastBall.shot && !lastBall.isWicket && !lastBall.isExtra) {
-        this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced);
+        this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced, this.gameScene.shotReachedBoundary);
         this.updateHUD();
       } else if (lastBall) {
         this.controller.handleInningsCompletion();
@@ -661,9 +660,7 @@ export class UIManager {
       const vOut = calculateShotTrajectory(1, 0.5, 0.5, theta_shot, {x:0, y:0, z:0}, {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type);
       
       this.gameScene.animateHitPath(outcome.distance, outcome.shot.direction, vOut);
-      if (outcome.distance >= SIX_THRESHOLD) {
-        this.controller.setCameraMode('follow_shot');
-      }
+      this.controller.setCameraMode('follow_shot');
       // Result toast is deferred to onBallResolvedCallback
     } else {
       title = 'Dot Ball';
@@ -791,21 +788,20 @@ export class UIManager {
             dot.className = 'over-dot blue extra';
             dot.textContent = outcome.extraType === 'wide' ? 'WD' : (outcome.extraType === 'noball' ? 'NB' : 'EX');
             dot.title = `Ball ${i + 1}: Extra Delivery (${outcome.extraType ? outcome.extraType.toUpperCase() : 'Extra'} +1 Run)`;
-          } else if (outcome.isFreeHit && outcome.distance < SIX_THRESHOLD) {
+          } else if (outcome.isFreeHit && !outcome.runs) {
             // Blue dot: Free hit delivery
             dot.className = 'over-dot blue extra free-hit';
             dot.textContent = 'FH';
             dot.title = `Ball ${i + 1}: Free Hit Delivery (Dot Ball - 0 runs)`;
-          } else if (outcome.distance >= SIX_THRESHOLD) {
+          } else if (outcome.runs === 6) {
             // Gold dot: SIX scored (6 runs)
             dot.className = 'over-dot gold six';
             dot.textContent = '6';
             dot.title = `Ball ${i + 1}: SIX! (${outcome.distance.toFixed(1)}m)`;
           } else {
-            // Green dot: Dot Ball (0 runs)
             dot.className = 'over-dot green legal';
-            dot.textContent = '•';
-            dot.title = `Ball ${i + 1}: Dot Ball (0 runs)`;
+            dot.textContent = outcome.runs ? String(outcome.runs) : '•';
+            dot.title = `Ball ${i + 1}: ${outcome.runs || 0} runs`;
           }
         } else {
           // Gray/Empty outline: Upcoming/unbowled
@@ -901,8 +897,8 @@ export class UIManager {
     const playerInnings = state.innings.find(i => i.batter.id === state.player.id);
     const botInnings = state.innings.find(i => i.batter.id === state.bot.id);
 
-    const playerSixes = playerInnings ? playerInnings.balls.filter(b => b.distance >= SIX_THRESHOLD).length : 0;
-    const botSixes = botInnings ? botInnings.balls.filter(b => b.distance >= SIX_THRESHOLD).length : 0;
+    const playerSixes = playerInnings ? playerInnings.balls.filter(b => b.runs === 6).length : 0;
+    const botSixes = botInnings ? botInnings.balls.filter(b => b.runs === 6).length : 0;
     const playerCarry = playerInnings ? playerInnings.balls.reduce((acc, b) => acc + b.distance, 0) : 0;
     const botCarry = botInnings ? botInnings.balls.reduce((acc, b) => acc + b.distance, 0) : 0;
 
@@ -1107,14 +1103,14 @@ export class UIManager {
         dot.className = 'mini-dot extra';
         dot.textContent = ball.extraType === 'wide' ? 'WD' : 'NB';
         dot.title = `Ball ${idx + 1}: Extra Delivery (+1 Run)`;
-      } else if (ball.distance >= SIX_THRESHOLD) {
+      } else if (ball.runs === 6) {
         dot.className = 'mini-dot six';
         dot.textContent = `${Math.round(ball.distance)}m`;
         dot.title = `Ball ${idx + 1}: SIX! (${ball.distance.toFixed(1)}m)`;
       } else {
         dot.className = 'mini-dot dot';
-        dot.textContent = '•';
-        dot.title = `Ball ${idx + 1}: Dot Ball (0 runs)`;
+        dot.textContent = ball.runs ? String(ball.runs) : '•';
+        dot.title = `Ball ${idx + 1}: ${ball.runs || 0} runs`;
       }
       container.appendChild(dot);
     });

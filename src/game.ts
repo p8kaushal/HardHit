@@ -1,5 +1,5 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { evaluateWicket, calculateDistance, checkExtraBall, SIX_THRESHOLD, calculateDeliveryVelocity, calculateProjectedCreaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
+import { evaluateWicket, calculateDistance, checkExtraBall, calculateDeliveryVelocity, calculateProjectedCreaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { activeInputManager } from './input';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
@@ -419,7 +419,7 @@ export class MatchController {
     return outcome;
   }
 
-  public finalizeBallOutcome(rawDistance: number, hasBounced: boolean): number {
+  public finalizeBallOutcome(rawDistance: number, hasBounced: boolean, reachedBoundary?: boolean): number {
     try {
       let distance = rawDistance;
       if (isNaN(distance) || !isFinite(distance) || distance < 0) {
@@ -430,7 +430,7 @@ export class MatchController {
       const innings = this.getCurrentInnings();
       
       // Evaluate outcome using formula
-      const runs = evaluateFinalOutcome(distance, hasBounced);
+      const runs = evaluateFinalOutcome(distance, hasBounced, reachedBoundary);
       
       innings.score += runs;
       if (runs === 6) {
@@ -440,6 +440,7 @@ export class MatchController {
       const lastBall = innings.balls[innings.balls.length - 1];
       if (lastBall) {
         lastBall.distance = distance;
+        lastBall.runs = runs;
       }
       
       console.log(`[GAME EVENT] Dynamic resolution: ${distance.toFixed(1)}m, bounced: ${hasBounced} => ${runs} runs. Score: ${innings.score}`);
@@ -676,7 +677,7 @@ export class MatchController {
     
     // Calculate player's total sixes across all batting innings
     const playerInnings = this.state.innings.filter(i => i.batter.id === player.id);
-    const sixesHit = playerInnings.reduce((acc, inn) => acc + inn.balls.filter(b => b.distance >= SIX_THRESHOLD).length, 0);
+    const sixesHit = playerInnings.reduce((acc, inn) => acc + inn.balls.filter(b => b.runs === 6).length, 0);
     
     const isTie = this.state.winnerId === null;
     const baseXP = playerWon ? 100 : (isTie ? 50 : 30);

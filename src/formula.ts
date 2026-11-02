@@ -536,12 +536,12 @@ export function getParabolicFlightPosition(
   return { x, y, z };
 }
 
-export function evaluateFinalOutcome(distance: number, hasBounced: boolean): number {
-  if (distance >= 65 && !hasBounced) {
+export function evaluateFinalOutcome(distance: number, hasBounced: boolean, reachedBoundary = distance >= 65): number {
+  if (reachedBoundary && !hasBounced) {
     return 6;
-  } else if (distance >= 65 && hasBounced) {
+  } else if (reachedBoundary && hasBounced) {
     return 4;
-  } else if (distance >= 40 && distance < 65) {
+  } else if (distance >= 40) {
     return distance >= 55 ? 3 : 2;
   } else if (distance >= 15 && distance < 40) {
     return distance >= 25 ? 2 : 1;
@@ -551,10 +551,10 @@ export function evaluateFinalOutcome(distance: number, hasBounced: boolean): num
 }
 
 
-export function calculateShotDistance(ball: { position: { x: number, z: number } } | any): number {
+export function calculateShotDistance(ball: { position: { x: number, z: number } }, origin = { x: 0, z: -8.8 }): number {
   if (!ball || !ball.position) return 0.0;
-  const dx = ball.position.x - 0.0;
-  const dz = ball.position.z - (-18.5);
+  const dx = ball.position.x - origin.x;
+  const dz = ball.position.z - origin.z;
   let shotDistanceMeters = Math.hypot(dx, dz);
   
   if (isNaN(shotDistanceMeters) || !isFinite(shotDistanceMeters) || shotDistanceMeters < 0) {

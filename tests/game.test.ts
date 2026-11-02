@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MatchController } from '../src/game';
-import { calculateShotTrajectory, checkExtraBall } from '../src/formula';
+import { calculateShotDistance, calculateShotTrajectory, checkExtraBall, evaluateFinalOutcome } from '../src/formula';
 import type { DeliveryChoice } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -71,4 +71,23 @@ test('shot trajectory follows all four cardinal directions with finite speed', (
     assert.ok(Object.values(velocity).every(Number.isFinite));
     assert.ok(Math.hypot(velocity.x, velocity.y, velocity.z) <= 38.000001);
   }
+});
+
+test('boundary scoring uses the rope crossing and bounce, not carry distance alone', () => {
+  assert.equal(evaluateFinalOutcome(58, false, true), 6);
+  assert.equal(evaluateFinalOutcome(58, true, true), 4);
+  assert.equal(evaluateFinalOutcome(70, false, false), 3);
+  assert.equal(calculateShotDistance({ position: { x: 0, z: -8.8 } }), 0);
+  assert.ok(Math.abs(calculateShotDistance({ position: { x: 3, z: -4.8 } }) - 5) < 1e-9);
+});
+
+test('finalizing a six records its runs and biggest hit consistently', () => {
+  const game = match();
+  const innings = game.getCurrentInnings();
+  game.recordBall(delivery(0.5), null);
+  assert.equal(game.finalizeBallOutcome(58, false, true), 6);
+  assert.equal(innings.score, 6);
+  assert.equal(innings.biggestSix, 58);
+  assert.equal(innings.balls[0].runs, 6);
+  assert.equal(innings.balls[0].distance, 58);
 });
