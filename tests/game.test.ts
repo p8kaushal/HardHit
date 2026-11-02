@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBotPlayer, MatchController } from '../src/game';
-import { calculateShotDistance, calculateShotTrajectory, checkExtraBall, evaluateFinalOutcome } from '../src/formula';
+import { calculateShotDistance, calculateShotTrajectory, checkExtraBall, evaluateFinalOutcome, frameIndependentDamping } from '../src/formula';
 import type { BallOutcome, DeliveryChoice } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -71,6 +71,12 @@ test('shot trajectory follows all four cardinal directions with finite speed', (
     assert.ok(Object.values(velocity).every(Number.isFinite));
     assert.ok(Math.hypot(velocity.x, velocity.y, velocity.z) <= 38.000001);
   }
+});
+
+test('ball drag produces the same damping over time at 30 and 60 fps', () => {
+  const at30 = frameIndependentDamping(0.985, 1 / 30) ** 30;
+  const at60 = frameIndependentDamping(0.985, 1 / 60) ** 60;
+  assert.ok(Math.abs(at30 - at60) < 1e-12);
 });
 
 test('boundary scoring uses the rope crossing and bounce, not carry distance alone', () => {

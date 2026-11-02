@@ -1,7 +1,7 @@
 import * as BABYLON from 'babylonjs';
 import { CameraMode } from './types';
 import { globalAutoAssistConfig } from './game';
-import { getParabolicFlightPosition } from './formula';
+import { frameIndependentDamping, getParabolicFlightPosition } from './formula';
 
 export class GameScene {
   public scene: BABYLON.Scene;
@@ -910,18 +910,20 @@ export class GameScene {
     try {
       if (!this.currentBallPos || !this.currentBallVelocity || !this.ballUnitDir || !this.ballSideDir || !this.ballMesh) return;
 
-      // Air drag applied every frame
-      this.currentBallVelocity.x *= 0.985;
-      this.currentBallVelocity.y *= 0.985;
-      this.currentBallVelocity.z *= 0.985;
+      const dt = Math.min(this.engine.getDeltaTime() / 1000, 0.05);
+      const airDrag = frameIndependentDamping(0.985, dt);
+      this.currentBallVelocity.x *= airDrag;
+      this.currentBallVelocity.y *= airDrag;
+      this.currentBallVelocity.z *= airDrag;
 
       const ballRadius = 0.075;
       if (this.currentBallPos.y < ballRadius) {
         this.currentBallPos.y = ballRadius;
         globalAutoAssistConfig.hasBounced = true;
         // Turf rolling friction deceleration
-        this.currentBallVelocity.x *= 0.92;
-        this.currentBallVelocity.z *= 0.92;
+        const turfDrag = frameIndependentDamping(0.92, dt);
+        this.currentBallVelocity.x *= turfDrag;
+        this.currentBallVelocity.z *= turfDrag;
         // Turf bounce rebounds (0.55 coefficient)
         this.currentBallVelocity.y = Math.abs(this.currentBallVelocity.y) * 0.55;
       }
@@ -936,7 +938,6 @@ export class GameScene {
         return;
       }
 
-      const dt = this.engine.getDeltaTime() / 1000;
       // Apply gravity
       if (this.currentBallPos.y > ballRadius) {
           this.currentBallVelocity.y -= 9.81 * dt;
