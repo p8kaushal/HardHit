@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBotPlayer, MatchController } from '../src/game';
-import { calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, evaluateFinalOutcome, frameIndependentDamping } from '../src/formula';
+import { BATTER_CREASE_Z, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, evaluateFinalOutcome, frameIndependentDamping, getParabolicFlightPosition } from '../src/formula';
 import type { BallOutcome, DeliveryChoice } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -84,6 +84,20 @@ test('delivery animation advances at the same speed at 30 and 60 fps', () => {
   const at60 = deliveryAnimationStep(1000 / 60, 1) * 60;
   assert.ok(Math.abs(at30 - at60) < 1e-9);
   assert.equal(deliveryAnimationStep(500, 1), 3);
+});
+
+test('delivery trajectory reaches the bounce point and the batter crease', () => {
+  const release = { x: 0, y: 1.9, z: 10 };
+  const bounce = { x: 0.4, y: 0.06, z: -7.5 };
+  const crease = { x: 0.4, y: 0.85, z: BATTER_CREASE_Z };
+  const bounceProgress = (bounce.z - release.z) / (crease.z - release.z);
+  const atBounce = getParabolicFlightPosition(bounceProgress, release, bounce, crease);
+  const atCrease = getParabolicFlightPosition(1, release, bounce, crease);
+  assert.ok(Math.abs(atBounce.z - bounce.z) < 1e-9);
+  assert.ok(Math.abs(atBounce.y - bounce.y) < 1e-9);
+  assert.ok(Math.abs(atCrease.x - crease.x) < 1e-9);
+  assert.ok(Math.abs(atCrease.y - crease.y) < 1e-9);
+  assert.ok(Math.abs(atCrease.z - crease.z) < 1e-9);
 });
 
 test('boundary scoring uses the rope crossing and bounce, not carry distance alone', () => {

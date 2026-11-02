@@ -1,7 +1,7 @@
 import * as BABYLON from 'babylonjs';
 import { CameraMode } from './types';
 import { globalAutoAssistConfig } from './game';
-import { deliveryAnimationStep, frameIndependentDamping, getParabolicFlightPosition } from './formula';
+import { BATTER_CREASE_Z, deliveryAnimationStep, frameIndependentDamping, getParabolicFlightPosition } from './formula';
 
 export class GameScene {
   public scene: BABYLON.Scene;
@@ -20,7 +20,7 @@ export class GameScene {
   private timingRing: BABYLON.Mesh | null = null;
   
   // Characters (Procedural low-poly)
-  public static CREASE_ANCHOR = new BABYLON.Vector3(0.0, 0.0, -8.8);
+  public static CREASE_ANCHOR = new BABYLON.Vector3(0.0, 0.0, BATTER_CREASE_Z);
   public playerCreaseOffset = new BABYLON.Vector3(-0.35, 0.0, 0.0);
   private bowlerRoot: BABYLON.TransformNode | null = null;
         public batterRoot: BABYLON.TransformNode | null = null;
@@ -76,7 +76,7 @@ export class GameScene {
           this.updateBallFlight();
         }
         if (this.isAnimatingBall && this.isBotBatting) {
-          if (this.ballMesh && this.ballMesh.position.z <= -16.0 && !this.hasBotSwung) {
+          if (this.ballMesh && this.ballMesh.position.z <= -7.5 && !this.hasBotSwung) {
             this.hasBotSwung = true;
             if (this.botBattingTriggerCallback) {
               this.botBattingTriggerCallback();
@@ -128,7 +128,7 @@ export class GameScene {
         if (this.isAnimatingBall && this.ballMesh) {
           const z = this.ballMesh.position.z;
           // Physical arrival zone definition
-          if (z <= -14.0 && z >= -18.5) {
+          if (z <= -6.5 && z >= BATTER_CREASE_Z) {
             globalAutoAssistConfig.bufferedTiming = 0.5; // Guaranteed valid timing offset (0 deviation)
           }
         }
@@ -482,22 +482,6 @@ export class GameScene {
     const points: BABYLON.Vector3[] = [];
     const steps = 60;
     
-    // In updateBallFlight, we use (0.0, 1.8, 16.5) to bounce to (targetX, 0.85, -18.5)
-    // Wait, generateTrajectoryPoints is used by animateDelivery for the player bowling.
-    // The prompt says "In src/scene.ts / src/game.ts (updateBallFlight / updateBowlerDelivery), implement a two-phase parabolic flight path synced with the landing bounce coordinates... update the visual path trace mesh generation logic (prediction lines) to match this exact two-phase parabolic bounce math so the physical ball travels exactly along the rendered path."
-    // Let's implement it for both player and bot deliveries to be safe.
-    
-    // For animateDelivery (Player bowling):
-    // Release is at (-0.6 or 0.6, 1.8, -10.5). Crease is at 10.
-    // To keep it unified and match the exact prompt coordinates for Phase 1 & 2:
-    // Start release point: Bowler hand (0.0, 1.8, 16.5).
-    // Bounce contact: landing marker coordinate (targetX, 0.06, targetZ).
-    // End destination: Crease coordinate (targetX + seamDrift, 0.85, -18.5).
-    
-    // The prompt explicitly specifies:
-    // Start release point: (0.0, 1.8, 16.5)
-    // End destination: (targetX, 0.85, -18.5)
-    
     const targetX = aimTarget.x;
     // We get targetZ from the same marker logic. For bot, it's bounceMarker Z.
     // We will just use the bounce marker Z or compute it.
@@ -507,7 +491,7 @@ export class GameScene {
     const release = { x: startX, y: 1.9, z: 10.0 };
     const bounce = { x: targetX, y: 0.06, z: bounceZ };
     const seamDrift = 0;
-    const end = { x: targetX + seamDrift, y: 0.85, z: -18.5 };
+    const end = { x: targetX + seamDrift, y: 0.85, z: BATTER_CREASE_Z };
     
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
@@ -613,7 +597,7 @@ export class GameScene {
       this.predictionPath = null;
     }
     if (!this.isBotBatting && assistMultiplier >= 0.7) {
-      const visiblePoints = this.ballTrajectoryPoints.filter(p => p.z >= -16.0);
+      const visiblePoints = this.ballTrajectoryPoints.filter(p => p.z >= BATTER_CREASE_Z);
       if (visiblePoints.length > 1) {
         this.predictionPath = BABYLON.MeshBuilder.CreateDashedLines('predictionPath', {
           points: visiblePoints,
@@ -660,7 +644,7 @@ export class GameScene {
       let currentSpeedScale = speedScale;
       let fov = 75;
 
-      if (this.ballMesh && this.ballMesh.position.z <= -14.0) {
+      if (this.ballMesh && this.ballMesh.position.z <= -6.5) {
         // Time Dilation
         if (!this.isBotBatting) {
           if (assistMultiplier >= 0.7) { // Rookie
@@ -672,7 +656,7 @@ export class GameScene {
 
         // Camera FOV Zoom
         if (this.activeCameraMode === 'batter_eye' && this.scene.activeCamera) {
-          const progress = Math.min(1, Math.max(0, (-14.0 - this.ballMesh.position.z) / 3.8));
+          const progress = Math.min(1, Math.max(0, (-6.5 - this.ballMesh.position.z) / 2.3));
           fov = BABYLON.Scalar.Lerp(75, 50, progress);
           (this.scene.activeCamera as BABYLON.TargetCamera).fov = fov * (Math.PI / 180);
         }
@@ -726,8 +710,7 @@ export class GameScene {
 
       this.ballMesh?.position.copyFrom(this.ballTrajectoryPoints[index]);
       
-      // Check if ball crossed the crease (z = -17.0 approx)
-      if (!this.creaseCrossedFired && this.ballMesh && this.ballMesh.position.z <= -17.0) {
+      if (!this.creaseCrossedFired && this.ballMesh && this.ballMesh.position.z <= -8.5) {
         this.creaseCrossedFired = true;
         if (this.onBallCreaseCrossedCallback) {
           this.onBallCreaseCrossedCallback();
@@ -899,7 +882,7 @@ export class GameScene {
       const release = { x: startX, y: 1.9, z: 10.0 };
       const bounce = { x: targetX, y: 0.06, z: targetZ };
       const seamDrift = 0;
-      const end = { x: targetX + seamDrift, y: 0.85, z: -18.5 };
+      const end = { x: targetX + seamDrift, y: 0.85, z: BATTER_CREASE_Z };
       
       const pos = getParabolicFlightPosition(progress, release, bounce, end);
       ball.position.set(pos.x, pos.y, pos.z);

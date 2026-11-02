@@ -510,8 +510,8 @@ export class UIManager {
           z = (this.gameScene as any).currentBallPos?.z || 0;
         }
         
-        const reactionTrigger = z <= -8.0;
-        const creaseTrigger = z <= -19.5;
+        const reactionTrigger = z <= -5.5;
+        const creaseTrigger = z <= -8.8;
 
         if (creaseTrigger) {
           this.hideAssistedPrompt();

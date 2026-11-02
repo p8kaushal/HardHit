@@ -20,6 +20,7 @@ export function calculateBounceTarget(line: string, length: string): BABYLON.Vec
 
 export const SIX_THRESHOLD = 70;
 export const BAT_ANIMATION_LEAD_TIME = 0.15; // 150ms swing apex delay
+export const BATTER_CREASE_Z = -8.8;
 
 /** Apply a 60 Hz damping coefficient consistently at any frame rate. */
 export function frameIndependentDamping(perFrame: number, elapsedSeconds: number): number {
