@@ -48,6 +48,8 @@ Face off against intelligent AI bot tiers in a high-stakes, rapid-fire cricket e
 | **Action Execution** | `Spacebar` (Stop bowling release point meter / Trigger bat swing timing) |
 | **Shortcuts Modal** | Press `?` or click the HUD shortcuts button |
 
+On a phone, drag the left batting stick to aim and tap a shot button with your other thumb as the ball arrives. Aim bowling deliveries by dragging on the pitch, then hold and release the delivery button in the green timing zone.
+
 ---
 
 ## 🚀 Getting Started

@@ -1523,6 +1523,14 @@ body {
   }
 }
 
+@media (max-width: 480px) {
+  .game-hud .hud-profile-badge { display: none; }
+  .game-hud .scoreboard-hud { justify-content: space-between; }
+  .game-hud .hud-tracker-section { display: none; }
+  #recommended-shot-banner { display: none !important; }
+  #bowler-runup-indicator { font-size: 1rem !important; text-align: center; }
+}
+
 /* Canvas Viewport */
 .canvas-container {
   position: fixed;
@@ -2814,4 +2822,46 @@ kbd {
   height: 24px;
   background: white;
   transform: translateX(-50%);
+}
+
+/* Touch batting: aim with one thumb and strike with the other. */
+.touch-batting-controls { display: none; }
+@media (pointer: coarse), (max-width: 768px) {
+  #control-batting .side-dock { display: none; }
+  .touch-batting-controls {
+    position: absolute;
+    inset: auto 0 max(1rem, env(safe-area-inset-bottom));
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    padding: 0 max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left));
+    pointer-events: none;
+  }
+  .touch-aim, .touch-shot-buttons { pointer-events: auto; touch-action: none; }
+  .touch-aim { display: grid; justify-items: center; gap: .25rem; color: white; font-size: .7rem; font-weight: 800; letter-spacing: .12em; }
+  .touch-stick {
+    position: relative;
+    width: clamp(100px, 22vw, 140px);
+    aspect-ratio: 1;
+    border: 2px solid rgba(255,255,255,.65);
+    border-radius: 50%;
+    background: rgba(7, 16, 30, .45);
+    touch-action: none;
+  }
+  .touch-stick::before, .touch-stick::after { content: ''; position: absolute; background: rgba(255,255,255,.2); }
+  .touch-stick::before { width: 1px; height: 72%; left: 50%; top: 14%; }
+  .touch-stick::after { height: 1px; width: 72%; top: 50%; left: 14%; }
+  .touch-stick-knob {
+    position: absolute; left: 50%; top: 50%; width: 40%; height: 40%; border-radius: 50%;
+    background: rgba(255,255,255,.7); border: 2px solid white; transform: translate(-50%, -50%); pointer-events: none;
+  }
+  .touch-shot-buttons { display: grid; grid-template-columns: repeat(2, minmax(58px, 72px)); gap: .5rem; }
+  .touch-shot {
+    aspect-ratio: 1; border-radius: 50%; color: white; font-weight: 900; font-size: .67rem;
+    border: 2px solid rgba(255,255,255,.8); background: rgba(26,49,80,.86); touch-action: none;
+    box-shadow: 0 5px 16px rgba(0,0,0,.3); -webkit-tap-highlight-color: transparent;
+  }
+  .touch-shot:active { transform: scale(.93); filter: brightness(1.25); }
+  .loft-shot { background: rgba(28,105,151,.9); }
+  .power-shot { background: rgba(172,57,54,.9); }
 }

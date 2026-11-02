@@ -4,6 +4,7 @@ import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
 import { bowlingReleaseTiming, checkExtraBall, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
+import { TouchBattingControls } from './touch-controls';
 
 export class UIManager {
   private controller: MatchController;
@@ -51,6 +52,11 @@ export class UIManager {
       (x, z) => this.gameScene.updateBounceMarker({ x, z })
     );
     this.initEventListeners();
+    new TouchBattingControls(
+      document.getElementById('touch-stick')!,
+      document.querySelectorAll<HTMLButtonElement>('.touch-shot'),
+      (direction, type) => this.executeBattingSwingGesture(direction, type)
+    );
     this.updateHUD();
 
     this.gameScene.botBattingTriggerCallback = () => {

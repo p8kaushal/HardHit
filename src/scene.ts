@@ -1,7 +1,8 @@
 import * as BABYLON from 'babylonjs';
 import { CameraMode } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, deliveryAnimationStep, frameIndependentDamping, getParabolicFlightPosition } from './formula';
+import { BATTER_CREASE_Z, deliveryAnimationStep, getParabolicFlightPosition } from './formula';
+import { stepBall, type BallState } from './ball-physics';
 
 export class GameScene {
   public scene: BABYLON.Scene;
@@ -15,6 +16,7 @@ export class GameScene {
   // Gameplay Meshes
   private ballMesh: BABYLON.Mesh | null = null;
   private ballTrail: BABYLON.LinesMesh | null = null;
+  private readonly trailVertices = Array.from({ length: 10 }, () => BABYLON.Vector3.Zero());
   private predictionPath: BABYLON.LinesMesh | null = null;
   public bounceMarker: BABYLON.Mesh | null = null;
   private timingRing: BABYLON.Mesh | null = null;
@@ -45,13 +47,12 @@ export class GameScene {
   public hasBotSwung: boolean = false;
   public botBattingTriggerCallback: (() => void) | null = null;
   
-  private currentBallVelocity: BABYLON.Vector3 | null = null;
   private currentBallPos: BABYLON.Vector3 | null = null;
   private shotOrigin: BABYLON.Vector3 | null = null;
+  private shotPhysics: BallState | null = null;
+  private physicsAccumulator = 0;
   public shotReachedBoundary = false;
   private ballPathPoints: BABYLON.Vector3[] = [];
-  private ballUnitDir: BABYLON.Vector3 | null = null;
-  private ballSideDir: BABYLON.Vector3 | null = null;
   
   constructor(canvasElementId: string) {
     this.canvas = document.getElementById(canvasElementId) as unknown as HTMLCanvasElement;
@@ -85,13 +86,14 @@ export class GameScene {
         }
         if (this.activeCameraMode === 'follow_shot' && this.ballMesh) {
           const currentTarget = this.primaryCamera.getTarget();
-          const newTarget = BABYLON.Vector3.Lerp(currentTarget, this.ballMesh.position, 0.08);
+          const frames = Math.min(this.engine.getDeltaTime(), 50) * 60 / 1000;
+          const newTarget = BABYLON.Vector3.Lerp(currentTarget, this.ballMesh.position, 1 - Math.pow(0.92, frames));
           if (Number.isFinite(newTarget.x) && Number.isFinite(newTarget.y) && Number.isFinite(newTarget.z)) {
             this.primaryCamera.setTarget(newTarget);
           }
           
           const targetPos = this.ballMesh.position.add(new BABYLON.Vector3(0, 4.5, -11.0));
-          this.primaryCamera.position = BABYLON.Vector3.Lerp(this.primaryCamera.position, targetPos, 0.05);
+          this.primaryCamera.position = BABYLON.Vector3.Lerp(this.primaryCamera.position, targetPos, 1 - Math.pow(0.95, frames));
           if (this.primaryCamera.position.y < 3.0) {
             this.primaryCamera.position.y = 3.0;
           }
@@ -728,22 +730,23 @@ export class GameScene {
 
   private drawBallTrail(): void {
     if (!this.ballMesh) return;
-    
-    // Clear old trail line
-    if (this.ballTrail) {
-      this.ballTrail.dispose();
-    }
-    
     const index = Math.floor(this.ballAnimationTime);
     const trailPoints = this.ballTrajectoryPoints.slice(Math.max(0, index - 8), index + 1);
-    
-    if (trailPoints.length > 1) {
-      this.ballTrail = BABYLON.MeshBuilder.CreateLines('ballTrail', {
-        points: trailPoints,
-        updatable: true
-      }, this.scene);
-      this.ballTrail.color = new BABYLON.Color3(0.9, 0.9, 0.4);
+    this.updateTrail(trailPoints, new BABYLON.Color3(0.9, 0.9, 0.4));
+  }
+
+  private updateTrail(points: BABYLON.Vector3[], color: BABYLON.Color3): void {
+    if (points.length < 2) return;
+    const padding = this.trailVertices.length - points.length;
+    for (let i = 0; i < this.trailVertices.length; i++) {
+      this.trailVertices[i].copyFrom(points[Math.max(0, i - padding)]);
     }
+    this.ballTrail = BABYLON.MeshBuilder.CreateLines('ballTrail', {
+      points: this.trailVertices,
+      updatable: true,
+      instance: this.ballTrail || undefined
+    }, this.scene);
+    this.ballTrail.color.copyFrom(color);
   }
 
   public animateBatterSwing(_directionAngle: number, successCallback: () => void): void {
@@ -891,43 +894,25 @@ export class GameScene {
 
   private updateBallPhysics(): void {
     try {
-      if (!this.currentBallPos || !this.currentBallVelocity || !this.ballUnitDir || !this.ballSideDir || !this.ballMesh) return;
+      if (!this.currentBallPos || !this.shotPhysics || !this.ballMesh) return;
 
-      const dt = Math.min(this.engine.getDeltaTime() / 1000, 0.05);
-      const airDrag = frameIndependentDamping(BALL_AIR_DAMPING, dt);
-      this.currentBallVelocity.x *= airDrag;
-      this.currentBallVelocity.y *= airDrag;
-      this.currentBallVelocity.z *= airDrag;
-
-      const ballRadius = 0.075;
-      if (this.currentBallPos.y < ballRadius) {
-        this.currentBallPos.y = ballRadius;
-        globalAutoAssistConfig.hasBounced = true;
-        // Turf rolling friction deceleration
-        const turfDrag = frameIndependentDamping(0.92, dt);
-        this.currentBallVelocity.x *= turfDrag;
-        this.currentBallVelocity.z *= turfDrag;
-        // Turf bounce rebounds (0.55 coefficient)
-        this.currentBallVelocity.y = Math.abs(this.currentBallVelocity.y) * 0.55;
+      const step = 1 / 120;
+      this.physicsAccumulator += Math.min(this.engine.getDeltaTime() / 1000, 0.05);
+      while (this.physicsAccumulator >= step) {
+        stepBall(this.shotPhysics, step);
+        this.physicsAccumulator -= step;
+        if (this.shotPhysics.stopped || this.shotPhysics.reachedBoundary) break;
       }
-
-      const currentSpeed = Math.sqrt(this.currentBallVelocity.x ** 2 + this.currentBallVelocity.z ** 2);
-      const distanceToOrigin = Math.sqrt(this.currentBallPos.x ** 2 + this.currentBallPos.z ** 2);
-      const isAtBoundary = distanceToOrigin >= 65;
-      this.shotReachedBoundary = isAtBoundary;
-
-      if ((currentSpeed < 0.3 && this.currentBallPos.y <= 0.2) || isAtBoundary) {
+      globalAutoAssistConfig.hasBounced = this.shotPhysics.hasBounced;
+      this.shotReachedBoundary = this.shotPhysics.reachedBoundary;
+      this.ballMesh.position.copyFrom(this.currentBallPos);
+      if (this.shotPhysics.stopped || this.shotPhysics.reachedBoundary) {
         this.endDeliveryCycle();
         return;
       }
 
-      // Apply gravity
-      if (this.currentBallPos.y > ballRadius) {
-          this.currentBallVelocity.y -= 9.81 * dt;
-      }
-      
-      this.currentBallPos.addInPlace(this.currentBallVelocity.scale(dt));
       this.ballPathPoints.push(this.currentBallPos.clone());
+      if (this.ballPathPoints.length > 10) this.ballPathPoints.shift();
 
       this.ballMesh.position.copyFrom(this.currentBallPos);
 
@@ -944,15 +929,7 @@ export class GameScene {
       }
 
       // Draw custom line trail for hit path
-      const trailPoints = this.ballPathPoints.slice(Math.max(0, this.ballPathPoints.length - 10), this.ballPathPoints.length);
-      if (trailPoints.length > 1) {
-        if (this.ballTrail) this.ballTrail.dispose();
-        this.ballTrail = BABYLON.MeshBuilder.CreateLines('ballTrail', {
-          points: trailPoints,
-          updatable: true
-        }, this.scene);
-        this.ballTrail.color = new BABYLON.Color3(1, 0.85, 0.2);
-      }
+      this.updateTrail(this.ballPathPoints, new BABYLON.Color3(1, 0.85, 0.2));
     } catch (e) {
       console.error("[BALL TRACKING CRASH GUARD]", e);
     }
@@ -990,13 +967,8 @@ export class GameScene {
     this.currentBallPos = startPoint.clone();
     this.shotOrigin = startPoint.clone();
     this.shotReachedBoundary = false;
-    this.currentBallVelocity = currentVelocity;
-
-    // Flight direction for camera
-    const unitDir = currentVelocity.clone().normalize();
-    unitDir.y = 0;
-    this.ballSideDir = new BABYLON.Vector3(-unitDir.z, 0, unitDir.x);
-    this.ballUnitDir = unitDir;
+    this.shotPhysics = { position: this.currentBallPos, velocity: currentVelocity, hasBounced: false, reachedBoundary: false, stopped: false };
+    this.physicsAccumulator = 0;
     
     globalAutoAssistConfig.isBallInPlay = true;
   }

@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBotPlayer, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
+import { directionFromStick, TouchBattingControls } from '../src/touch-controls';
+import { stepBall, type BallState } from '../src/ball-physics';
 import { BALL_AIR_DAMPING, BATTER_CREASE_Z, bowlingReleaseTiming, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, evaluateFinalOutcome, frameIndependentDamping, getParabolicFlightPosition } from '../src/formula';
 import type { BallOutcome, DeliveryChoice } from '../src/types';
 
@@ -13,6 +15,32 @@ Object.assign(globalThis, { localStorage: {
 
 const delivery = (timing: number, x = 0): DeliveryChoice => ({
   aimTarget: { x, z: -3.5 }, line: 'middle', length: 'good', type: 'fast', releaseTiming: timing
+});
+
+test('touch stick maps eight directions and ignores its dead zone', () => {
+  assert.equal(directionFromStick(0, 0), null);
+  assert.equal(directionFromStick(0.1, 0.1), null);
+  assert.deepEqual([[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]].map(([x,y]) => directionFromStick(x,y)), [0,1,2,3,4,5,6,7]);
+});
+
+test('a second finger can strike while the aiming finger remains held', () => {
+  const stickEvents: Record<string, (event: any) => void> = {};
+  const shotEvents: Record<string, (event: any) => void> = {};
+  const stick = {
+    querySelector: () => ({ style: {} }),
+    addEventListener: (name: string, fn: (event: any) => void) => { stickEvents[name] = fn; },
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
+    setPointerCapture: () => {}, setAttribute: () => {}
+  };
+  const button = { dataset: { shot: 'lofted' }, addEventListener: (name: string, fn: (event: any) => void) => { shotEvents[name] = fn; } };
+  const shots: Array<[number, string]> = [];
+  new TouchBattingControls(stick as unknown as HTMLElement, [button] as unknown as NodeListOf<HTMLButtonElement>, (direction, type) => shots.push([direction, type]));
+  stickEvents.pointerdown({ pointerId: 1, clientX: 100, clientY: 50, preventDefault() {} });
+  shotEvents.pointerdown({ pointerId: 2, preventDefault() {} });
+  assert.deepEqual(shots, [[2, 'lofted']]);
+  stickEvents.pointerup({ pointerId: 1 });
+  shotEvents.pointerdown({ pointerId: 3, preventDefault() {} });
+  assert.deepEqual(shots[1], [0, 'lofted']);
 });
 
 function match(): MatchController {
@@ -137,6 +165,25 @@ test('a well-hit lofted shot can clear the boundary before bouncing', () => {
   }
   assert.equal(bounced, false);
   assert.ok(z >= 65);
+});
+
+test('fixed-step shot physics resolves a lofted six and a grounded shot', () => {
+  const zero = { x: 0, y: 0, z: 0 };
+  const simulate = (type: string): BallState => {
+    const state: BallState = {
+      position: { x: 0, y: 0.4, z: BATTER_CREASE_Z },
+      velocity: calculateShotTrajectory(1, 0.5, 0.5, -Math.PI / 2, zero, zero, true, true, 'Medium', type),
+      hasBounced: false, reachedBoundary: false, stopped: false
+    };
+    for (let i = 0; i < 2400 && !state.stopped && !state.reachedBoundary; i++) stepBall(state, 1 / 120);
+    return state;
+  };
+  const loft = simulate('lofted');
+  assert.equal(loft.reachedBoundary, true);
+  assert.equal(loft.hasBounced, false);
+  const ground = simulate('grounded');
+  assert.equal(ground.hasBounced, true);
+  assert.ok(ground.reachedBoundary || ground.stopped);
 });
 
 test('delivery animation advances at the same speed at 30 and 60 fps', () => {
