@@ -253,7 +253,7 @@
             <div class="hud-stat-item">
               <span class="hud-stat-label">SCORE</span>
               <div class="hud-stat-value">
-                <span id="hud-score-count">0</span><span class="hud-slash">/</span><strong id="hud-wickets-count">0/6</strong>
+                <span id="hud-score-count">0</span><span class="hud-slash">/</span><strong id="hud-wickets-count">0</strong>
               </div>
             </div>
             <div class="hud-stat-divider"></div>
@@ -458,11 +458,14 @@
               <div id="touch-stick" class="touch-stick" role="img" aria-label="Shot aim: Straight. Drag to change direction."><span class="touch-stick-knob"></span></div>
               <span>AIM</span>
             </div>
+            <div class="touch-batting-actions">
+              <label class="bat-contact-control">BAT FACE <input class="bat-contact" type="range" min="0" max="100" value="50" aria-label="Bat face contact: edge to middle to edge"><span>EDGE &nbsp; · &nbsp; MIDDLE &nbsp; · &nbsp; EDGE</span></label>
             <div class="touch-shot-buttons" aria-label="Batting shots">
               <button type="button" class="touch-shot loft-shot" data-shot="lofted">LOFT</button>
               <button type="button" class="touch-shot drive-shot" data-shot="grounded">DRIVE</button>
               <button type="button" class="touch-shot power-shot" data-shot="power">POWER</button>
               <button type="button" class="touch-shot defend-shot" data-shot="defensive">DEFEND</button>
+            </div>
             </div>
           </div>
           <!-- Left Dock: Aim Direction Clock Selector -->
@@ -502,6 +505,8 @@
                 <button class="btn" data-val="defensive">Defensive (Ultra Safe)</button>
               </div>
             </div>
+
+            <label class="bat-contact-control">Bat face <input class="bat-contact" type="range" min="0" max="100" value="50" aria-label="Bat face contact: edge to middle to edge"><span>EDGE &nbsp; · &nbsp; MIDDLE &nbsp; · &nbsp; EDGE</span></label>
 
             <div class="action-btn-row">
               <button id="btn-bat-swing" class="btn primary-btn size-large">Hold & Release SPACE / Touch</button>

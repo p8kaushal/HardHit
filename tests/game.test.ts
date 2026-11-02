@@ -4,7 +4,7 @@ import { createBotPlayer, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, TouchBattingControls } from '../src/touch-controls';
 import { stepBall, type BallState } from '../src/ball-physics';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, evaluateFinalOutcome, evaluateWicket, frameIndependentDamping, getDeliveryFlightPosition, getParabolicFlightPosition } from '../src/formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, evaluateFinalOutcome, evaluateWicket, frameIndependentDamping, getDeliveryFlightPosition, getParabolicFlightPosition } from '../src/formula';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -62,6 +62,16 @@ test('bowling meter maps its midpoint to ideal release and clamps extremes', () 
   assert.equal(bowlingReleaseTiming(-100), 0);
   assert.equal(bowlingReleaseTiming(1200), 0.5);
   assert.equal(bowlingReleaseTiming(3000), 1);
+});
+
+test('bowling release timing affects the executed target in a predictable way', () => {
+  const target = { x: 0, z: -3.5 };
+  assert.deepEqual(bowlingExecutionTarget(target, 0.5, 50), target);
+  assert.deepEqual(bowlingExecutionTarget(target, 0, 100), target);
+  const early = bowlingExecutionTarget(target, 0.2, 50);
+  const late = bowlingExecutionTarget(target, 0.8, 50);
+  assert.ok(early.x < 0 && late.x > 0);
+  assert.ok(early.z > target.z && late.z < target.z);
 });
 
 test('keyboard bowling starts at good length and updates the aim marker', () => {
@@ -181,6 +191,14 @@ test('shot quality affects exit speed without changing direction', () => {
   const mistimed = calculateShotTrajectory(0, 0.5, 0.5, -Math.PI / 4, zero, zero);
   assert.ok(Math.hypot(clean.x, clean.y, clean.z) > Math.hypot(mistimed.x, mistimed.y, mistimed.z));
   assert.ok(Math.abs(clean.x / clean.z - mistimed.x / mistimed.z) < 1e-9);
+});
+
+test('batter power influences the ball exit speed', () => {
+  const zero = { x: 0, y: 0, z: 0 };
+  const velocity = (power: number) => calculateShotTrajectory(1, 0.5, 0.5, -Math.PI / 2, zero, zero, true, true, 'Medium', 'power', power);
+  const low = velocity(30);
+  const high = velocity(80);
+  assert.ok(Math.hypot(high.x, high.y, high.z) > Math.hypot(low.x, low.y, low.z));
 });
 
 test('ball drag produces the same damping over time at 30 and 60 fps', () => {

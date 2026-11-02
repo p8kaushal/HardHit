@@ -10,6 +10,7 @@ export function runBotSimulation(matchCount: number = 500, specificTier?: 'Rooki
     let totalDeliveriesFaced = 0;
     let totalWides = 0;
     let totalLegalDeliveries = 0;
+    let totalWickets = 0;
     let maxCreaseX = 0;
 
     for (let m = 0; m < matchCount; m++) {
@@ -18,9 +19,7 @@ export function runBotSimulation(matchCount: number = 500, specificTier?: 'Rooki
       batter.batterHand = m < matchCount / 2 ? 'RHB' : 'LHB'; // Split RHB/LHB
 
       let ballsBowled = 0;
-      let wicketsLost = 0;
-
-      while (ballsBowled < 6 && wicketsLost < 1) {
+      while (ballsBowled < 6) {
         const delivery = botChooseDelivery(bowler, bowlTier);
         
         const absX = Math.abs(delivery.aimTarget.x);
@@ -45,7 +44,7 @@ export function runBotSimulation(matchCount: number = 500, specificTier?: 'Rooki
         const wicketResult = evaluateWicket(batter, bowler, delivery, shot);
         
         if (wicketResult.isWicket) {
-          wicketsLost++;
+          totalWickets++;
         }
         
         ballsBowled++;
@@ -61,6 +60,7 @@ export function runBotSimulation(matchCount: number = 500, specificTier?: 'Rooki
       "Total Overs": matchCount,
       "Legal Balls %": legalRate,
       "Wide %": widesRate,
+      "Wickets": totalWickets,
       "Max Crease X Offset": maxCreaseX.toFixed(3)
     });
   }

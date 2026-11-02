@@ -56,6 +56,16 @@ export function bowlingReleaseTiming(elapsedMs: number): number {
   return Math.max(0, Math.min(1, elapsedMs / 2400));
 }
 
+/** Early and late releases deviate in opposite directions; accuracy limits the error. */
+export function bowlingExecutionTarget(target: { x: number; z: number }, timing: number, accuracy: number): { x: number; z: number } {
+  const error = (Math.max(0, Math.min(1, timing)) - 0.5) * 2;
+  const inaccuracy = 1 - Math.max(0, Math.min(100, accuracy)) / 100;
+  return {
+    x: Math.max(-1.5, Math.min(1.5, target.x + error * inaccuracy * 0.3)),
+    z: Math.max(-8.2, Math.min(0.5, target.z - error * inaccuracy))
+  };
+}
+
 /**
  * Predicted Arrival Z Timestamp Solver
  */
@@ -451,7 +461,8 @@ export function calculateShotTrajectory(
   _isRHB: boolean = true,
   _isHuman: boolean = false,
   _difficulty: string = 'Medium',
-  shotType: string = 'power'
+  shotType: string = 'power',
+  batterPower: number = 50
 ): { x: number, y: number, z: number } {
   let Vy = 0;
   let Vz = 0;
@@ -500,7 +511,8 @@ export function calculateShotTrajectory(
   // Imperfect timing/contact reduces exit speed instead of producing the
   // same flight for every successful shot of a given type.
   const quality = Math.max(0, Math.min(1, Number.isFinite(Q) ? Q : 0));
-  const speedFactor = 0.55 + 0.45 * quality;
+  const powerFactor = 0.75 + Math.max(0, Math.min(100, batterPower)) / 200;
+  const speedFactor = (0.55 + 0.45 * quality) * powerFactor;
   Vx *= speedFactor;
   Vy *= speedFactor;
   Vz *= speedFactor;

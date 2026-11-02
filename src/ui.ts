@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 import { TouchBattingControls } from './touch-controls';
 
@@ -28,6 +28,7 @@ export class UIManager {
   
   // Selections
   private selectedShotType: ShotType = 'grounded';
+  private selectedContactZone = 0.5;
   private selectedBowlType: 'fast' | 'medium' | 'slow' | 'offspin' | 'legspin' = 'fast';
   public isBannerActive: boolean = false;
 
@@ -75,6 +76,12 @@ export class UIManager {
     canvas.addEventListener('pointermove', (e) => this.handlePointerMove(e));
     canvas.addEventListener('pointerup', (e) => this.handlePointerUp(e));
     canvas.addEventListener('pointercancel', () => { this.isPointerDown = false; });
+
+    const contactInputs = document.querySelectorAll<HTMLInputElement>('.bat-contact');
+    contactInputs.forEach(input => input.addEventListener('input', () => {
+      this.selectedContactZone = Math.max(0, Math.min(1, input.valueAsNumber / 100));
+      contactInputs.forEach(other => { other.value = input.value; });
+    }));
 
     // Shot selector
     const batTypeButtons = document.querySelectorAll('#bat-type-group .btn');
@@ -359,10 +366,16 @@ export class UIManager {
     this.currentAimTargetX = this.keyboardInputManager.intent.aimX;
     this.currentAimTargetZ = this.keyboardInputManager.intent.aimZ;
 
+    const executedTarget = bowlingExecutionTarget(
+      { x: this.currentAimTargetX, z: this.currentAimTargetZ },
+      timing,
+      this.controller.getCurrentInnings().bowler.stats.bowling.accuracy
+    );
+
     this.activeDelivery = {
-      aimTarget: { x: this.currentAimTargetX, z: this.currentAimTargetZ },
-      line: getLineTypeFromAimX(this.currentAimTargetX, this.controller.getCurrentInnings().batter.batterHand || 'RHB'),
-      length: this.currentAimTargetZ < -6.5 ? 'yorker' : (this.currentAimTargetZ < -4.5 ? 'full' : (this.currentAimTargetZ < -2.5 ? 'good' : (this.currentAimTargetZ < -0.5 ? 'short' : 'bouncer'))),
+      aimTarget: executedTarget,
+      line: getLineTypeFromAimX(executedTarget.x, this.controller.getCurrentInnings().batter.batterHand || 'RHB'),
+      length: executedTarget.z < -6.5 ? 'yorker' : (executedTarget.z < -4.5 ? 'full' : (executedTarget.z < -2.5 ? 'good' : (executedTarget.z < -0.5 ? 'short' : 'bouncer'))),
       type: this.selectedBowlType,
       releaseTiming: timing
     };
@@ -408,7 +421,7 @@ export class UIManager {
       direction,
       type,
       timing: Math.max(0.0, Math.min(1.0, timing)),
-      contactZone: contactZone ?? (0.44 + Math.random() * 0.12)
+      contactZone: contactZone ?? this.selectedContactZone
     };
 
     this.gameScene.animateBatterSwing(direction, () => {
@@ -661,7 +674,8 @@ export class UIManager {
     } else if (outcome.shot) {
       const theta_shot = (outcome.shot.direction * Math.PI) / 4 - Math.PI / 2;
       const quality = Math.max(0, 1 - Math.abs(outcome.shot.timing - 0.5) * 2 - Math.abs(outcome.shot.contactZone - 0.5));
-      const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, {x:0, y:0, z:0}, {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type);
+      const batterPower = this.controller.getCurrentInnings().batter.stats.batting.power;
+      const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, {x:0, y:0, z:0}, {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower);
       
       this.gameScene.animateHitPath(outcome.distance, outcome.shot.direction, vOut);
       this.controller.setCameraMode('follow_shot');
@@ -753,7 +767,7 @@ export class UIManager {
     if (ballsCountEl) ballsCountEl.innerText = `${legalCount}/6`;
 
     const wicketsCountEl = document.getElementById('hud-wickets-count');
-    if (wicketsCountEl) wicketsCountEl.innerText = `${currentInn.wicketsLost}/${currentInn.maxWickets}`;
+    if (wicketsCountEl) wicketsCountEl.innerText = `${currentInn.wicketsLost}`;
 
     const scoreCountEl = document.getElementById('hud-score-count');
     if (scoreCountEl) scoreCountEl.innerText = `${currentInn.score}`;
@@ -1159,7 +1173,7 @@ export class UIManager {
     if (scoreCountEl) scoreCountEl.innerText = '0';
 
     const wicketsCountEl = document.getElementById('hud-wickets-count');
-    if (wicketsCountEl) wicketsCountEl.innerText = '0/6';
+    if (wicketsCountEl) wicketsCountEl.innerText = '0';
 
     const ballsCountEl = document.getElementById('hud-balls-count');
     if (ballsCountEl) ballsCountEl.innerText = '0/6';
