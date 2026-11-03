@@ -51,6 +51,7 @@ export interface DeliveryChoice {
   turn?: number;         // 0.0 to 1.0 (spin strength; ignored for pace deliveries)
   swing?: number;        // -1 to 1, left/right from the bowler's view
   overTheWicket?: boolean;
+  bowlingArm?: 'Right' | 'Left';
   batterPosition?: { x: number; z: number }; // metres from the starting stance at release
 }
 

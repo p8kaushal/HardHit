@@ -21,6 +21,7 @@ Play a biggest-six duel against a bot. Each batter faces six legal deliveries; t
 - **Precision Timing & Placement**: Swing timing paired with directional shot placement controls.
 - **Ball Flight and Boundary Scoring**: Watch the ball travel across the field; a shot that clears the boundary before bouncing scores six.
 - **Batter Position**: Before release, use the movement buttons or I/J/K/L to step forward, left, back or right. The stance locks during the delivery and affects contact timing and reach.
+- **Bowling Side**: Select over or around the wicket before bowling. The selected side changes the release position and incoming angle.
 - **AI Difficulty Tiers**: Challenge Rookie, Medium and Hard bots.
 - **Match State & Rules Engine**: Six legal balls per innings, biggest-six scoring, tie-breaks and a one-ball sudden death, plus a personal leaderboard stored in the browser.
 

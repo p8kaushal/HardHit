@@ -2,7 +2,7 @@ import * as BABYLON from 'babylonjs';
 import { gameNow, isGamePaused } from './game-clock';
 import { CameraMode, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BATTER_CREASE_Z, batterContactProgress, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
+import { BATTER_CREASE_Z, batterContactProgress, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryDurationMs, deliveryReleaseX, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
 import { stepBall, type BallState } from './ball-physics';
 
 export class GameScene {
@@ -472,6 +472,10 @@ export class GameScene {
     this.updateBatterPosition();
   }
 
+  public setBowlerSide(overTheWicket: boolean, bowlingArm: 'Right' | 'Left'): void {
+    if (this.bowlerRoot) this.bowlerRoot.position.x = deliveryReleaseX({ overTheWicket, bowlingArm });
+  }
+
   private buildBall(): void {
     const ballMat = new BABYLON.StandardMaterial('ballMat', this.scene);
     ballMat.diffuseColor = new BABYLON.Color3(0.85, 0.1, 0.1);
@@ -496,7 +500,7 @@ export class GameScene {
   public generateTrajectoryPoints(
     aimTarget: { x: number; z: number },
     type: DeliveryType,
-    _overTheWicket: boolean = true,
+    overTheWicket: boolean = true,
     turn = 0.5,
     swing = 0,
     pace = 0.5
@@ -507,11 +511,11 @@ export class GameScene {
     const targetX = aimTarget.x;
     const bounceZ = aimTarget.z;
     
-    const startX = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
+    const delivery = { aimTarget, type, line: 'middle' as const, length: 'good' as const, releaseTiming: 0.5, overTheWicket, bowlingArm: globalAutoAssistConfig.bowlerArm || 'Right' };
+    const startX = deliveryReleaseX(delivery);
     const release = { x: startX, y: 1.9, z: 10.0 };
     const bounce = { x: targetX, y: 0.06, z: bounceZ };
-    const seamDrift = 0;
-    const end = { x: targetX + seamDrift, y: deliveryArrivalHeight(bounceZ, type, pace), z: BATTER_CREASE_Z };
+    const end = { x: deliveryBaseCreaseX(delivery), y: deliveryArrivalHeight(bounceZ, type, pace), z: BATTER_CREASE_Z };
     
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
@@ -652,7 +656,7 @@ export class GameScene {
 
     // Set bowler initial X based on bowler arm
     if (this.bowlerRoot) {
-      this.bowlerRoot.position.x = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
+      this.setBowlerSide(overTheWicket, globalAutoAssistConfig.bowlerArm || 'Right');
     }
 
     // Animate bowler release arm rotation (for player bowling context if needed)
@@ -884,7 +888,7 @@ export class GameScene {
     this.bowlerRoot.position.z = z;
     this.bowlerRoot.position.y = bounce;
     this.bowlerRoot.rotation.x = Math.sin(progress * Math.PI * 16) * 0.2;
-    this.bowlerRoot.position.x = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
+    this.bowlerRoot.position.x = deliveryReleaseX(globalAutoAssistConfig.currentDelivery || { bowlingArm: globalAutoAssistConfig.bowlerArm });
   }
 
   public updateBallFlight(): void {
@@ -916,11 +920,10 @@ export class GameScene {
       const targetZ = delivery?.aimTarget.z ?? -3.5;
       this.notifyDeliveryBounce(progress, targetZ);
         
-      const startX = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
+      const startX = deliveryReleaseX(delivery || { bowlingArm: globalAutoAssistConfig.bowlerArm });
       const release = { x: startX, y: 1.9, z: 10.0 };
       const bounce = { x: targetX, y: 0.06, z: targetZ };
-      const seamDrift = 0;
-      const end = { x: targetX + seamDrift, y: deliveryArrivalHeight(targetZ, delivery?.type, delivery?.pace), z: BATTER_CREASE_Z };
+      const end = { x: delivery ? deliveryBaseCreaseX(delivery) : targetX, y: deliveryArrivalHeight(targetZ, delivery?.type, delivery?.pace), z: BATTER_CREASE_Z };
       
       const pos = getDeliveryFlightPosition(progress, release, bounce, end, delivery?.type ?? 'medium', delivery?.turn, delivery?.swing, delivery?.pace);
       ball.position.set(pos.x, pos.y, pos.z);

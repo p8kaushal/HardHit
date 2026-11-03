@@ -59,8 +59,22 @@ export function deliverySwingAtCrease(type: DeliveryType, swing = 0, bounceZ = -
   return deliverySwingAtBounce(type, swing, bounceZ) * (1 + 2 * (1 - fraction) / fraction);
 }
 
+/** Release side is mirrored for left-arm bowling and around-the-wicket. */
+export function deliveryReleaseX(delivery: Pick<DeliveryChoice, 'bowlingArm' | 'overTheWicket'>): number {
+  const arm = delivery.bowlingArm === 'Left' ? -1 : 1;
+  return 0.6 * arm * (delivery.overTheWicket === false ? -1 : 1);
+}
+
+/** Approximate retained lateral velocity after pitching. */
+export function deliveryBaseCreaseX(delivery: DeliveryChoice): number {
+  if (delivery.overTheWicket === undefined) return delivery.aimTarget.x;
+  const beforePitch = 10 - delivery.aimTarget.z;
+  const afterPitch = delivery.aimTarget.z - BATTER_CREASE_Z;
+  return delivery.aimTarget.x + (delivery.aimTarget.x - deliveryReleaseX(delivery)) * afterPitch / beforePitch * 0.75;
+}
+
 export function deliveryCreaseX(delivery: DeliveryChoice): number {
-  return delivery.aimTarget.x + deliverySwingAtCrease(delivery.type, delivery.swing, delivery.aimTarget.z) + deliveryTurn(delivery.type, delivery.turn);
+  return deliveryBaseCreaseX(delivery) + deliverySwingAtCrease(delivery.type, delivery.swing, delivery.aimTarget.z) + deliveryTurn(delivery.type, delivery.turn);
 }
 
 /** Actual pitch point, including any movement before the bounce. */
@@ -78,17 +92,17 @@ export function batterContactProgress(delivery: DeliveryChoice): number {
 }
 
 export function deliveryContactPoint(delivery: DeliveryChoice): { x: number; y: number; z: number } {
-  const start = { x: 0.6, y: 1.9, z: 10 };
+  const start = { x: deliveryReleaseX(delivery), y: 1.9, z: 10 };
   const bounce = { x: delivery.aimTarget.x, y: 0.06, z: delivery.aimTarget.z };
-  const end = { x: delivery.aimTarget.x, y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
+  const end = { x: deliveryBaseCreaseX(delivery), y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
   return getDeliveryFlightPosition(batterContactProgress(delivery), start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
 }
 
 /** Approximate incoming velocity at contact from the same path used on screen. */
 export function deliveryVelocityAtCrease(delivery: DeliveryChoice): { x: number; y: number; z: number } {
-  const start = { x: 0.6, y: 1.9, z: 10 };
+  const start = { x: deliveryReleaseX(delivery), y: 1.9, z: 10 };
   const bounce = { x: delivery.aimTarget.x, y: 0.06, z: delivery.aimTarget.z };
-  const end = { x: delivery.aimTarget.x, y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
+  const end = { x: deliveryBaseCreaseX(delivery), y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
   const sample = (progress: number) => getDeliveryFlightPosition(progress, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
   const contact = batterContactProgress(delivery);
   const before = sample(Math.max(0, contact - 0.01));
@@ -105,9 +119,9 @@ export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'L
   const stumpHeight = 0.711;
   const impactZ = BATTER_CONTACT_Z + (delivery.batterPosition?.z ?? 0);
   const progress = (impactZ - 10) / (BATTER_CREASE_Z - 10);
-  const start = { x: 0.6, y: 1.9, z: 10 };
+  const start = { x: deliveryReleaseX(delivery), y: 1.9, z: 10 };
   const bounce = { x: delivery.aimTarget.x, y: 0.06, z: delivery.aimTarget.z };
-  const end = { x: delivery.aimTarget.x, y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
+  const end = { x: deliveryBaseCreaseX(delivery), y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
   const impact = getDeliveryFlightPosition(progress, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
   const wicket = getDeliveryFlightPosition(1, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
   const hitsWicket = Math.abs(wicket.x) <= stumpHalfWidth + ballRadius && wicket.y <= stumpHeight + ballRadius;

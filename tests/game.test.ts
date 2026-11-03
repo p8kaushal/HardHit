@@ -6,7 +6,7 @@ import { directionFromStick, suggestedShotDirection, TouchBattingControls } from
 import { stepBall, type BallState } from '../src/ball-physics';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery } from '../src/formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
@@ -619,6 +619,28 @@ test('pitch marker matches the actual bounce for pace, swing and spin', () => {
     assert.ok(Math.abs(actual.x - marker.x) < 1e-9);
     assert.ok(Math.abs(actual.z - marker.z) < 1e-9);
   }
+});
+
+test('bowling side and arm change the same path used for visuals and adjudication', () => {
+  for (const arm of ['Right', 'Left'] as const) {
+    for (const overTheWicket of [true, false]) {
+      const ball = { ...delivery(0.5, 0), bowlingArm: arm, overTheWicket, swing: 0.4 };
+      const release = { x: deliveryReleaseX(ball), y: 1.9, z: 10 };
+      const bounce = { x: ball.aimTarget.x, y: 0.06, z: ball.aimTarget.z };
+      const end = { x: deliveryBaseCreaseX(ball), y: 0.8, z: BATTER_CREASE_Z };
+      const actual = getDeliveryFlightPosition(1, release, bounce, end, ball.type, ball.turn, ball.swing, ball.pace);
+      assert.ok(Math.abs(actual.x - deliveryCreaseX(ball)) < 1e-9);
+      assert.equal(Math.sign(release.x), (arm === 'Right' ? 1 : -1) * (overTheWicket ? 1 : -1));
+    }
+  }
+  const over = { ...delivery(0.5, 0.7), bowlingArm: 'Right' as const, overTheWicket: true };
+  const around = { ...over, overTheWicket: false };
+  assert.notEqual(deliveryCreaseX(over), deliveryCreaseX(around));
+  assert.deepEqual(deliveryPitchPoint(over), deliveryPitchPoint(around));
+  assert.notEqual(deliveryVelocityAtCrease(over).x, deliveryVelocityAtCrease(around).x);
+  assert.notEqual(battingContactZone(over, 0.5), battingContactZone(around, 0.5));
+  assert.equal(checkExtraBall(over).isExtra, false);
+  assert.equal(checkExtraBall(around).type, 'wide');
 });
 
 test('delivery height is continuous at the pitch and rises after impact', () => {

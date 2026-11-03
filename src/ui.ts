@@ -38,6 +38,7 @@ export class UIManager {
   // Selections
   private selectedShotType: ShotType = 'grounded';
   private selectedBowlType: 'fast' | 'medium' | 'slow' | 'offspin' | 'legspin' = 'fast';
+  private overTheWicket = true;
   public isBannerActive: boolean = false;
 
   // Result Toast Auto-dismiss Timer
@@ -144,6 +145,18 @@ export class UIManager {
     });
 
     // Bowl type selector
+    document.querySelectorAll<HTMLButtonElement>('#bowl-side-group button').forEach(button => {
+      button.addEventListener('click', () => {
+        if (this.isBallActive) return;
+        this.overTheWicket = button.dataset.side === 'over';
+        this.gameScene.setBowlerSide(this.overTheWicket, this.controller.getCurrentInnings().bowler.bowlingArm || 'Right');
+        document.querySelectorAll<HTMLButtonElement>('#bowl-side-group button').forEach(option => {
+          const selected = option === button;
+          option.classList.toggle('active', selected);
+          option.setAttribute('aria-pressed', String(selected));
+        });
+      });
+    });
     const bowlTypeButtons = document.querySelectorAll('#bowl-type-group .btn');
     bowlTypeButtons.forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -443,6 +456,8 @@ export class UIManager {
       line: getLineTypeFromAimX(executedTarget.x, this.controller.getCurrentInnings().batter.batterHand || 'RHB'),
       length: executedTarget.z < -6.5 ? 'yorker' : (executedTarget.z < -4.5 ? 'full' : (executedTarget.z < -2.5 ? 'good' : (executedTarget.z < -0.5 ? 'short' : 'bouncer'))),
       type: this.selectedBowlType,
+      overTheWicket: this.overTheWicket,
+      bowlingArm: this.controller.getCurrentInnings().bowler.bowlingArm || 'Right',
       releaseTiming: timing,
       pace: (document.getElementById('bowl-pace') as HTMLInputElement).valueAsNumber / 100,
       turn: spin ? (document.getElementById('bowl-turn') as HTMLInputElement).valueAsNumber / 100 : 0,
@@ -729,7 +744,7 @@ export class UIManager {
         this.activeDelivery.type,
         onArrivedCb,
         onResolvedCb,
-        true, // overTheWicket
+        this.activeDelivery.overTheWicket ?? true,
         () => { // onCreaseCrossed
           this.hideAssistedPrompt();
         },
@@ -951,6 +966,7 @@ export class UIManager {
     }
 
     const innings = this.controller.getCurrentInnings();
+    globalAutoAssistConfig.bowlerArm = innings.bowler.bowlingArm || 'Right';
     const isPlayerBatting = innings.batter.id === state.player.id;
     
     this.gameScene.isBotBatting = !isPlayerBatting;
@@ -989,6 +1005,7 @@ export class UIManager {
       
       // Auto trigger bot delivery
       this.activeDelivery = botChooseDelivery(state.bot, this.controller.botDifficulty, innings.batter.batterHand || 'RHB');
+      this.gameScene.setBowlerSide(this.activeDelivery.overTheWicket ?? true, this.activeDelivery.bowlingArm || 'Right');
       this.activeDelivery.batterPosition = { ...this.batterPosition };
       this.touchBattingControls.setLocked(false);
       this.touchBattingControls.setSuggestion(suggestedShotDirection(this.activeDelivery));
@@ -1002,6 +1019,7 @@ export class UIManager {
     } else {
       // Bowler mode
       this.gameScene.setPlayerCreaseOffset(-0.35, 0);
+      this.gameScene.setBowlerSide(this.overTheWicket, innings.bowler.bowlingArm || 'Right');
       this.gameScene.setCameraMode('bowler_eye');
       this.controller.setCameraMode('bowler_eye');
       if (controlBowling) {

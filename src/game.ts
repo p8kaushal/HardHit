@@ -1,5 +1,5 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, deliveryContactPoint, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
+import { evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, deliveryContactPoint, deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
@@ -745,7 +745,7 @@ export class MatchController {
     if (ball) {
       ball.isVisible = true;
       if (typeof ball.setEnabled === 'function') ball.setEnabled(true);
-      const startX = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
+      const startX = deliveryReleaseX(globalAutoAssistConfig.currentDelivery || { bowlingArm: globalAutoAssistConfig.bowlerArm });
       if (ball.position) {
         ball.position.set(startX, 1.9, 10.0);
       }

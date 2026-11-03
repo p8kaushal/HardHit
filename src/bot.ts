@@ -1,5 +1,5 @@
 import { Player, DeliveryChoice, ShotChoice, ShotType } from './types';
-import { getAimXFromLineType } from './formula';
+import { deliveryContactPoint, getAimXFromLineType } from './formula';
 
 
 // Unused constants removed
@@ -58,6 +58,7 @@ export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium
     length,
     type: deliveryType,
     releaseTiming,
+    bowlingArm: bowler.bowlingArm || 'Right',
     overTheWicket: Math.random() > 0.3
   };
 }
@@ -95,10 +96,11 @@ export function botChooseShot(
 
   // Aim direction (0-7 clock) based on ball line
   let direction = Math.floor(Math.random() * 8);
-  if (delivery.aimTarget.x > 0.3) {
+  const lineAtBatter = deliveryContactPoint(delivery).x;
+  if (lineAtBatter > 0.3) {
     // Aim off side: zones 1, 2, 3
     direction = [1, 2, 3][Math.floor(Math.random() * 3)];
-  } else if (delivery.aimTarget.x < -0.3) {
+  } else if (lineAtBatter < -0.3) {
     // Aim leg side: zones 5, 6, 7
     direction = [5, 6, 7][Math.floor(Math.random() * 3)];
   } else {

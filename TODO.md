@@ -9,10 +9,10 @@
 
 ## Bowler side and delivery angle
 
-- [ ] Let the bowler choose over or around the wicket before delivery, with clear left/right and handedness feedback.
-- [ ] Carry the selected release position and angle through the entire delivery model: visual release, pitch target, swing, bounce, spin, incoming velocity, bat/pad impact, stumps, LBW, wides and shot outcomes. Keep the landing marker aligned with the actual trajectory.
-- [ ] Update bot choices, cameras, controls, delivery feedback and multiplayer messages to use the same side/angle choice.
-- [ ] Test both bowling arms, both batter handednesses, both sides, pace and spin, and trajectory-to-marker and umpiring consistency.
+- [x] Let the bowler choose over or around the wicket before delivery; mirror release positions for both bowling arms.
+- [x] Use the selected release angle in the visible delivery, pitch target, swing, spin, incoming velocity and simplified contact, LBW and wide decisions. Bots also choose a side.
+- [ ] Calibrate angle and lateral momentum against measured deliveries; add the side and release parameters to future multiplayer messages.
+- [ ] Test both bowling arms and batter handednesses on physical devices, including trajectory-to-marker and umpiring consistency.
 
 ## Remaining foundations
 

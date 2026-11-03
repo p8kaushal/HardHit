@@ -3054,6 +3054,7 @@ body { min-height: 100dvh; }
   #control-bowling .right-dock .bowling-adjustment input { min-height: 22px; }
   #control-bowling .right-dock .size-large { min-height: 36px; }
 }
+#control-bowling #bowl-side-group { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* Keep the middle of the pitch open; each thumb works a vertical side dock. */
 @media (orientation: landscape) and (max-height: 700px), (orientation: landscape) and (pointer: coarse) {
