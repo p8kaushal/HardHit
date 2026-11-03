@@ -420,15 +420,6 @@
                 <button class="btn" data-val="off">Off Side</button>
                 <button class="btn" data-val="leg">Leg Side</button>
               </div>
-              <div class="pitch-map-label">Drag to aim</div>
-              <div id="bowling-pitch-map" class="bowling-pitch-map" role="img" aria-label="Bowling target map: far end at top, bowler at bottom"><span id="bowling-map-marker" class="bowling-map-marker"></span></div>
-            </div>
-          </div>
-
-          <!-- Right Dock: Length & Type Selectors + Action Button -->
-          <div class="side-dock right-dock">
-            <div class="dock-header">
-              <h3>Delivery Setup</h3>
             </div>
             <div class="input-col">
               <label>Length:</label>
@@ -439,6 +430,15 @@
                 <button class="btn" data-val="short">Short</button>
                 <button class="btn" data-val="bouncer">Bouncer</button>
               </div>
+            </div>
+            <div class="pitch-map-label">Drag to aim</div>
+            <div id="bowling-pitch-map" class="bowling-pitch-map" role="img" aria-label="Bowling target map: far end at top, bowler at bottom"><span id="bowling-map-marker" class="bowling-map-marker"></span></div>
+          </div>
+
+          <!-- Right Dock: Delivery type, movement and release -->
+          <div class="side-dock right-dock">
+            <div class="dock-header">
+              <h3>Delivery Setup</h3>
             </div>
 
             <div class="input-col" style="margin-top: 0.6rem;">
@@ -457,7 +457,7 @@
             <label id="bowl-turn-control" class="bowling-adjustment hidden"><span class="adjustment-title">TURN <output id="bowl-turn-value">50%</output></span><input id="bowl-turn" type="range" min="0" max="100" value="50" aria-label="Spin turn intensity"><span class="adjustment-ends">LOW <span>HIGH</span></span></label>
 
             <div class="action-btn-row">
-              <button id="btn-bowl-pitch" class="btn primary-btn size-large">Hold & Release SPACE / Touch</button>
+              <button id="btn-bowl-pitch" class="btn primary-btn size-large">HOLD &amp; RELEASE</button>
             </div>
           </div>
         </div>
@@ -466,8 +466,8 @@
         <div id="control-batting" class="control-section hidden">
           <div class="touch-batting-controls">
             <div class="touch-aim">
-              <div id="touch-stick" class="touch-stick" role="img" aria-label="Shot aim: Straight. Drag to change direction."><span class="touch-stick-knob"></span></div>
-              <span>AIM</span>
+              <div id="touch-stick" class="touch-stick" role="img" aria-label="Shot aim locked: Straight. Drag to select another direction."><span class="touch-field-suggestion"></span><span class="touch-field-selected"></span><span class="touch-field-pitch"></span><span class="touch-stick-knob"></span><span class="field-label field-straight">STRAIGHT</span><span class="field-label field-left">LEFT</span><span class="field-label field-right">RIGHT</span><span class="field-label field-behind">BEHIND</span></div>
+              <span><i class="field-key suggestion-key"></i> GUIDE &nbsp; <i class="field-key selected-key"></i> AIM</span>
             </div>
             <div class="touch-batting-actions">
               <div class="footwork-control" role="group" aria-label="Batting footwork"><button type="button" class="footwork-choice active" data-footwork="front_foot" aria-pressed="true">FRONT</button><button type="button" class="footwork-choice" data-footwork="back_foot" aria-pressed="false">BACK</button></div>

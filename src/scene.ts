@@ -730,7 +730,10 @@ export class GameScene {
         return;
       }
 
-      this.ballMesh?.position.copyFrom(this.ballTrajectoryPoints[index]);
+      if (this.ballMesh) {
+        const next = this.ballTrajectoryPoints[Math.min(index + 1, this.ballTrajectoryPoints.length - 1)];
+        BABYLON.Vector3.LerpToRef(this.ballTrajectoryPoints[index], next, this.ballAnimationTime - index, this.ballMesh.position);
+      }
       
       if (!this.creaseCrossedFired && this.ballMesh && this.ballMesh.position.z <= -8.5) {
         this.creaseCrossedFired = true;

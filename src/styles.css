@@ -2959,20 +2959,33 @@ kbd {
   .touch-batting-actions { display: grid; gap: .5rem; }
   .touch-aim { display: grid; justify-items: center; gap: .25rem; color: white; font-size: .7rem; font-weight: 800; letter-spacing: .12em; }
   .touch-stick {
+    --selected-angle: 0deg;
+    --suggested-angle: 0deg;
     position: relative;
     width: clamp(100px, 22vw, 140px);
     aspect-ratio: 1;
     border: 2px solid rgba(255,255,255,.65);
     border-radius: 50%;
-    background: rgba(7, 16, 30, .45);
+    background: repeating-radial-gradient(circle, rgba(125,190,135,.12) 0 18%, transparent 19% 35%), rgba(7, 35, 24, .75);
     touch-action: none;
   }
-  .touch-stick::before, .touch-stick::after { content: ''; position: absolute; background: rgba(255,255,255,.2); }
-  .touch-stick::before { width: 1px; height: 72%; left: 50%; top: 14%; }
-  .touch-stick::after { height: 1px; width: 72%; top: 50%; left: 14%; }
+  .touch-field-suggestion, .touch-field-selected {
+    position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  }
+  .touch-field-suggestion { background: conic-gradient(from -22.5deg, rgba(107, 246, 113, .55) 0deg 45deg, transparent 45deg); transform: rotate(var(--suggested-angle)); }
+  .touch-field-selected { background: conic-gradient(from -22.5deg, rgba(89, 192, 255, .65) 0deg 45deg, transparent 45deg); transform: rotate(var(--selected-angle)); }
+  .touch-field-pitch { position: absolute; width: 8%; height: 22%; left: 46%; top: 39%; background: #d2ac73; border-radius: 2px; pointer-events: none; }
+  .field-label { position: absolute; color: white; font-size: clamp(6px, 1.4dvh, 8px); text-shadow: 0 1px 3px #000; pointer-events: none; }
+  .field-straight { top: 3%; left: 50%; transform: translateX(-50%); }
+  .field-behind { bottom: 3%; left: 50%; transform: translateX(-50%); }
+  .field-left { left: 3%; top: 48%; }
+  .field-right { right: 3%; top: 48%; }
+  .field-key { display: inline-block; width: .5em; height: .5em; border-radius: 50%; }
+  .suggestion-key { background: #72f378; }
+  .selected-key { background: #72c7ff; }
   .touch-stick-knob {
-    position: absolute; left: 50%; top: 50%; width: 40%; height: 40%; border-radius: 50%;
-    background: rgba(255,255,255,.7); border: 2px solid white; transform: translate(-50%, -50%); pointer-events: none;
+    position: absolute; z-index: 2; left: 50%; top: 50%; width: 24%; height: 24%; border-radius: 50%;
+    background: rgba(255,255,255,.72); border: 2px solid white; transform: translate(-50%, -50%); pointer-events: none;
   }
   .touch-shot-buttons { display: grid; grid-template-columns: repeat(2, minmax(58px, 72px)); gap: .5rem; }
   .touch-shot {
@@ -3040,4 +3053,42 @@ body { min-height: 100dvh; }
   #control-bowling .right-dock .btn-group .btn { min-height: 29px; }
   #control-bowling .right-dock .bowling-adjustment input { min-height: 22px; }
   #control-bowling .right-dock .size-large { min-height: 36px; }
+}
+
+/* Keep the middle of the pitch open; each thumb works a vertical side dock. */
+@media (orientation: landscape) and (max-height: 700px), (orientation: landscape) and (pointer: coarse) {
+  #control-bowling .left-dock, #control-bowling .right-dock {
+    width: min(29vw, 230px);
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+  }
+  #control-bowling .input-col { margin: 0 !important; }
+  #control-bowling .input-col > label { margin: 0 0 .12rem; font-size: .62rem; }
+  #control-bowling .btn-group, #control-bowling .vertical-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .15rem;
+  }
+  #control-bowling .btn-group .btn, #control-bowling .vertical-group .btn {
+    min-width: 0;
+    min-height: 29px;
+    padding: .15rem .1rem;
+    font-size: clamp(.48rem, 1.8vw, .68rem);
+    line-height: 1.05;
+    white-space: normal;
+  }
+  #control-bowling .bowling-adjustment input { min-height: 22px; }
+  #control-bowling .bowling-adjustment .adjustment-title { font-size: .6rem; }
+  #control-bowling .right-dock .action-btn-row { position: static; padding: 0; }
+  #control-bowling .right-dock .size-large { min-height: 36px; font-size: .7rem; padding: .25rem; }
+  #control-bowling .pitch-map-label { margin: 0; font-size: .58rem; }
+}
+@media (orientation: landscape) and (max-height: 320px) {
+  #control-bowling .right-dock .input-col > label { display: none; }
+  #control-bowling .side-dock { gap: .1rem; padding: .3rem; }
+  #control-bowling .btn-group .btn, #control-bowling .vertical-group .btn { min-height: 25px; }
+  #control-bowling .bowling-adjustment { gap: 0; }
+  #control-bowling .bowling-adjustment input { min-height: 18px; }
+  #control-bowling .right-dock .size-large { min-height: 32px; }
 }

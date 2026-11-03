@@ -1,4 +1,14 @@
 import type { ShotType } from './types';
+import type { DeliveryChoice } from './types';
+import { deliveryCreaseX } from './formula';
+
+const DIRECTION_LABELS = ['Straight', 'Forward right', 'Right', 'Back right', 'Behind', 'Back left', 'Left', 'Forward left'];
+
+/** A simple line-based guide, not a guarantee of a successful shot. */
+export function suggestedShotDirection(delivery: DeliveryChoice): number {
+  const line = deliveryCreaseX(delivery);
+  return line > 0.2 ? 1 : line < -0.2 ? 7 : 0;
+}
 
 /** Map a stick vector to the game's clockwise eight-way shot direction. */
 export function directionFromStick(x: number, y: number, deadZone = 0.18): number | null {
@@ -11,12 +21,13 @@ export function directionFromStick(x: number, y: number, deadZone = 0.18): numbe
 export class TouchBattingControls {
   private pointerId: number | null = null;
   private direction = 0;
+  private locked = false;
   private readonly knob: HTMLElement;
 
   constructor(private readonly stick: HTMLElement, buttons: NodeListOf<HTMLButtonElement>, private readonly onShot: (direction: number, type: ShotType) => void) {
     this.knob = stick.querySelector<HTMLElement>('.touch-stick-knob')!;
     stick.addEventListener('pointerdown', event => {
-      if (this.pointerId !== null) return;
+      if (this.locked || this.pointerId !== null) return;
       event.preventDefault();
       this.pointerId = event.pointerId;
       stick.setPointerCapture(event.pointerId);
@@ -28,9 +39,6 @@ export class TouchBattingControls {
     const release = (event: PointerEvent) => {
       if (event.pointerId !== this.pointerId) return;
       this.pointerId = null;
-      this.direction = 0;
-      this.knob.style.transform = 'translate(-50%, -50%)';
-      stick.setAttribute('aria-label', 'Shot aim: Straight. Drag to change direction.');
     };
     stick.addEventListener('pointerup', release);
     stick.addEventListener('pointercancel', release);
@@ -40,6 +48,16 @@ export class TouchBattingControls {
     }));
   }
 
+  public setLocked(locked: boolean): void {
+    this.locked = locked;
+    if (locked) this.pointerId = null;
+  }
+
+  public setSuggestion(direction: number): void {
+    this.stick.style.setProperty('--suggested-angle', `${direction * 45}deg`);
+    this.stick.setAttribute('data-suggestion', DIRECTION_LABELS[direction]);
+  }
+
   private update(event: PointerEvent): void {
     const rect = this.stick.getBoundingClientRect();
     const radius = Math.min(rect.width, rect.height) / 2;
@@ -47,10 +65,12 @@ export class TouchBattingControls {
     const x = (event.clientX - rect.left - rect.width / 2) / radius;
     const y = (event.clientY - rect.top - rect.height / 2) / radius;
     const distance = Math.hypot(x, y);
+    const direction = directionFromStick(x, y);
+    if (direction === null) return;
     const scale = distance > 1 ? 1 / distance : 1;
     this.knob.style.transform = `translate(calc(-50% + ${x * scale * radius * 0.55}px), calc(-50% + ${y * scale * radius * 0.55}px))`;
-    this.direction = directionFromStick(x, y) ?? 0;
-    const labels = ['Straight', 'Forward right', 'Right', 'Back right', 'Back', 'Back left', 'Left', 'Forward left'];
-    this.stick.setAttribute('aria-label', `Shot aim: ${labels[this.direction]}. Drag to change direction.`);
+    this.direction = direction;
+    this.stick.style.setProperty('--selected-angle', `${direction * 45}deg`);
+    this.stick.setAttribute('aria-label', `Shot aim locked: ${DIRECTION_LABELS[direction]}. Drag to select another direction.`);
   }
 }

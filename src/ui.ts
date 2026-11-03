@@ -4,7 +4,7 @@ import { BallOutcome, DeliveryChoice, Player, ShotChoice, ShotType } from './typ
 import { botChooseDelivery, botChooseShot } from './bot';
 import { battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
-import { TouchBattingControls } from './touch-controls';
+import { suggestedShotDirection, TouchBattingControls } from './touch-controls';
 import { initBowlingAdjustmentReadouts, isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
 import { addLeaderboardEntry, readLeaderboard } from './leaderboard';
 import { clearGameTimeout, gameNow, isGamePaused, setGameTimeout } from './game-clock';
@@ -13,6 +13,7 @@ export class UIManager {
   private controller: MatchController;
   private gameScene: GameScene;
   private keyboardInputManager: KeyboardInputManager;
+  private touchBattingControls: TouchBattingControls;
 
   // Gesture/Swipe Tracking
   private swipeStartX = 0;
@@ -56,7 +57,7 @@ export class UIManager {
     this.initEventListeners();
     initBowlingAdjustmentReadouts();
     updateBowlingAdjustmentVisibility(this.keyboardInputManager.intent.deliveryType);
-    new TouchBattingControls(
+    this.touchBattingControls = new TouchBattingControls(
       document.getElementById('touch-stick')!,
       document.querySelectorAll<HTMLButtonElement>('.touch-shot'),
       (direction, type) => this.executeBattingSwingGesture(direction, type)
@@ -438,6 +439,7 @@ export class UIManager {
       contactZone: battingContactZone(this.activeDelivery, timing, contactZone),
       footwork: isPlayerBatting ? this.keyboardInputManager.intent.footwork : undefined
     };
+    if (isPlayerBatting) this.touchBattingControls.setLocked(true);
 
     this.gameScene.animateBatterSwing(direction, () => {
       // Swing visual completes
@@ -906,7 +908,9 @@ export class UIManager {
       }
       
       // Auto trigger bot delivery
-      this.activeDelivery = botChooseDelivery(state.bot, this.controller.botDifficulty);
+      this.activeDelivery = botChooseDelivery(state.bot, this.controller.botDifficulty, innings.batter.batterHand || 'RHB');
+      this.touchBattingControls.setLocked(false);
+      this.touchBattingControls.setSuggestion(suggestedShotDirection(this.activeDelivery));
       this.gameScene.updateBounceMarker(this.activeDelivery.aimTarget);
       globalAutoAssistConfig.currentDelivery = this.activeDelivery;
 

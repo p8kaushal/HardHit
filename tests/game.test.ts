@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBotPlayer, getOrCreatePlayer, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
-import { directionFromStick, TouchBattingControls } from '../src/touch-controls';
+import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { stepBall, type BallState } from '../src/ball-physics';
-import { botChooseShot } from '../src/bot';
+import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
 import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliverySwingAtBounce, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
@@ -72,17 +72,33 @@ test('a second finger can strike while the aiming finger remains held', () => {
     querySelector: () => ({ style: {} }),
     addEventListener: (name: string, fn: (event: any) => void) => { stickEvents[name] = fn; },
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
+    style: { setProperty: () => {} },
     setPointerCapture: () => {}, setAttribute: () => {}
   };
   const button = { dataset: { shot: 'lofted' }, addEventListener: (name: string, fn: (event: any) => void) => { shotEvents[name] = fn; } };
   const shots: Array<[number, string]> = [];
-  new TouchBattingControls(stick as unknown as HTMLElement, [button] as unknown as NodeListOf<HTMLButtonElement>, (direction, type) => shots.push([direction, type]));
+  const controls = new TouchBattingControls(stick as unknown as HTMLElement, [button] as unknown as NodeListOf<HTMLButtonElement>, (direction, type) => shots.push([direction, type]));
   stickEvents.pointerdown({ pointerId: 1, clientX: 100, clientY: 50, preventDefault() {} });
   shotEvents.pointerdown({ pointerId: 2, preventDefault() {} });
   assert.deepEqual(shots, [[2, 'lofted']]);
   stickEvents.pointerup({ pointerId: 1 });
   shotEvents.pointerdown({ pointerId: 3, preventDefault() {} });
-  assert.deepEqual(shots[1], [0, 'lofted']);
+  assert.deepEqual(shots[1], [2, 'lofted']);
+  controls.setLocked(true);
+  stickEvents.pointerdown({ pointerId: 4, clientX: 0, clientY: 50, preventDefault() {} });
+  shotEvents.pointerdown({ pointerId: 5, preventDefault() {} });
+  assert.deepEqual(shots[2], [2, 'lofted']);
+  controls.setLocked(false);
+  stickEvents.pointerdown({ pointerId: 6, clientX: 0, clientY: 50, preventDefault() {} });
+  shotEvents.pointerdown({ pointerId: 7, preventDefault() {} });
+  assert.deepEqual(shots[3], [6, 'lofted']);
+});
+
+test('shot guide follows the delivered line including movement', () => {
+  assert.equal(suggestedShotDirection(delivery(0.5)), 0);
+  assert.equal(suggestedShotDirection(delivery(0.5, 0.5)), 1);
+  assert.equal(suggestedShotDirection(delivery(0.5, -0.5)), 7);
+  assert.equal(suggestedShotDirection({ ...delivery(0.5), type: 'offspin', turn: 1 }), 7);
 });
 
 function match(): MatchController {
@@ -203,6 +219,23 @@ test('bowler camera screen directions map to the correct pitch coordinates', () 
   assert.equal(calculateBounceTarget('off', 'good', 'LHB').x, -0.45);
   assert.equal(getLineTypeFromAimX(0.45, 'RHB'), 'off');
   assert.equal(getLineTypeFromAimX(-0.45, 'LHB'), 'off');
+});
+
+test('bot off-side deliveries use the batter handedness', () => {
+  const random = Math.random;
+  const bowler = createBotPlayer('Medium');
+  bowler.stats.bowling.accuracy = 100;
+  Math.random = () => 0.1;
+  try {
+    const rightHander = botChooseDelivery(bowler, 'Rookie', 'RHB');
+    const leftHander = botChooseDelivery(bowler, 'Rookie', 'LHB');
+    assert.equal(rightHander.line, 'off');
+    assert.equal(leftHander.line, 'off');
+    assert.ok(rightHander.aimTarget.x > 0);
+    assert.ok(leftHander.aimTarget.x < 0);
+  } finally {
+    Math.random = random;
+  }
 });
 
 test('well-timed shots retain their selected direction on every bot tier', () => {

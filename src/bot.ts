@@ -1,4 +1,5 @@
 import { Player, DeliveryChoice, ShotChoice, ShotType } from './types';
+import { getAimXFromLineType } from './formula';
 
 
 // Unused constants removed
@@ -17,7 +18,7 @@ function clamp(val: number, min: number, max: number): number {
 /**
  * Bot generates its 3D delivery parameters.
  */
-export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium' | 'Hard' = 'Medium'): DeliveryChoice {
+export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium' | 'Hard' = 'Medium', batterHand: 'RHB' | 'LHB' = 'RHB'): DeliveryChoice {
   const pace = bowler.stats.bowling.pace;
   const deliveryType: import('./types').DeliveryType = pace > 70 ? 'fast' : (pace > 40 ? 'medium' : 'slow');
 
@@ -36,9 +37,7 @@ export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium
   }
 
   // Use formula utility if available, else approximate
-  let baseAimX = 0;
-  if (line === 'off') baseAimX = -0.45;
-  if (line === 'leg') baseAimX = 0.45;
+  const baseAimX = getAimXFromLineType(line, batterHand);
 
   let aimZ = -3.5;
   if (length === 'yorker') aimZ = -7.5;
