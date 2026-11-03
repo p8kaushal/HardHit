@@ -31,7 +31,6 @@ export class GameScene {
   public playerCreaseOffset = new BABYLON.Vector3(-0.35, 0.0, 0.0);
   private bowlerRoot: BABYLON.TransformNode | null = null;
         public batterRoot: BABYLON.TransformNode | null = null;
-        public hudAvatarRoot: BABYLON.TransformNode | null = null;
     public batMesh: BABYLON.Mesh | null = null;
 
 
@@ -130,9 +129,6 @@ export class GameScene {
       if (this.ballMesh) {
         this.ballMesh.position = new BABYLON.Vector3(0, 1.8, 18.0);
         this.ballMesh.setEnabled(false);
-      }
-      if (this.hudAvatarRoot) {
-        this.hudAvatarRoot.setEnabled(false);
       }
     };
 
@@ -424,20 +420,6 @@ export class GameScene {
     // but the prompt says: Set its position ONCE at initialization: batterRoot.position.set(-0.35, 0.0, -8.8);
         this.updateBatterPosition();
 
-    // Isolate HUD Avatar (Now used as Contact Marker)
-    const hudAvatarRoot = new BABYLON.TransformNode("hudAvatarRoot", this.scene);
-    hudAvatarRoot.parent = null; // Removed from primaryCamera
-    
-    // Add a simple representation for the avatar so it is visible
-    const avatarMesh = BABYLON.MeshBuilder.CreateBox("hudAvatarMesh", { size: 0.3 }, this.scene);
-    avatarMesh.parent = hudAvatarRoot;
-    const avatarMat = new BABYLON.StandardMaterial('avatarMat', this.scene);
-    avatarMat.diffuseColor = new BABYLON.Color3(1.0, 0.5, 0.0);
-    avatarMesh.material = avatarMat;
-    
-    hudAvatarRoot.setEnabled(false);
-    
-    this.hudAvatarRoot = hudAvatarRoot;
   }
 
   public setBatterHandedness(hand: 'RHB' | 'LHB'): void {
@@ -842,7 +824,6 @@ export class GameScene {
     if (this.ballMesh) this.ballMesh.setEnabled(false);
     if (this.bounceMarker) this.bounceMarker.setEnabled(false);
     if (this.timingRing) this.timingRing.setEnabled(false);
-    if (this.hudAvatarRoot) this.hudAvatarRoot.setEnabled(false);
     if (this.predictionPath) {
       this.predictionPath.dispose();
       this.predictionPath = null;
@@ -993,12 +974,6 @@ export class GameScene {
     // Set startPoint to the actual batter's position (crease anchor Z = -8.8)
     const startPoint = this.ballMesh?.position.clone() ?? new BABYLON.Vector3(this.batterRoot?.position.x || 0, 0.4, this.batterRoot?.position.z || -8.8);
     if (this.ballMesh) startPoint.y -= BALL_VISUAL_OFFSET;
-    
-    // Only render/position the marker when valid bat-ball contact occurs in pitch/outfield space (Z > -10.0m)
-    if (this.hudAvatarRoot && startPoint.z > -10.0) {
-      this.hudAvatarRoot.setEnabled(true);
-      this.hudAvatarRoot.position.copyFrom(startPoint);
-    }
     
     // Fix angle so that direction 0 (straight) maps to +Z, and 2 (right/off-side) maps to +X
     const angle = Math.PI / 2 - (direction * Math.PI) / 4;
