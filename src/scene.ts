@@ -825,9 +825,9 @@ export class GameScene {
       this.ballTrail = null;
     }
 
-    if (this.onBallResolvedCallback) {
-      this.onBallResolvedCallback();
-    }
+    const onResolved = this.onBallResolvedCallback;
+    this.onBallResolvedCallback = null;
+    onResolved?.();
   }
 
   public resetBowlerMesh(): void {
@@ -1014,9 +1014,11 @@ export class GameScene {
       );
     }
     
+    const onResolved = this.onBallResolvedCallback;
+    this.onBallResolvedCallback = null;
     setTimeout(() => {
       if (this.batterRoot) this.batterRoot.rotation.x = 0;
-      if (this.onBallResolvedCallback) this.onBallResolvedCallback();
+      onResolved?.();
     }, 1500);
   }
 }

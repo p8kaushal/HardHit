@@ -28,7 +28,8 @@ export class UIManager {
   public isBallActive = false;
   private activeDelivery: DeliveryChoice | null = null;
   private activeShot: ShotChoice | null = null;
-  private deliveryStartFrame = 0;
+  private deliveryStarted = false;
+  private deliveryGeneration = 0;
   
   // Selections
   private selectedShotType: ShotType = 'grounded';
@@ -38,8 +39,13 @@ export class UIManager {
   // Result Toast Auto-dismiss Timer
   private toastDismissTimer: any = null;
   private botDeliveryTimer: any = null;
+  private cancelBattingRunUp: (() => void) | null = null;
 
   public setController(controller: MatchController) {
+    this.deliveryGeneration++;
+    this.cancelBattingRunUp?.();
+    this.cancelBattingRunUp = null;
+    if (this.botDeliveryTimer) clearGameTimeout(this.botDeliveryTimer);
     this.controller = controller;
   }
 
@@ -494,11 +500,14 @@ export class UIManager {
   }
 
   private deliverBall3D(): void {
-    if (!this.activeDelivery || this.deliveryStartFrame > Date.now() - 100) return; // Prevent double trigger in same frame
+    if (!this.activeDelivery || this.deliveryStarted) return;
 
     this.isBallActive = true;
     this.hideResultToast();
-    this.deliveryStartFrame = Date.now();
+    this.deliveryStarted = true;
+    const generation = this.deliveryGeneration;
+    let arrived = false;
+    let resolved = false;
 
     // Lock camera in pre-contact player perspective before delivery commences
     const recShotHud = document.getElementById('recommended-shot-hud');
@@ -580,6 +589,8 @@ export class UIManager {
     }
 
     const onArrivedCb = () => {
+      if (generation !== this.deliveryGeneration || arrived) return;
+      arrived = true;
       this.hideBattingHelper();
       this.hideAssistedPrompt();
       this.isBannerActive = false;
@@ -587,6 +598,8 @@ export class UIManager {
     };
     
     const onResolvedCb = () => {
+      if (generation !== this.deliveryGeneration || resolved) return;
+      resolved = true;
       // Step 1: Detect that the ball has come to a rest or crossed boundary (triggers this callback)
       this.hideBattingHelper();
       this.hideAssistedPrompt();
@@ -628,6 +641,7 @@ export class UIManager {
       }
 
       setTimeout(() => {
+        if (generation !== this.deliveryGeneration) return;
         // Step 3: Fade out and hide the result banner overlay completely
         this.hideResultToast();
 
@@ -649,7 +663,7 @@ export class UIManager {
       // Bot is bowler
       (this.gameScene as any).onBallArrivedCallback = onArrivedCb;
       (this.gameScene as any).onBallResolvedCallback = onResolvedCb;
-      initBattingDelivery(true, this.gameScene.scene.getMeshByName('cricketBall'));
+      this.cancelBattingRunUp = initBattingDelivery(true, this.gameScene.scene.getMeshByName('cricketBall'));
     } else {
       // Start delivery trajectory
       this.gameScene.animateDelivery(
@@ -865,6 +879,10 @@ export class UIManager {
   }
 
   public setupActiveTurn(): void {
+    this.cancelBattingRunUp?.();
+    this.cancelBattingRunUp = null;
+    this.deliveryGeneration++;
+    this.deliveryStarted = false;
     this.isBallActive = false;
     const state = this.controller.state;
     
@@ -1147,6 +1165,10 @@ export class UIManager {
   }
 
   public handleRematch(): void {
+    this.cancelBattingRunUp?.();
+    this.cancelBattingRunUp = null;
+    this.deliveryGeneration++;
+    this.deliveryStarted = false;
     // 1. Hide summary modal
     const modal = document.getElementById('match-summary-modal');
     if (modal) {
