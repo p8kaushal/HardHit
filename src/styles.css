@@ -2897,6 +2897,43 @@ kbd {
 
 /* Touch batting: aim with one thumb and strike with the other. */
 .touch-batting-controls { display: none; }
+.rotate-hint { display: none; }
+@media (orientation: portrait) and (max-width: 480px) {
+  .rotate-hint:not(.dismissed) {
+    position: fixed;
+    z-index: 1100;
+    top: max(58px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    width: max-content;
+    max-width: calc(100vw - 2rem);
+    padding: .5rem .7rem;
+    border-radius: .5rem;
+    background: rgba(13, 24, 39, .95);
+    color: white;
+    font-size: .75rem;
+  }
+  .rotate-hint button { border: 0; background: transparent; color: white; font-size: 1.4rem; line-height: 1; cursor: pointer; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  #control-bowling .left-dock { width: min(23vw, 160px); }
+  #control-bowling .right-dock {
+    width: min(69vw, 620px);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: .25rem .5rem;
+  }
+  #control-bowling .right-dock .dock-header { display: none; }
+  #control-bowling .right-dock .input-col { margin-top: 0 !important; }
+  #control-bowling .btn-group .btn { min-height: 34px; }
+  #control-bowling .right-dock .action-btn-row { grid-column: 1 / -1; position: static; padding: 0; background: transparent; }
+  #control-bowling .right-dock .size-large { min-height: 40px; padding: .4rem; }
+  #control-bowling .bowling-adjustment span { display: none; }
+}
 .footwork-control { display: flex; gap: .3rem; }
 .footwork-choice {
   flex: 1;

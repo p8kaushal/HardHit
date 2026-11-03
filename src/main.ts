@@ -5,6 +5,10 @@ import { runBotSimulation } from './simulate';
 let controller: MatchController | null = null;
 let ui: UIManager | null = null;
 
+document.getElementById('dismiss-rotate-hint')!.addEventListener('click', () => {
+  document.querySelector('.rotate-hint')!.classList.add('dismissed');
+});
+
 function loadLobbyProfile(): void {
   const player = getOrCreatePlayer();
   renderProfile(player);
