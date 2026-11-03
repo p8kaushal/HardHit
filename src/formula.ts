@@ -28,6 +28,7 @@ export function bowlingTargetFromScreen(x: number, y: number): { x: number; z: n
 
 export const BAT_ANIMATION_LEAD_TIME = 0.15; // 150ms swing apex delay
 export const BATTER_CREASE_Z = -8.8;
+export const BATTER_CONTACT_Z = -8.4;
 export const BALL_AIR_DAMPING = 0.9985;
 
 export function deliveryDurationMs(type: DeliveryType, pace = 0.5): number {
@@ -70,14 +71,28 @@ export function deliveryPitchPoint(delivery: DeliveryChoice): { x: number; z: nu
   };
 }
 
+/** Fraction of the standard flight when the ball reaches the batter's stance. */
+export function batterContactProgress(delivery: DeliveryChoice): number {
+  const z = Math.max(-0.3, Math.min(0.8, delivery.batterPosition?.z ?? 0));
+  return Math.max(0, Math.min(1, (BATTER_CONTACT_Z + z - 10) / (BATTER_CREASE_Z - 10)));
+}
+
+export function deliveryContactPoint(delivery: DeliveryChoice): { x: number; y: number; z: number } {
+  const start = { x: 0.6, y: 1.9, z: 10 };
+  const bounce = { x: delivery.aimTarget.x, y: 0.06, z: delivery.aimTarget.z };
+  const end = { x: delivery.aimTarget.x, y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
+  return getDeliveryFlightPosition(batterContactProgress(delivery), start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
+}
+
 /** Approximate incoming velocity at contact from the same path used on screen. */
 export function deliveryVelocityAtCrease(delivery: DeliveryChoice): { x: number; y: number; z: number } {
   const start = { x: 0.6, y: 1.9, z: 10 };
   const bounce = { x: delivery.aimTarget.x, y: 0.06, z: delivery.aimTarget.z };
   const end = { x: delivery.aimTarget.x, y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
   const sample = (progress: number) => getDeliveryFlightPosition(progress, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
-  const before = sample(0.99);
-  const atCrease = sample(1);
+  const contact = batterContactProgress(delivery);
+  const before = sample(Math.max(0, contact - 0.01));
+  const atCrease = sample(contact);
   const seconds = deliveryDurationMs(delivery.type, delivery.pace) / 1000 * 0.01;
   return { x: (atCrease.x - before.x) / seconds, y: (atCrease.y - before.y) / seconds, z: (atCrease.z - before.z) / seconds };
 }
@@ -88,7 +103,7 @@ export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'L
   const ballRadius = 0.036;
   const stumpHalfWidth = 0.1143;
   const stumpHeight = 0.711;
-  const impactZ = -8.4;
+  const impactZ = BATTER_CONTACT_Z + (delivery.batterPosition?.z ?? 0);
   const progress = (impactZ - 10) / (BATTER_CREASE_Z - 10);
   const start = { x: 0.6, y: 1.9, z: 10 };
   const bounce = { x: delivery.aimTarget.x, y: 0.06, z: delivery.aimTarget.z };
@@ -99,11 +114,11 @@ export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'L
   if (!hitsWicket) return null;
 
   // This is a simplified fixed stance; it represents a pad, not a full body mesh.
-  const hitsPad = Math.abs(impact.x) <= 0.30 + ballRadius && impact.y >= 0.18 && impact.y <= 1.05;
+  const hitsPad = Math.abs(impact.x - (delivery.batterPosition?.x ?? 0)) <= 0.30 + ballRadius && impact.y >= 0.18 && impact.y <= 1.05;
   if (!hitsPad) return 'bowled';
   const legSign = hand === 'RHB' ? -1 : 1;
   const pitchX = delivery.aimTarget.x + deliverySwingAtBounce(delivery.type, delivery.swing, delivery.aimTarget.z);
-  if (pitchX * legSign > stumpHalfWidth + ballRadius) return null;
+  if (delivery.aimTarget.z > impactZ && pitchX * legSign > stumpHalfWidth + ballRadius) return null;
   const impactInLine = Math.abs(impact.x) <= stumpHalfWidth + ballRadius;
   const impactOutsideOff = impact.x * legSign < -(stumpHalfWidth + ballRadius);
   return impactInLine || (!offeredShot && impactOutsideOff) ? 'lbw' : null;
@@ -112,7 +127,7 @@ export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'L
 /** Contact varies with timing and the line the ball actually reaches. */
 export function battingContactZone(delivery: DeliveryChoice, timing: number, baseContact?: number): number {
   const base = baseContact ?? 0.5 + (timing - 0.5) * 0.4;
-  return Math.max(0, Math.min(1, base + deliveryCreaseX(delivery) * 0.25));
+  return Math.max(0, Math.min(1, base + (deliveryContactPoint(delivery).x - (delivery.batterPosition?.x ?? 0)) * 0.25));
 }
 
 /** Ballistic vertical motion, with a simplified rebound from the pitch. */
@@ -256,7 +271,7 @@ export function evaluateWicket(
   let isWicket = false;
   let isEdgeFallback = !isCleanHit && isWithinTolerance;
   let reason = '';
-  const missed = !isWithinTolerance;
+  const missed = !isWithinTolerance || Math.abs(deliveryContactPoint(delivery).x - (delivery.batterPosition?.x ?? 0)) > 1.25;
 
   // Shot direction is the intended outgoing direction, not the incoming
   // ball's contact angle. Timing determines contact and must not rewrite aim.
@@ -364,9 +379,10 @@ export function checkExtraBall(delivery: DeliveryChoice, _batterHand: 'RHB' | 'L
     return { isExtra: true, type: 'noball' };
   }
 
-  const x = deliveryCreaseX(delivery);
-  // Measure strictly relative to absolute pitch center line (X=0.0m) bypassing stance offsets
-  if (Math.abs(x) > 0.89) {
+  const ballX = deliveryContactPoint(delivery).x;
+  const relativeX = ballX - (delivery.batterPosition?.x ?? 0);
+  // Moving away cannot turn a delivery reachable from the original stance into a wide.
+  if (Math.abs(ballX) > 0.89 && Math.abs(relativeX) > 0.89) {
     return { isExtra: true, type: 'wide' };
   }
 

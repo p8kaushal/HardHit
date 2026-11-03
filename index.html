@@ -469,9 +469,21 @@
         <!-- Batting Inputs -->
         <div id="control-batting" class="control-section hidden">
           <div class="touch-batting-controls">
+            <div class="touch-aim-area">
             <div class="touch-aim">
               <div id="touch-stick" class="touch-stick" role="img" aria-label="Shot aim locked: Straight. Drag to select another direction."><span class="touch-field-suggestion"></span><span class="touch-field-selected"></span><span class="touch-field-pitch"></span><span class="touch-stick-knob"></span><span class="field-label field-straight">STRAIGHT</span><span class="field-label field-left">LEFT</span><span class="field-label field-right">RIGHT</span><span class="field-label field-behind">BEHIND</span></div>
               <span><i class="field-key suggestion-key"></i> GUIDE &nbsp; <i class="field-key selected-key"></i> AIM</span>
+            </div>
+            <div class="batter-movement" role="group" aria-label="Move batter before release">
+              <span>MOVE</span>
+              <div class="batter-movement-grid">
+                <button type="button" data-batter-move="forward" aria-label="Move batter forward">↑</button>
+                <button type="button" data-batter-move="left" aria-label="Move batter left">←</button>
+                <button type="button" data-batter-move="reset" aria-label="Reset batter position">●</button>
+                <button type="button" data-batter-move="right" aria-label="Move batter right">→</button>
+                <button type="button" data-batter-move="back" aria-label="Move batter back">↓</button>
+              </div>
+            </div>
             </div>
             <div class="touch-batting-actions">
               <div class="footwork-control" role="group" aria-label="Batting footwork"><button type="button" class="footwork-choice active" data-footwork="front_foot" aria-pressed="true">FRONT</button><button type="button" class="footwork-choice" data-footwork="back_foot" aria-pressed="false">BACK</button></div>
@@ -502,6 +514,16 @@
                   <button class="clock-btn pos-6" data-val="6" title="Leg-Side Flat">←</button>
                   <button class="clock-btn pos-7" data-val="7" title="Leg-Side High">↖</button>
                 </div>
+              </div>
+            </div>
+            <div class="batter-movement desktop-batter-movement" role="group" aria-label="Move batter before release">
+              <span>MOVE (I J K L)</span>
+              <div class="batter-movement-grid">
+                <button type="button" data-batter-move="forward" aria-label="Move batter forward">↑</button>
+                <button type="button" data-batter-move="left" aria-label="Move batter left">←</button>
+                <button type="button" data-batter-move="reset" aria-label="Reset batter position">●</button>
+                <button type="button" data-batter-move="right" aria-label="Move batter right">→</button>
+                <button type="button" data-batter-move="back" aria-label="Move batter back">↓</button>
               </div>
             </div>
           </div>

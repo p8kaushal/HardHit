@@ -2,10 +2,10 @@
 
 ## Batter positioning before delivery
 
-- [ ] Add accessible touch and keyboard controls for moving the batter left/right and a limited distance forward/back before release. Keep every control usable in compact landscape layouts and avoid obscuring the ball or pitch.
-- [ ] Define physical movement limits, starting stance and when movement locks; provide clear feedback for both players.
-- [ ] Feed the chosen stance into the visible batter position, bat reach and contact, timing, pad impact, LBW, wides and shot trajectory. Handle left- and right-handed batters consistently.
-- [ ] Test movement bounds, lock timing, contact and dismissal decisions, both handednesses, and phone/tablet layouts.
+- [x] Add touch and keyboard controls for moving the batter left/right and a limited distance forward/back before release.
+- [x] Bound the stance and lock movement at release; apply it to the visible batter, timing, approximate reach, pad impact, LBW and wides.
+- [ ] Replace the simplified stance/contact model with spatial bat and body collision, calibrate it for both handednesses, and communicate the stance to a future opponent.
+- [ ] Test movement and release locking on physical phones and tablets, including simultaneous touch input.
 
 ## Bowler side and delivery angle
 

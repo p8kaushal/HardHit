@@ -6,10 +6,11 @@ import { directionFromStick, suggestedShotDirection, TouchBattingControls } from
 import { stepBall, type BallState } from '../src/ball-physics';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery } from '../src/formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
+import { moveBatter } from '../src/batter-position';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -96,6 +97,27 @@ test('touch stick maps eight directions and ignores its dead zone', () => {
   assert.equal(directionFromStick(0, 0), null);
   assert.equal(directionFromStick(0.1, 0.1), null);
   assert.deepEqual([[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]].map(([x,y]) => directionFromStick(x,y)), [0,1,2,3,4,5,6,7]);
+});
+
+test('batter movement stays within its bounds and can be reset', () => {
+  assert.deepEqual(moveBatter({ x: 0, z: 0 }, 5, 5), { x: 0.6, z: 0.8 });
+  assert.deepEqual(moveBatter({ x: 0, z: 0 }, -5, -5), { x: -0.6, z: -0.3 });
+  assert.deepEqual(moveBatter({ x: 0.2, z: 0.2 }, -0.2, -0.2), { x: 0, z: 0 });
+});
+
+test('batter stance changes contact timing and reach without manufacturing wides', () => {
+  const central = delivery(0.5);
+  const forward = { ...central, batterPosition: { x: 0, z: 0.8 } };
+  const back = { ...central, batterPosition: { x: 0, z: -0.3 } };
+  assert.ok(batterContactProgress(forward) < batterContactProgress(central));
+  assert.ok(batterContactProgress(back) > batterContactProgress(central));
+  const outside = { ...delivery(0.5, 0.7), batterPosition: { x: -0.6, z: 0 } };
+  assert.equal(checkExtraBall(outside).isExtra, false);
+  const movedIntoLine = { ...delivery(0.5, 1.1), batterPosition: { x: 0.4, z: 0 } };
+  assert.equal(checkExtraBall(movedIntoLine).isExtra, false);
+  const game = match();
+  const shot = { direction: 0, type: 'power' as const, timing: 0.5, contactZone: 0.5 };
+  assert.equal(game.recordBall(outside, shot).missed, true);
 });
 
 test('a second finger can strike while the aiming finger remains held', () => {
@@ -199,6 +221,7 @@ test('release timing and line distinguish legal balls, wides and no-balls', () =
 test('LBW considers pitch, impact, offered shot, stumps, handedness and no-balls', () => {
   const turning = { ...delivery(0.5, 0.25), type: 'offspin' as const, turn: 1 };
   assert.equal(resolveMissedDelivery(turning, 'RHB', true), 'lbw');
+  assert.equal(resolveMissedDelivery({ ...turning, batterPosition: { x: 0.6, z: 0 } }, 'RHB', true), 'bowled');
   assert.equal(resolveMissedDelivery({ ...turning, releaseTiming: 1 }, 'RHB', true), null);
   const outsideLeg = { ...delivery(0.5, -0.25), type: 'legspin' as const, turn: 1 };
   assert.equal(resolveMissedDelivery(outsideLeg, 'RHB', true), null);

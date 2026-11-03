@@ -2,7 +2,8 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { BallOutcome, DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { BATTER_CONTACT_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { moveBatter, type BatterPosition } from './batter-position';
 import { KeyboardInputManager } from './input';
 import { suggestedShotDirection, TouchBattingControls } from './touch-controls';
 import { initBowlingAdjustmentReadouts, isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
@@ -15,6 +16,8 @@ export class UIManager {
   private gameScene: GameScene;
   private keyboardInputManager: KeyboardInputManager;
   private touchBattingControls: TouchBattingControls;
+  private batterPosition: BatterPosition = { x: 0, z: 0 };
+  private batterPositionLocked = false;
 
   // Gesture/Swipe Tracking
   private swipeStartX = 0;
@@ -47,6 +50,8 @@ export class UIManager {
     this.cancelBattingRunUp?.();
     this.cancelBattingRunUp = null;
     if (this.botDeliveryTimer) clearGameTimeout(this.botDeliveryTimer);
+    this.batterPosition = { x: 0, z: 0 };
+    this.batterPositionLocked = false;
     this.controller = controller;
   }
 
@@ -111,6 +116,18 @@ export class UIManager {
       const footwork = button.dataset.footwork;
       if (footwork === 'front_foot' || footwork === 'back_foot') this.keyboardInputManager.setFootwork(footwork);
     }));
+
+    document.querySelectorAll<HTMLButtonElement>('[data-batter-move]').forEach(button => {
+      button.addEventListener('click', () => this.movePlayerBatter(button.dataset.batterMove || ''));
+    });
+    window.addEventListener('keydown', event => {
+      const directions: Record<string, string> = { i: 'forward', j: 'left', k: 'back', l: 'right' };
+      const direction = directions[event.key.toLowerCase()];
+      if (!direction || event.repeat || isGamePaused() || !document.getElementById('screen-gameplay')?.classList.contains('active')) return;
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      event.preventDefault();
+      this.movePlayerBatter(direction);
+    });
 
     // Shot selector
     const batTypeButtons = document.querySelectorAll('#bat-type-group .btn');
@@ -334,6 +351,24 @@ export class UIManager {
     this.keyboardInputManager.updateFeedbackOverlay();
   }
 
+  private movePlayerBatter(direction: string): void {
+    if (this.batterPositionLocked || this.controller.state.status !== 'playing' || this.controller.getCurrentInnings().batter.id !== this.controller.state.player.id) return;
+    const offsets: Record<string, [number, number]> = { left: [-0.2, 0], right: [0.2, 0], forward: [0, 0.2], back: [0, -0.2] };
+    if (direction === 'reset') this.batterPosition = { x: 0, z: 0 };
+    else if (offsets[direction]) this.batterPosition = moveBatter(this.batterPosition, ...offsets[direction]);
+    else return;
+    this.gameScene.setPlayerCreaseOffset(-0.35 + this.batterPosition.x, this.batterPosition.z);
+    if (this.activeDelivery) {
+      this.activeDelivery.batterPosition = { ...this.batterPosition };
+      this.touchBattingControls.setSuggestion(suggestedShotDirection(this.activeDelivery));
+    }
+    this.updateBatterMovementControls();
+  }
+
+  private updateBatterMovementControls(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-batter-move]').forEach(button => { button.disabled = this.batterPositionLocked; });
+  }
+
   public startUserBowlingDelivery(): void {
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     if (isPlayerBatting || this.isBallActive || globalAutoAssistConfig.isRunUpActive) return;
@@ -448,7 +483,7 @@ export class UIManager {
     } else {
       // A swing begins 150 ms before the selected delivery reaches the crease.
       const elapsed = gameNow() - (globalAutoAssistConfig.deliveryStartTime ?? gameNow());
-      timing = 0.5 + (elapsed - (deliveryDurationMs(this.activeDelivery.type, this.activeDelivery.pace) - 150)) / 500;
+      timing = 0.5 + (elapsed - (deliveryDurationMs(this.activeDelivery.type, this.activeDelivery.pace) * batterContactProgress(this.activeDelivery) - 150)) / 500;
     }
 
     this.activeShot = {
@@ -577,8 +612,8 @@ export class UIManager {
         }
         
         const elapsed = gameNow() - (globalAutoAssistConfig.deliveryStartTime ?? gameNow());
-        const reactionTrigger = elapsed >= Math.max(0, deliveryDurationMs(this.activeDelivery.type, this.activeDelivery.pace) - 300);
-        const creaseTrigger = z <= -8.8;
+        const reactionTrigger = elapsed >= Math.max(0, deliveryDurationMs(this.activeDelivery.type, this.activeDelivery.pace) * batterContactProgress(this.activeDelivery) - 300);
+        const creaseTrigger = z <= BATTER_CONTACT_Z + (this.activeDelivery.batterPosition?.z ?? 0);
 
         if (creaseTrigger) {
           this.hideAssistedPrompt();
@@ -679,7 +714,12 @@ export class UIManager {
       // Bot is bowler
       (this.gameScene as any).onBallArrivedCallback = onArrivedCb;
       (this.gameScene as any).onBallResolvedCallback = onResolvedCb;
-      this.cancelBattingRunUp = initBattingDelivery(true, this.gameScene.scene.getMeshByName('cricketBall'), () => gameSound.play('delivery'));
+      this.cancelBattingRunUp = initBattingDelivery(true, this.gameScene.scene.getMeshByName('cricketBall'), () => {
+        this.batterPositionLocked = true;
+        if (this.activeDelivery) this.activeDelivery.batterPosition = { ...this.batterPosition };
+        this.updateBatterMovementControls();
+        gameSound.play('delivery');
+      });
     } else {
       // Start delivery trajectory
       gameSound.play('delivery');
@@ -931,6 +971,9 @@ export class UIManager {
 
     if (isPlayerBatting) {
       // Batter mode
+      this.batterPositionLocked = false;
+      this.gameScene.setPlayerCreaseOffset(-0.35 + this.batterPosition.x, this.batterPosition.z);
+      this.updateBatterMovementControls();
       this.gameScene.setCameraMode('batter_eye');
       this.controller.setCameraMode('batter_eye');
       if (controlBatting) {
@@ -946,6 +989,7 @@ export class UIManager {
       
       // Auto trigger bot delivery
       this.activeDelivery = botChooseDelivery(state.bot, this.controller.botDifficulty, innings.batter.batterHand || 'RHB');
+      this.activeDelivery.batterPosition = { ...this.batterPosition };
       this.touchBattingControls.setLocked(false);
       this.touchBattingControls.setSuggestion(suggestedShotDirection(this.activeDelivery));
       this.gameScene.updateBounceMarker(deliveryPitchPoint(this.activeDelivery));
@@ -957,6 +1001,7 @@ export class UIManager {
       }, 1500);
     } else {
       // Bowler mode
+      this.gameScene.setPlayerCreaseOffset(-0.35, 0);
       this.gameScene.setCameraMode('bowler_eye');
       this.controller.setCameraMode('bowler_eye');
       if (controlBowling) {
@@ -1184,6 +1229,8 @@ export class UIManager {
   }
 
   public handleRematch(): void {
+    this.batterPosition = { x: 0, z: 0 };
+    this.batterPositionLocked = false;
     this.cancelBattingRunUp?.();
     this.cancelBattingRunUp = null;
     this.deliveryGeneration++;

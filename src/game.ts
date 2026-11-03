@@ -1,5 +1,5 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, deliveryCreaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
+import { evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, deliveryContactPoint, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
@@ -315,9 +315,10 @@ export class MatchController {
 
     const wicketResult = shot ? evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier) : null;
     if (wicketResult) missed = wicketResult.missed ?? false;
-    if (shot && Math.abs(deliveryCreaseX(delivery)) > 1.25) missed = true;
+    const relativeLine = deliveryContactPoint(delivery).x - (delivery.batterPosition?.x ?? 0);
+    if (shot && Math.abs(relativeLine) > 1.25) missed = true;
     // A ball contacted by the bat is not a wide, provided it is within reach.
-    if (extra.type === 'wide' && shot && !missed && Math.abs(deliveryCreaseX(delivery)) <= 1.25) {
+    if (extra.type === 'wide' && shot && !missed && Math.abs(relativeLine) <= 1.25) {
       extra = { isExtra: false, type: null };
     }
     if (extra.type === 'wide') missed = true;

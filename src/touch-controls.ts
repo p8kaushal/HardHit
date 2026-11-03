@@ -1,12 +1,12 @@
 import type { ShotType } from './types';
 import type { DeliveryChoice } from './types';
-import { deliveryCreaseX } from './formula';
+import { deliveryContactPoint } from './formula';
 
 const DIRECTION_LABELS = ['Straight', 'Forward right', 'Right', 'Back right', 'Behind', 'Back left', 'Left', 'Forward left'];
 
 /** A simple line-based guide, not a guarantee of a successful shot. */
 export function suggestedShotDirection(delivery: DeliveryChoice): number {
-  const line = deliveryCreaseX(delivery);
+  const line = deliveryContactPoint(delivery).x - (delivery.batterPosition?.x ?? 0);
   return line > 0.2 ? 1 : line < -0.2 ? 7 : 0;
 }
 

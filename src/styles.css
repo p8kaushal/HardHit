@@ -3136,6 +3136,22 @@ body { min-height: 100dvh; }
 }
 .pace-control input[type="range"]::-moz-range-thumb { width: 18px; height: 10px; border: 2px solid #fff; border-radius: 5px; background: #1d2a3a; }
 .sound-toggle { width: 32px; height: 32px; font-size: 1rem; flex-shrink: 0; }
+.batter-movement { display: grid; justify-items: center; gap: .15rem; color: white; font-size: .58rem; font-weight: 800; }
+.batter-movement-grid { display: grid; grid-template-columns: repeat(3, 32px); gap: 2px; }
+.batter-movement-grid button { min-width: 0; height: 32px; padding: 0; border: 1px solid #9eb4c8; border-radius: 6px; background: rgba(20, 35, 55, .92); color: white; font-size: 1rem; touch-action: manipulation; }
+.batter-movement-grid button:disabled { opacity: .4; }
+.batter-movement-grid [data-batter-move="forward"] { grid-area: 1 / 2; }
+.batter-movement-grid [data-batter-move="left"] { grid-area: 2 / 1; }
+.batter-movement-grid [data-batter-move="reset"] { grid-area: 2 / 2; }
+.batter-movement-grid [data-batter-move="right"] { grid-area: 2 / 3; }
+.batter-movement-grid [data-batter-move="back"] { grid-area: 3 / 2; }
+.touch-aim-area { display: flex; gap: .45rem; align-items: end; }
+.touch-aim-area, .batter-movement { pointer-events: auto; }
+@media (orientation: landscape) and (max-height: 320px) {
+  .batter-movement-grid { grid-template-columns: repeat(3, 27px); }
+  .batter-movement-grid button { height: 27px; font-size: .85rem; }
+  .touch-aim-area { gap: .25rem; }
+}
 .bowling-movement { display: flex; flex: 1; min-width: 0; flex-direction: column; justify-content: space-between; gap: .3rem; }
 .bowling-movement .movement-control { width: 100%; }
 .movement-directions { display: flex; justify-content: space-between; color: #f6d34d; font-size: .9rem; line-height: 1; padding: 0 .3rem; }

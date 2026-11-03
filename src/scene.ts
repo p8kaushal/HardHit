@@ -2,7 +2,7 @@ import * as BABYLON from 'babylonjs';
 import { gameNow, isGamePaused } from './game-clock';
 import { CameraMode, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BATTER_CREASE_Z, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
+import { BATTER_CREASE_Z, batterContactProgress, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
 import { stepBall, type BallState } from './ball-physics';
 
 export class GameScene {
@@ -307,7 +307,7 @@ export class GameScene {
   public resetCameraToPlayerView(isPlayerBatting: boolean): void {
     if (this.batterRoot) {
       this.batterRoot.parent = null;
-      this.batterRoot.position.set(-0.35, 0.0, -8.8);
+      this.updateBatterPosition();
     }
     const targetMode: CameraMode = isPlayerBatting ? 'batter_eye' : 'bowler_eye';
     this.setCameraMode(targetMode);
@@ -466,8 +466,8 @@ export class GameScene {
   }
 
   public setPlayerCreaseOffset(dx: number, dz: number): void {
-    const clampedDx = Math.max(-0.8, Math.min(0.8, dx));
-    const clampedDz = Math.max(-1.2, Math.min(0.5, dz));
+    const clampedDx = Math.max(-0.95, Math.min(0.25, dx));
+    const clampedDz = Math.max(-0.3, Math.min(0.8, dz));
     this.playerCreaseOffset.set(clampedDx, 0.0, clampedDz);
     this.updateBatterPosition();
   }
@@ -732,6 +732,7 @@ export class GameScene {
 
       if (index >= this.ballTrajectoryPoints.length - 1) {
         // Ball passed/reached batter stumps
+        this.ballMesh?.position.copyFrom(this.ballTrajectoryPoints[this.ballTrajectoryPoints.length - 1]);
         this.isAnimatingBall = false;
         this.updateDeliveryAnimation = null;
         this.ballMesh?.setEnabled(false);
@@ -905,8 +906,9 @@ export class GameScene {
       const duration = deliveryDurationMs(delivery?.type ?? 'medium', delivery?.pace);
       let progress = elapsed / duration;
       
-      if (progress >= 1.0) {
-        progress = 1.0;
+      const contactProgress = delivery ? batterContactProgress(delivery) : 1;
+      if (progress >= contactProgress) {
+        progress = contactProgress;
         globalAutoAssistConfig.isDeliveryActive = false;
       }
       
@@ -922,7 +924,7 @@ export class GameScene {
       
       const pos = getDeliveryFlightPosition(progress, release, bounce, end, delivery?.type ?? 'medium', delivery?.turn, delivery?.swing, delivery?.pace);
       ball.position.set(pos.x, pos.y, pos.z);
-      if (progress >= 1.0 && this.onBallArrivedCallback) this.onBallArrivedCallback();
+      if (progress >= contactProgress && this.onBallArrivedCallback) this.onBallArrivedCallback();
     }
   }
 
@@ -980,7 +982,7 @@ export class GameScene {
     this.setCameraMode('follow_shot');
     
     // Set startPoint to the actual batter's position (crease anchor Z = -8.8)
-    const startPoint = new BABYLON.Vector3(this.batterRoot?.position.x || 0, 0.4, this.batterRoot?.position.z || -8.8);
+    const startPoint = this.ballMesh?.position.clone() ?? new BABYLON.Vector3(this.batterRoot?.position.x || 0, 0.4, this.batterRoot?.position.z || -8.8);
     
     // Only render/position the marker when valid bat-ball contact occurs in pitch/outfield space (Z > -10.0m)
     if (this.hudAvatarRoot && startPoint.z > -10.0) {
