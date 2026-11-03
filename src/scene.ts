@@ -4,6 +4,7 @@ import { CameraMode, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, batterContactProgress, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryDurationMs, deliveryReleaseX, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
 import { stepBall, type BallState } from './ball-physics';
+import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
 const BALL_VISUAL_RADIUS = 0.075;
@@ -65,6 +66,7 @@ export class GameScene {
   public shotReachedBoundary = false;
   public shotBoundaryOnFull = false;
   private ballPathPoints: BABYLON.Vector3[] = [];
+  private shotCameraDirection: CameraVector = { x: 0, y: 0, z: 1 };
   
   constructor(canvasElementId: string) {
     this.canvas = document.getElementById(canvasElementId) as unknown as HTMLCanvasElement;
@@ -106,14 +108,16 @@ export class GameScene {
           }
         }
         if (this.activeCameraMode === 'follow_shot' && this.ballMesh) {
+          const pose = followShotPose(this.ballMesh.position, this.shotCameraDirection);
           const currentTarget = this.primaryCamera.getTarget();
           const frames = Math.min(this.engine.getDeltaTime(), 50) * 60 / 1000;
-          const newTarget = BABYLON.Vector3.Lerp(currentTarget, this.ballMesh.position, 1 - Math.pow(0.92, frames));
+          const target = new BABYLON.Vector3(pose.target.x, pose.target.y, pose.target.z);
+          const newTarget = BABYLON.Vector3.Lerp(currentTarget, target, 1 - Math.pow(0.92, frames));
           if (Number.isFinite(newTarget.x) && Number.isFinite(newTarget.y) && Number.isFinite(newTarget.z)) {
             this.primaryCamera.setTarget(newTarget);
           }
           
-          const targetPos = this.ballMesh.position.add(new BABYLON.Vector3(0, 4.5, -11.0));
+          const targetPos = new BABYLON.Vector3(pose.position.x, pose.position.y, pose.position.z);
           this.primaryCamera.position = BABYLON.Vector3.Lerp(this.primaryCamera.position, targetPos, 1 - Math.pow(0.95, frames));
           if (this.primaryCamera.position.y < 3.0) {
             this.primaryCamera.position.y = 3.0;
@@ -868,6 +872,12 @@ export class GameScene {
     this.isAnimatingBall = false;
     
     this.detachCameraFromBall();
+    if (this.currentBallPos && this.shotPhysics) {
+      const pose = shotResultPose(this.currentBallPos, this.shotCameraDirection);
+      this.setCameraMode('shot_result');
+      this.primaryCamera.setTarget(new BABYLON.Vector3(pose.target.x, pose.target.y, pose.target.z));
+      this.primaryCamera.setPosition(new BABYLON.Vector3(pose.position.x, pose.position.y, pose.position.z));
+    }
     
     if (this.ballMesh) this.ballMesh.setEnabled(false);
     if (this.bounceMarker) this.bounceMarker.setEnabled(false);
@@ -1020,9 +1030,6 @@ export class GameScene {
     this.clearBallTrail();
     this.ballMesh?.setEnabled(true);
     
-    // Transition active camera to follow_shot trajectory view immediately upon bat contact
-    this.setCameraMode('follow_shot');
-    
     // Set startPoint to the actual batter's position (crease anchor Z = -8.8)
     const startPoint = this.ballMesh?.position.clone() ?? new BABYLON.Vector3(this.batterRoot?.position.x || 0, 0.4, this.batterRoot?.position.z || -8.8);
     if (this.ballMesh) startPoint.y -= BALL_VISUAL_OFFSET;
@@ -1037,6 +1044,12 @@ export class GameScene {
     if (this.batterHand === 'RHB' && !V_out) {
       currentVelocity.x = -currentVelocity.x;
     }
+
+    this.shotCameraDirection = shotCameraDirection(currentVelocity);
+    const cameraPose = followShotPose(startPoint, this.shotCameraDirection);
+    this.setCameraMode('follow_shot');
+    this.primaryCamera.setTarget(new BABYLON.Vector3(cameraPose.target.x, cameraPose.target.y, cameraPose.target.z));
+    this.primaryCamera.setPosition(new BABYLON.Vector3(cameraPose.position.x, cameraPose.position.y, cameraPose.position.z));
 
     this.ballPathPoints = [startPoint.add(new BABYLON.Vector3(0, BALL_VISUAL_OFFSET, 0))];
     this.currentBallPos = startPoint.clone();

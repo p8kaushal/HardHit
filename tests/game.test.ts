@@ -12,6 +12,7 @@ import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout,
 import { SoundManager } from '../src/sound';
 import { UIManager } from '../src/ui';
 import { moveBatter } from '../src/batter-position';
+import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -22,6 +23,28 @@ Object.assign(globalThis, { localStorage: {
 
 const delivery = (timing: number, x = 0): DeliveryChoice => ({
   aimTarget: { x, z: -3.5 }, line: 'middle', length: 'good', type: 'fast', releaseTiming: timing
+});
+
+test('shot cameras follow every direction and keep a stable elevated result view', () => {
+  const ball = { x: 12, y: 3, z: -4 };
+  for (const [x, z] of [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]) {
+    const direction = shotCameraDirection({ x, y: 12, z });
+    const follow = followShotPose(ball, direction);
+    const result = shotResultPose(ball, direction);
+    const behind = (ball.x - follow.position.x) * direction.x + (ball.z - follow.position.z) * direction.z;
+    assert.ok(Math.abs(behind - 12) < 1e-9);
+    assert.ok(follow.position.y > ball.y && result.position.y > ball.y);
+    assert.deepEqual(follow.target, ball);
+    assert.deepEqual(result.target, ball);
+    assert.ok(Object.values(result.position).every(Number.isFinite));
+  }
+  assert.deepEqual(shotCameraDirection({ x: 0, y: 0, z: 0 }), { x: 0, y: 0, z: 1 });
+  const beyondRope = shotResultPose({ x: 90, y: 0, z: 90 }, shotCameraDirection({ x: 1, y: 0, z: 1 }));
+  assert.ok(Math.hypot(beyondRope.position.x, beyondRope.position.z) <= 55.000001);
+  assert.ok(Math.hypot(beyondRope.target.x, beyondRope.target.z) <= 62.000001);
+  const chase = followShotPose({ x: 90, y: 4, z: 90 }, shotCameraDirection({ x: 1, y: 0, z: 1 }));
+  assert.ok(Math.hypot(chase.position.x, chase.position.z) <= 60.000001);
+  assert.ok(chase.position.y >= 14);
 });
 
 test('sound effects unlock on input and respect mute without interrupting play', () => {
