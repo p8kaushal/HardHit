@@ -1,6 +1,7 @@
 import { InputIntent, ShotType } from './types';
 import { globalAutoAssistConfig } from './game';
 import { updateBowlingAdjustmentVisibility } from './bowling-controls';
+import { isGamePaused } from './game-clock';
 
 export let activeInputManager: KeyboardInputManager | null = null;
 
@@ -55,8 +56,8 @@ export class KeyboardInputManager {
     this.updateFeedbackOverlay();
   }
 
-  private boundHandleKeyDown = (e: KeyboardEvent) => this.handleKeyDown(e);
-  private boundHandleKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
+  private boundHandleKeyDown = (e: KeyboardEvent) => { if (!isGamePaused()) this.handleKeyDown(e); };
+  private boundHandleKeyUp = (e: KeyboardEvent) => { if (!isGamePaused()) this.handleKeyUp(e); };
 
   private setupListeners(): void {
     window.addEventListener('keydown', this.boundHandleKeyDown);

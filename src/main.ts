@@ -1,13 +1,17 @@
 import { getOrCreatePlayer, MatchController } from './game';
 import { UIManager, renderProfile, renderLeaderboard } from './ui';
 import { runBotSimulation } from './simulate';
+import { setGamePaused } from './game-clock';
 
 let controller: MatchController | null = null;
 let ui: UIManager | null = null;
 
-document.getElementById('dismiss-rotate-hint')!.addEventListener('click', () => {
-  document.querySelector('.rotate-hint')!.classList.add('dismissed');
-});
+const portrait = window.matchMedia('(orientation: portrait)');
+function updateOrientation(): void {
+  const playing = document.getElementById('screen-gameplay')!.classList.contains('active');
+  setGamePaused(playing && portrait.matches);
+}
+portrait.addEventListener('change', updateOrientation);
 
 function loadLobbyProfile(): void {
   const player = getOrCreatePlayer();
@@ -19,6 +23,7 @@ function showScreen(screenId: string): void {
   const screens = document.querySelectorAll('.screen');
   screens.forEach(s => s.classList.remove('active'));
   document.getElementById(screenId)!.classList.add('active');
+  updateOrientation();
 }
 
 function initLobby(): void {

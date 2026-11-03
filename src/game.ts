@@ -1,5 +1,6 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
 import { evaluateWicket, calculateDistance, checkExtraBall, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
+import { gameNow, setGameTimeout } from './game-clock';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
 
@@ -271,7 +272,7 @@ export class MatchController {
   }
 
   public recordDeliveryStart(): void {
-    globalAutoAssistConfig.deliveryStartTime = performance.now();
+    globalAutoAssistConfig.deliveryStartTime = gameNow();
     const innings = this.getCurrentInnings();
     globalAutoAssistConfig.bowlerArm = innings.bowler.bowlingArm || 'Right';
   }
@@ -703,7 +704,7 @@ export class MatchController {
   export function initBattingDelivery(isBotBowler: boolean, ball: any): void {
     if (isBotBowler) {
       globalAutoAssistConfig.isRunUpActive = true;
-      globalAutoAssistConfig.runUpStartTime = performance.now();
+      globalAutoAssistConfig.runUpStartTime = gameNow();
       const indicator = document.createElement('div');
       indicator.id = 'bowler-runup-indicator';
       indicator.style.position = 'absolute';
@@ -718,7 +719,7 @@ export class MatchController {
       indicator.innerText = 'Bowler Running In...';
       document.body.appendChild(indicator);
   
-      setTimeout(() => {
+      setGameTimeout(() => {
         if (indicator.parentNode) {
           indicator.parentNode.removeChild(indicator);
         }
@@ -737,7 +738,7 @@ export class MatchController {
         ball.position.set(startX, 1.9, 10.0);
       }
       globalAutoAssistConfig.isDeliveryActive = true;
-      globalAutoAssistConfig.deliveryStartTime = performance.now();
+      globalAutoAssistConfig.deliveryStartTime = gameNow();
       globalAutoAssistConfig.hasBounced = false;
     }
   }

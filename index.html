@@ -228,9 +228,10 @@
 
     <!-- Gameplay Screen -->
     <div id="screen-gameplay" class="screen">
-      <div class="rotate-hint" role="status">
-        <span>Rotate your device for more room to play.</span>
-        <button type="button" id="dismiss-rotate-hint" aria-label="Dismiss rotation suggestion">×</button>
+      <div class="rotate-hint" role="status" aria-live="polite">
+        <div class="rotate-icon" aria-hidden="true">↻</div>
+        <strong>Turn your device sideways</strong>
+        <span>Play resumes in landscape.</span>
       </div>
       <!-- HUD Overlay -->
       <!-- HUD Overlay (Broadcast Glass Scorebar HUD) -->
@@ -451,9 +452,9 @@
               </div>
             </div>
 
-            <label id="bowl-pace-control" class="bowling-adjustment">SPEED <input id="bowl-pace" type="range" min="0" max="100" value="50" aria-label="Bowling speed"><span>LOW &nbsp; · &nbsp; HIGH</span></label>
-            <label id="bowl-swing-control" class="bowling-adjustment">SWING <input id="bowl-swing" type="range" min="-100" max="100" value="0" aria-label="Swing direction and amount from bowler's view"><span>LEFT &nbsp; · &nbsp; NONE &nbsp; · &nbsp; RIGHT</span></label>
-            <label id="bowl-turn-control" class="bowling-adjustment hidden">SPIN TURN <input id="bowl-turn" type="range" min="0" max="100" value="50" aria-label="Spin turn amount"><span>LOW &nbsp; · &nbsp; HIGH</span></label>
+            <label id="bowl-pace-control" class="bowling-adjustment"><span class="adjustment-title">PACE <output id="bowl-pace-value">50%</output></span><input id="bowl-pace" type="range" min="0" max="100" value="50" aria-label="Bowling pace intensity"><span class="adjustment-ends">LOW <span>HIGH</span></span></label>
+            <label id="bowl-swing-control" class="bowling-adjustment"><span class="adjustment-title">SWING <output id="bowl-swing-value">STRAIGHT</output></span><input id="bowl-swing" type="range" min="-100" max="100" value="0" aria-label="Swing direction and amount from bowler's view"><span class="adjustment-ends">LEFT <span>RIGHT</span></span></label>
+            <label id="bowl-turn-control" class="bowling-adjustment hidden"><span class="adjustment-title">TURN <output id="bowl-turn-value">50%</output></span><input id="bowl-turn" type="range" min="0" max="100" value="50" aria-label="Spin turn intensity"><span class="adjustment-ends">LOW <span>HIGH</span></span></label>
 
             <div class="action-btn-row">
               <button id="btn-bowl-pitch" class="btn primary-btn size-large">Hold & Release SPACE / Touch</button>

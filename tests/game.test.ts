@@ -6,8 +6,9 @@ import { directionFromStick, TouchBattingControls } from '../src/touch-controls'
 import { stepBall, type BallState } from '../src/ball-physics';
 import { botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliverySwingAtBounce, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getParabolicFlightPosition } from '../src/formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliverySwingAtBounce, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
+import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout } from '../src/game-clock';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -18,6 +19,44 @@ Object.assign(globalThis, { localStorage: {
 
 const delivery = (timing: number, x = 0): DeliveryChoice => ({
   aimTarget: { x, z: -3.5 }, line: 'middle', length: 'good', type: 'fast', releaseTiming: timing
+});
+
+test('portrait pause freezes gameplay time and scheduled deliveries', () => {
+  const originalPerformance = globalThis.performance;
+  const originalWindow = globalThis.window;
+  const originalClearTimeout = globalThis.clearTimeout;
+  let now = 1000;
+  let next = 0;
+  const queue = new Map<number, () => void>();
+  Object.assign(globalThis, {
+    performance: { now: () => now },
+    window: { setTimeout: (fn: () => void) => { const id = ++next; queue.set(id, fn); return id; } },
+    clearTimeout: (id: number) => queue.delete(id)
+  });
+  const tick = () => { const [id, fn] = queue.entries().next().value!; queue.delete(id); fn(); };
+  try {
+    let delivered = false;
+    const start = gameNow();
+    setGameTimeout(() => { delivered = true; }, 200);
+    now += 100;
+    tick();
+    setGamePaused(true);
+    assert.equal(isGamePaused(), true);
+    now += 10000;
+    tick();
+    assert.equal(gameNow() - start, 100);
+    assert.equal(delivered, false);
+    setGamePaused(false);
+    now += 100;
+    tick();
+    assert.equal(delivered, true);
+    const cancelled = setGameTimeout(() => { throw new Error('cancelled timer fired'); }, 100);
+    clearGameTimeout(cancelled);
+    assert.equal(queue.size, 0);
+  } finally {
+    setGamePaused(false);
+    Object.assign(globalThis, { performance: originalPerformance, window: originalWindow, clearTimeout: originalClearTimeout });
+  }
 });
 
 test('touch stick maps eight directions and ignores its dead zone', () => {
@@ -162,6 +201,8 @@ test('bowler camera screen directions map to the correct pitch coordinates', () 
   assert.ok(Math.abs(bowlingTargetFromScreen(0.5, 1).z - 0.5) < 1e-9);
   assert.equal(calculateBounceTarget('off', 'good', 'RHB').x, 0.45);
   assert.equal(calculateBounceTarget('off', 'good', 'LHB').x, -0.45);
+  assert.equal(getLineTypeFromAimX(0.45, 'RHB'), 'off');
+  assert.equal(getLineTypeFromAimX(-0.45, 'LHB'), 'off');
 });
 
 test('well-timed shots retain their selected direction on every bot tier', () => {

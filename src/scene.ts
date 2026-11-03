@@ -1,4 +1,5 @@
 import * as BABYLON from 'babylonjs';
+import { gameNow, isGamePaused } from './game-clock';
 import { CameraMode, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BATTER_CREASE_Z, deliveryAnimationStep, deliveryArrivalHeight, deliveryDurationMs, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
@@ -141,7 +142,7 @@ export class GameScene {
 
     // Start render loop
     this.engine.runRenderLoop(() => {
-      this.scene.render();
+      if (!isGamePaused()) this.scene.render();
     });
 
     window.addEventListener('resize', () => {
@@ -662,6 +663,7 @@ export class GameScene {
 
     const animateFrame = () => {
       if (!this.isAnimatingBall) return;
+      if (isGamePaused()) { requestAnimationFrame(animateFrame); return; }
       let currentSpeedScale = speedScale;
       let fov = 75;
 
@@ -852,7 +854,7 @@ export class GameScene {
       this.batterRoot.getChildMeshes().forEach(m => { m.isVisible = true; });
     }
     
-    const elapsed = performance.now() - globalAutoAssistConfig.runUpStartTime;
+    const elapsed = gameNow() - globalAutoAssistConfig.runUpStartTime;
     const duration = 1200;
     const progress = Math.min(1.0, elapsed / duration);
     
@@ -880,7 +882,7 @@ export class GameScene {
     // If we only render predictionPath for player, then for bot we just move the ball.
 
     if (globalAutoAssistConfig.deliveryStartTime) {
-      const elapsed = performance.now() - globalAutoAssistConfig.deliveryStartTime;
+      const elapsed = gameNow() - globalAutoAssistConfig.deliveryStartTime;
       const delivery = globalAutoAssistConfig.currentDelivery;
       const duration = deliveryDurationMs(delivery?.type ?? 'medium', delivery?.pace);
       let progress = elapsed / duration;

@@ -5,8 +5,9 @@ import { botChooseDelivery, botChooseShot } from './bot';
 import { battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 import { TouchBattingControls } from './touch-controls';
-import { isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
+import { initBowlingAdjustmentReadouts, isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
 import { addLeaderboardEntry, readLeaderboard } from './leaderboard';
+import { clearGameTimeout, gameNow, isGamePaused, setGameTimeout } from './game-clock';
 
 export class UIManager {
   private controller: MatchController;
@@ -53,6 +54,7 @@ export class UIManager {
       (x, z) => this.setBowlingTarget({ x, z })
     );
     this.initEventListeners();
+    initBowlingAdjustmentReadouts();
     updateBowlingAdjustmentVisibility(this.keyboardInputManager.intent.deliveryType);
     new TouchBattingControls(
       document.getElementById('touch-stick')!,
@@ -318,7 +320,7 @@ export class UIManager {
 
     this.isBallActive = true; 
     globalAutoAssistConfig.isRunUpActive = true;
-    globalAutoAssistConfig.runUpStartTime = performance.now();
+    globalAutoAssistConfig.runUpStartTime = gameNow();
 
     // Auto-hide panels
     const controlBowling = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
@@ -346,7 +348,7 @@ export class UIManager {
     const marker = indicator.querySelector<HTMLElement>('.release-meter-marker')!;
     const updateMeter = () => {
       if (!globalAutoAssistConfig.isRunUpActive || !indicator?.isConnected) return;
-      const elapsed = performance.now() - (globalAutoAssistConfig.runUpStartTime ?? performance.now());
+      const elapsed = gameNow() - (globalAutoAssistConfig.runUpStartTime ?? gameNow());
       const progress = bowlingReleaseTiming(elapsed);
       marker.style.left = `${progress * 100}%`;
       meter.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
@@ -366,7 +368,7 @@ export class UIManager {
     }
 
     // calculate timing based on proximity to 1200ms
-    const elapsed = performance.now() - (globalAutoAssistConfig.runUpStartTime || 0);
+    const elapsed = gameNow() - (globalAutoAssistConfig.runUpStartTime || 0);
     const timing = bowlingReleaseTiming(elapsed);
 
     // Now pitch the ball
@@ -425,7 +427,7 @@ export class UIManager {
       timing = simulatedTiming;
     } else {
       // A swing begins 150 ms before the selected delivery reaches the crease.
-      const elapsed = performance.now() - (globalAutoAssistConfig.deliveryStartTime ?? performance.now());
+      const elapsed = gameNow() - (globalAutoAssistConfig.deliveryStartTime ?? gameNow());
       timing = 0.5 + (elapsed - (deliveryDurationMs(this.activeDelivery.type, this.activeDelivery.pace) - 150)) / 500;
     }
 
@@ -535,6 +537,7 @@ export class UIManager {
       // Start polling for flight progression
       const checkFlight = () => {
         if (!this.isBallActive || !this.activeDelivery) return;
+        if (isGamePaused()) { requestAnimationFrame(checkFlight); return; }
         if (!globalAutoAssistConfig.isDeliveryActive) {
           requestAnimationFrame(checkFlight);
           return;
@@ -548,7 +551,7 @@ export class UIManager {
           z = (this.gameScene as any).currentBallPos?.z || 0;
         }
         
-        const elapsed = performance.now() - (globalAutoAssistConfig.deliveryStartTime ?? performance.now());
+        const elapsed = gameNow() - (globalAutoAssistConfig.deliveryStartTime ?? gameNow());
         const reactionTrigger = elapsed >= Math.max(0, deliveryDurationMs(this.activeDelivery.type, this.activeDelivery.pace) - 300);
         const creaseTrigger = z <= -8.8;
 
@@ -907,8 +910,8 @@ export class UIManager {
       this.gameScene.updateBounceMarker(this.activeDelivery.aimTarget);
       globalAutoAssistConfig.currentDelivery = this.activeDelivery;
 
-      if (this.botDeliveryTimer) clearTimeout(this.botDeliveryTimer);
-      this.botDeliveryTimer = setTimeout(() => {
+      if (this.botDeliveryTimer) clearGameTimeout(this.botDeliveryTimer);
+      this.botDeliveryTimer = setGameTimeout(() => {
         this.deliverBall3D();
       }, 1500);
     } else {
@@ -1156,7 +1159,7 @@ export class UIManager {
     this.activeShot = null;
     this.isBallActive = false;
     if (this.botDeliveryTimer) {
-      clearTimeout(this.botDeliveryTimer);
+      clearGameTimeout(this.botDeliveryTimer);
       this.botDeliveryTimer = null;
     }
     this.hideResultToast();
