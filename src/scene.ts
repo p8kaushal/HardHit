@@ -33,7 +33,9 @@ export class GameScene {
   private bowlerLegs: BABYLON.Mesh[] = [];
   private bowlerArms: BABYLON.Mesh[] = [];
   public batterRoot: BABYLON.TransformNode | null = null;
+  private batterHead: BABYLON.TransformNode | null = null;
   public batMesh: BABYLON.Mesh | null = null;
+  private batPivot: BABYLON.TransformNode | null = null;
 
 
   // Animation state
@@ -427,10 +429,15 @@ export class GameScene {
     const batter = new BABYLON.TransformNode('batterRoot', this.scene);
     batter.position.set(-0.35, 0, -8.8);
     limb('batterTorso', batter, blue, 0, 1.23, 0, 0.67, 0.42);
-    ball('batterHead', batter, skin, 0, 1.76, 0, 0.27);
-    const cap = ball('batterHelmet', batter, helmet, 0, 1.84, 0, 0.29);
+    const head = new BABYLON.TransformNode('batterHeadPivot', this.scene);
+    head.parent = batter;
+    head.position.y = 1.76;
+    head.rotation.y = -this.batterStanceAngle();
+    this.batterHead = head;
+    ball('batterHead', head, skin, 0, 0, 0, 0.27);
+    const cap = ball('batterHelmet', head, helmet, 0, 0.08, 0, 0.29);
     cap.scaling.y = 0.75;
-    box('helmetPeak', batter, helmet, 0, 1.81, 0.15, 0.26, 0.035, 0.16);
+    box('helmetPeak', head, helmet, 0, 0.05, 0.15, 0.26, 0.035, 0.16);
     [-1, 1].forEach((side, i) => {
       limb(`batterLeg${i}`, batter, trousers, side * 0.13, 0.48, 0, 0.86, 0.17);
       box(`batterPad${i}`, batter, pads, side * 0.13, 0.38, 0.095, 0.19, 0.57, 0.1);
@@ -439,11 +446,16 @@ export class GameScene {
       arm.rotation.z = side * 0.24;
       ball(`batterGlove${i}`, batter, pads, side * 0.3, 0.89, 0.13, 0.16);
     });
-    const bat = box('batMesh', batter, batWood, 0.36, 0.48, 0.2, 0.22, 0.64, 0.065);
-    bat.rotation.z = -0.2;
-    limb('batHandle', bat, grip, 0, 0.44, 0, 0.27, 0.05);
+    const batPivot = new BABYLON.TransformNode('batPivot', this.scene);
+    batPivot.parent = batter;
+    batPivot.position.set(0.30, 0.91, 0.40);
+    batPivot.rotation.z = -0.2;
+    const bat = box('batMesh', batPivot, batWood, 0, -0.43, 0, 0.22, 0.64, 0.065);
+    bat.rotation.y = Math.PI / 2;
+    limb('batHandle', batPivot, grip, 0, -0.03, 0, 0.27, 0.05);
     this.batMesh = bat;
-    batter.rotation.y = Math.PI;
+    this.batPivot = batPivot;
+    batter.rotation.y = this.batterStanceAngle();
     this.batterRoot = batter;
     this.updateBatterPosition();
   }
@@ -454,10 +466,15 @@ export class GameScene {
     
     this.batterRoot.parent = null;
     this.batterRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
-    this.batterRoot.rotation = new BABYLON.Vector3(0, Math.PI, 0);
+    this.batterRoot.rotation = new BABYLON.Vector3(0, this.batterStanceAngle(), 0);
+    if (this.batterHead) this.batterHead.rotation.y = -this.batterStanceAngle();
     this.batterRoot.setEnabled(true);
 
     this.updateBatterPosition();
+  }
+
+  private batterStanceAngle(): number {
+    return this.batterHand === 'RHB' ? Math.PI / 2 : -Math.PI / 2;
   }
 
   public updateBatterPosition(): void {
@@ -815,28 +832,20 @@ export class GameScene {
   }
 
   public animateBatterSwing(_directionAngle: number, successCallback: () => void): void {
-    if (this.batMesh && this.batterRoot) {
+    if (this.batPivot && this.batterRoot) {
       const batter = this.batterRoot;
+      const stance = this.batterStanceAngle();
+      const pivot = this.batPivot;
+      this.scene.stopAnimation(pivot);
+      this.scene.stopAnimation(batter);
       const bodySwing = BABYLON.Animation.CreateAndStartAnimation(
-        'batterBodySwing', batter, 'rotation.y', 60, 9, Math.PI, Math.PI + 0.35,
+        'batterBodySwing', batter, 'rotation.y', 60, 12, stance, stance + 0.45,
         BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
       );
-      bodySwing?.onAnimationEndObservable.add(() => { batter.rotation.y = Math.PI; });
-      // Temporarily rotate batter and bat to swing (9 frames at 60fps = 0.15s)
-      const swingAnim = BABYLON.Animation.CreateAndStartAnimation(
-        'batterSwing',
-        this.batMesh,
-        'rotation.y',
-        60,
-        9,
-        0,
-        Math.PI * 0.9,
-        BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
-      );
-      
-      swingAnim?.onAnimationEndObservable.add(() => {
-        // Return bat
-        this.batMesh!.rotation.y = 0;
+      bodySwing?.onAnimationEndObservable.add(() => { batter.rotation.y = stance; });
+      const swing = new BABYLON.Animation('batSwing', 'rotation.z', 60, BABYLON.Animation.ANIMATIONTYPE_FLOAT);
+      swing.setKeys([{ frame: 0, value: -0.2 }, { frame: 4, value: -1.4 }, { frame: 10, value: 1.1 }, { frame: 18, value: -0.2 }]);
+      this.scene.beginDirectAnimation(pivot, [swing], 0, 18, false, 1, () => {
         successCallback();
       });
     } else {

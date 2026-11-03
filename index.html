@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Six Hitting Contest - Cricket Duel</title>
+  <title>HardHit | Six Hitting Contest</title>
   <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
@@ -12,6 +12,7 @@
     <div id="screen-lobby" class="screen active menu-overlay">
       <div class="menu-card">
         <div class="card header-card lobby-header" id="lobby-title">
+          <span class="brand-kicker">HARDHIT · CRICKET DUEL</span>
           <h1>SIX HITTING CONTEST</h1>
           <p>One over each. Six chances. Hit your biggest six.</p>
         </div>
@@ -120,6 +121,7 @@
             </table>
           </div>
         </div>
+        <a class="audio-credits" href="audio/CREDITS.txt" target="_blank" rel="noopener">Sound credits</a>
       </div>
     </div>
 
@@ -248,6 +250,7 @@
 
         <!-- Center Broadcast Scorebar Panel -->
         <div class="hud-box scoreboard-hud broadcast-scorebar">
+          <span class="broadcast-brand" aria-label="HardHit">HH</span>
           <!-- Innings Section -->
           <div class="hud-section hud-innings-section">
             <span class="hud-innings-pill" id="hud-innings-title">Innings 1</span>
@@ -286,7 +289,7 @@
           <!-- Biggest Six Section -->
           <div class="hud-section hud-six-section">
             <div class="hud-six-badge">
-              <span class="hud-six-fire">💥</span>
+              <span class="hud-six-fire" aria-hidden="true">◆</span>
               <div class="hud-six-details">
                 <span class="hud-stat-label">BIGGEST 6</span>
                 <strong class="hud-six-val" id="hud-biggest-six">0.0m</strong>
@@ -386,7 +389,8 @@
       <div id="opponent-badge" class="opponent-badge">Opponent: Bot | RHB</div>
 
       <!-- Floating Result Toast (Non-blocking top banner) -->
-      <div id="result-toast" class="result-toast hidden">
+      <div id="result-toast" class="result-toast hidden" role="status" aria-live="polite">
+        <span class="toast-kicker">HARDHIT · BALL RESULT</span>
         <div id="ball-outcome-title" class="toast-title">Six!</div>
         <div id="ball-outcome-desc" class="toast-desc">You hit it 85.4 meters!</div>
       </div>

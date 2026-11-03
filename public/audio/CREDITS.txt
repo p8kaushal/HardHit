@@ -1,0 +1,15 @@
+HardHit sound credits
+
+“Willow Bat Knock” by BudgetPixel AI
+https://budgetpixel.com/sfx/willow-bat-knock-3da2a28b
+Licensed under Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/
+
+“Wooden Tower Tumble” by BudgetPixel AI
+https://budgetpixel.com/sfx/wooden-tower-tumble-e7bae9a5
+Licensed under Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/
+
+“Live Stadium Crowd Roar” by BudgetPixel AI
+https://budgetpixel.com/sfx/live-stadium-crowd-roar-ad198e00
+Licensed under Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/
+
+Delivery and bounce effects are generated in the game.

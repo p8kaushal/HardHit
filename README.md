@@ -97,3 +97,5 @@ Ensure you have the following installed locally:
 ## 📄 License
 
 Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.
+
+Sound effects have their own licences and credits in [public/audio/CREDITS.txt](public/audio/CREDITS.txt).

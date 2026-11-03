@@ -26,34 +26,66 @@ const delivery = (timing: number, x = 0): DeliveryChoice => ({
 
 test('sound effects unlock on input and respect mute without interrupting play', () => {
   storage.delete('hardhit_sound_muted');
-  let tones = 0;
+  let sources = 0;
   const parameter = { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} };
   const node = { connect() { return this; }, start() {}, stop() {} };
   const context = {
     state: 'running', currentTime: 0, sampleRate: 100,
     destination: {},
     createGain: () => ({ ...node, gain: { ...parameter } }),
-    createOscillator: () => { tones++; return { ...node, frequency: { ...parameter } }; },
     createBuffer: () => ({ getChannelData: () => new Float32Array(50) }),
-    createBufferSource: () => ({ ...node, buffer: null }),
+    createBufferSource: () => { sources++; return { ...node, buffer: null }; },
     createBiquadFilter: () => ({ ...node, frequency: { value: 0 } }),
     suspend() { this.state = 'suspended'; return Promise.resolve(); },
     resume() { this.state = 'running'; return Promise.resolve(); }
   };
   const sounds = new SoundManager(() => context as unknown as AudioContext);
   sounds.play('bat');
-  assert.equal(tones, 0);
+  assert.equal(sources, 0);
   sounds.unlock();
   sounds.play('bat');
   sounds.play('bounce');
-  assert.equal(tones, 2);
+  assert.equal(sources, 2);
   sounds.setMuted(true);
   sounds.play('wicket');
-  assert.equal(tones, 2);
+  assert.equal(sources, 2);
   sounds.setMuted(false);
   sounds.play('delivery');
-  assert.equal(tones, 3);
+  assert.equal(sources, 3);
   storage.delete('hardhit_sound_muted');
+});
+
+test('recorded cricket sounds play on their events and stop when muted', () => {
+  const originalAudio = globalThis.Audio;
+  const originalDocument = globalThis.document;
+  const previousMute = storage.get('hardhit_sound_muted');
+  storage.delete('hardhit_sound_muted');
+  const loaded: string[] = [];
+  let played = 0;
+  let paused = 0;
+  class FakeAudio {
+    preload = '';
+    volume = 1;
+    constructor(url: string) { loaded.push(url); }
+    cloneNode() { return { volume: 1, addEventListener() {}, play() { played++; return Promise.resolve(); }, pause() { paused++; } }; }
+  }
+  Object.assign(globalThis, { Audio: FakeAudio, document: { baseURI: 'http://localhost/game/' } });
+  try {
+    const context = { state: 'running', suspend() { return Promise.resolve(); } };
+    const sounds = new SoundManager(() => context as unknown as AudioContext);
+    sounds.unlock();
+    assert.deepEqual(loaded.map(url => url.split('/').pop()), ['bat-impact.wav', 'stumps.wav', 'crowd-cheer.wav']);
+    sounds.play('bat');
+    sounds.play('boundary');
+    assert.equal(played, 2);
+    sounds.setMuted(true);
+    assert.equal(paused, 2);
+    sounds.play('wicket');
+    assert.equal(played, 2);
+  } finally {
+    Object.assign(globalThis, { Audio: originalAudio, document: originalDocument });
+    if (previousMute === undefined) storage.delete('hardhit_sound_muted'); else storage.set('hardhit_sound_muted', previousMute);
+  }
 });
 
 test('gameplay pauses when hidden or in portrait, and resumes only when both clear', () => {

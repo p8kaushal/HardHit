@@ -730,6 +730,7 @@ export class UIManager {
            title = `SIX! ${(shotDistanceMeters || 0).toFixed(1)}m`;
            desc = `Cleared the boundary towards ${getDirectionName(lastBall.shot.direction)}!`;
         } else if (runs === 4) {
+           gameSound.play('boundary');
            title = `FOUR!`;
            desc = `Bounced over the boundary towards ${getDirectionName(lastBall.shot.direction)}!`;
         } else if (runs === 0) {
@@ -854,6 +855,7 @@ export class UIManager {
     if (descEl) descEl.innerText = desc;
 
     if (toast) {
+      toast.dataset.outcome = /SIX|FOUR/i.test(title) ? 'boundary' : /WICKET|BOWLED|LBW/i.test(title) ? 'wicket' : 'standard';
       toast.classList.remove('hidden');
     }
 
