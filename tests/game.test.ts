@@ -386,6 +386,25 @@ test('fixed-step shot physics resolves a lofted six and a grounded shot', () => 
   assert.ok(ground.reachedBoundary || ground.stopped);
 });
 
+test('rope crossing and bounce are resolved in their actual order within a physics step', () => {
+  const nearRope = (height: number): BallState => ({
+    position: { x: 64.95, y: height, z: 0 },
+    velocity: { x: 30, y: -4, z: 0 },
+    hasBounced: false, reachedBoundary: false, stopped: false
+  });
+  const clearsRope = nearRope(0.09);
+  stepBall(clearsRope, 0.01);
+  assert.equal(clearsRope.reachedBoundary, true);
+  assert.equal(clearsRope.hasBounced, false);
+  assert.equal(evaluateFinalOutcome(65, clearsRope.hasBounced, clearsRope.reachedBoundary), 6);
+
+  const landsFirst = nearRope(0.08);
+  stepBall(landsFirst, 0.01);
+  assert.equal(landsFirst.reachedBoundary, true);
+  assert.equal(landsFirst.hasBounced, true);
+  assert.equal(evaluateFinalOutcome(65, landsFirst.hasBounced, landsFirst.reachedBoundary), 4);
+});
+
 test('delivery animation advances at the same speed at 30 and 60 fps', () => {
   const at30 = deliveryAnimationStep(1000 / 30, 1) * 30;
   const at60 = deliveryAnimationStep(1000 / 60, 1) * 60;

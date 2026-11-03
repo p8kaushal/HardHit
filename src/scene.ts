@@ -35,6 +35,7 @@ export class GameScene {
   private isAnimatingBall = false;
   private ballAnimationTime = 0;
   private ballTrajectoryPoints: BABYLON.Vector3[] = [];
+  private updateDeliveryAnimation: (() => void) | null = null;
   private onBallArrivedCallback: (() => void) | null = null;
   private onBallResolvedCallback: (() => void) | null = null;
   private onBallCreaseCrossedCallback: (() => void) | null = null;
@@ -70,6 +71,7 @@ export class GameScene {
 
     const observer = this.scene.onBeforeRenderObservable.add(() => {
       try {
+        this.updateDeliveryAnimation?.();
         if (globalAutoAssistConfig.isBallInPlay) {
           this.updateBallPhysics();
         }
@@ -662,8 +664,7 @@ export class GameScene {
     }
 
     const animateFrame = () => {
-      if (!this.isAnimatingBall) return;
-      if (isGamePaused()) { requestAnimationFrame(animateFrame); return; }
+      if (!this.isAnimatingBall) { this.updateDeliveryAnimation = null; return; }
       let currentSpeedScale = speedScale;
       let fov = 75;
 
@@ -716,9 +717,10 @@ export class GameScene {
         }
       }
 
-      if (index >= this.ballTrajectoryPoints.length) {
+      if (index >= this.ballTrajectoryPoints.length - 1) {
         // Ball passed/reached batter stumps
         this.isAnimatingBall = false;
+        this.updateDeliveryAnimation = null;
         this.ballMesh?.setEnabled(false);
         this.bounceMarker?.setEnabled(false);
         this.timingRing?.setEnabled(false);
@@ -745,10 +747,8 @@ export class GameScene {
       // Draw custom line trail
       this.drawBallTrail();
 
-      requestAnimationFrame(animateFrame);
     };
-
-    animateFrame();
+    this.updateDeliveryAnimation = animateFrame;
   }
 
   private drawBallTrail(): void {
