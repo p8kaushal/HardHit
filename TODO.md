@@ -9,7 +9,8 @@ Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. Unchecked items a
 - [ ] Exercise repeated full matches, interactive batting, no-balls/free hits, wides, wickets and sudden-death presentation in a real browser; verify sound and errors.
 - [x] Cancel held bowling and clear held inputs on pause or focus loss; track the bowling pointer so another finger cannot release it. Cover interruption logic in automated tests and normal pointer/keyboard bowling in an emulated browser.
 - [ ] Verify rotation, backgrounding, focus loss, pointer cancellation and simultaneous touch inputs end to end on physical devices, including batting while a delivery is in flight.
-- [ ] Show sudden-death deliveries and their deciding outcome alongside the regular innings in the summary.
+- [x] Show both sudden-death innings, including extras, alongside regular-innings scorecards; explain wicket-based decisions accurately and cover the summary with tests.
+- [ ] Visually verify sudden-death summary, rematch and lobby return in a browser after a naturally completed tied match.
 - [ ] Replace global delivery flags and loosely typed renderer callbacks incrementally with typed, cancellable match events and immutable delivery snapshots.
 - [ ] Remove obsolete diagnostic paths and duplicate UI/screen handling after verifying callers; do not discard useful tests.
 

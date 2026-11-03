@@ -1238,6 +1238,20 @@ export class UIManager {
 
     this.renderMiniTracker('summary-bot-tracker', botInnings?.balls || []);
 
+    const suddenDeath = document.getElementById('summary-sudden-death');
+    const extraInnings = state.tieBreakerActive ? state.innings.slice(2) : [];
+    if (suddenDeath) suddenDeath.classList.toggle('hidden', extraInnings.length < 2);
+    if (extraInnings.length >= 2) {
+      for (const [id, player] of [['player', state.player], ['bot', state.bot]] as const) {
+        const innings = extraInnings.find(item => item.batter.id === player.id);
+        const legal = innings?.balls.find(ball => !ball.isExtra);
+        const detail = legal?.isWicket ? 'Out' : `${(legal?.distance ?? 0).toFixed(1)}m`;
+        const label = document.getElementById(`summary-sudden-${id}`);
+        if (label) label.innerText = `${player.name}: ${innings?.score ?? 0}/${innings?.wicketsLost ?? 0} · ${detail}`;
+        this.renderMiniTracker(`summary-sudden-${id}-tracker`, innings?.balls || []);
+      }
+    }
+
     // 5. Save personal best to Leaderboard
     if (this.recordedSummary !== state) {
       addLeaderboardEntry({

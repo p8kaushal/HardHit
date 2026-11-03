@@ -547,11 +547,14 @@ export class MatchController {
       if (winnerInn && loserInn) {
         const winDist = winnerInn.balls.find(ball => !ball.isExtra)?.distance || 0;
         const loseDist = loserInn.balls.find(ball => !ball.isExtra)?.distance || 0;
+        const decidedByWicket = winnerInn.wicketsLost !== loserInn.wicketsLost;
         tieBreakDetails = {
           deciderTier: 'sudden_death',
           tierLabel: '1-Ball Sudden Death Decider',
           description: 'Decided in Sudden Death Extra Delivery',
-          marginText: `Won via Sudden Death Decider: ${winDist.toFixed(1)}m vs ${loseDist.toFixed(1)}m`
+          marginText: decidedByWicket
+            ? `${winnerInn.batter.name} survived; ${loserInn.batter.name} was dismissed.`
+            : `Won on sudden-death distance: ${winDist.toFixed(1)}m vs ${loseDist.toFixed(1)}m`
         };
       } else {
         tieBreakDetails = {

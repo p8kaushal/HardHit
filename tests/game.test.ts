@@ -1052,6 +1052,65 @@ test('sudden death compares legal hits even when an extra came first', () => {
   assert.match(game.state.tieBreakDetails?.marginText ?? '', /70\.0m vs 50\.0m/);
 });
 
+test('sudden-death wicket result explains the dismissal instead of a distance win', () => {
+  const game = match();
+  game.state.currentInningsIndex = 1;
+  (game as any).resolveMatch();
+  const [first, second] = game.state.innings.slice(2);
+  first.wicketsLost = 0;
+  second.wicketsLost = 1;
+  (game as any).resolveMatch();
+  assert.equal(game.state.winnerId, first.batter.id);
+  assert.match(game.state.tieBreakDetails?.marginText ?? '', /survived.*dismissed/);
+});
+
+test('match summary shows both sudden-death innings and their extras', () => {
+  const game = match();
+  game.state.currentInningsIndex = 1;
+  (game as any).resolveMatch();
+  const playerExtra = game.state.innings.slice(2).find(item => item.batter.id === game.state.player.id)!;
+  const botExtra = game.state.innings.slice(2).find(item => item.batter.id === game.state.bot.id)!;
+  const ball = (isExtra: boolean, distance: number): BallOutcome => ({
+    ballNumber: 1, delivery: delivery(0.5), shot: null, distance, runs: isExtra ? undefined : 4,
+    isWicket: false, wicketReason: '', isFreeHit: false, isExtra, extraType: isExtra ? 'wide' : null
+  });
+  playerExtra.balls = [ball(true, 0), ball(false, 48)];
+  playerExtra.score = 5;
+  botExtra.balls = [ball(false, 25)];
+  botExtra.score = 4;
+  game.state.status = 'completed';
+  const originalDocument = globalThis.document;
+  const playerLabel = { innerText: '' };
+  const botLabel = { innerText: '' };
+  let hidden = true;
+  const trackers: Record<string, BallOutcome[]> = {};
+  Object.assign(globalThis, { document: { getElementById: (id: string) => {
+    if (id === 'summary-sudden-death') return { classList: { toggle: (_name: string, value: boolean) => { hidden = value; } } };
+    if (id === 'summary-sudden-player') return playerLabel;
+    if (id === 'summary-sudden-bot') return botLabel;
+    return null;
+  } } });
+  try {
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.controller = game;
+    ui.recordedSummary = game.state;
+    ui.hideResultToast = () => {};
+    ui.keyboardInputManager = { closeHelpModal() {} };
+    ui.renderMiniTracker = (id: string, balls: BallOutcome[]) => { trackers[id] = balls; };
+    ui.showGameOverScreen();
+    assert.equal(hidden, false);
+    assert.match(playerLabel.innerText, /5\/0 · 48\.0m/);
+    assert.match(botLabel.innerText, /4\/0 · 25\.0m/);
+    assert.equal(trackers['summary-sudden-player-tracker'].length, 2);
+    assert.equal(trackers['summary-sudden-player-tracker'][0].extraType, 'wide');
+    game.state.tieBreakerActive = false;
+    ui.showGameOverScreen();
+    assert.equal(hidden, true);
+  } finally {
+    Object.assign(globalThis, { document: originalDocument });
+  }
+});
+
 test('a tied match completes both sudden-death innings and awards draw progression', () => {
   const game = match();
   const originalDocument = globalThis.document;
