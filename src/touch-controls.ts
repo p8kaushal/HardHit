@@ -53,6 +53,10 @@ export class TouchBattingControls {
     if (locked) this.pointerId = null;
   }
 
+  public cancelPointer(): void {
+    this.pointerId = null;
+  }
+
   public setSuggestion(direction: number): void {
     this.stick.style.setProperty('--suggested-angle', `${direction * 45}deg`);
     this.stick.setAttribute('data-suggestion', DIRECTION_LABELS[direction]);

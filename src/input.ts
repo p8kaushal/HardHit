@@ -57,7 +57,12 @@ export class KeyboardInputManager {
   }
 
   private boundHandleKeyDown = (e: KeyboardEvent) => { if (!isGamePaused()) this.handleKeyDown(e); };
-  private boundHandleKeyUp = (e: KeyboardEvent) => { if (!isGamePaused()) this.handleKeyUp(e); };
+  private boundHandleKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
+
+  public cancelHeldInputs(): void {
+    this.pressedKeys.clear();
+    this.spacePressed = false;
+  }
 
   private setupListeners(): void {
     window.addEventListener('keydown', this.boundHandleKeyDown);
@@ -160,9 +165,9 @@ export class KeyboardInputManager {
   private handleKeyUp(e: KeyboardEvent): void {
     this.pressedKeys.delete(e.key.toLowerCase());
     if (e.code === 'Space') {
+      const wasPressed = this.spacePressed;
       this.spacePressed = false;
-      const batting = this.isPlayerBatting();
-      if (!batting) {
+      if (wasPressed && !isGamePaused() && !this.isPlayerBatting()) {
         // End release meter on bowling release
         this.onEndBowling();
       }

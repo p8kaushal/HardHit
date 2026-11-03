@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createBotPlayer, getOrCreatePlayer, MatchController } from '../src/game';
+import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { stepBall, type BallState } from '../src/ball-physics';
@@ -368,6 +368,81 @@ test('keyboard bowling starts at good length and updates the aim marker', () => 
     input.destroy();
   } finally {
     Object.assign(globalThis, { window: originalWindow, document: originalDocument });
+  }
+});
+
+test('interrupted keyboard holds clear without releasing a delivery', () => {
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+  const listeners: Record<string, (event: any) => void> = {};
+  let starts = 0;
+  let releases = 0;
+  Object.assign(globalThis, {
+    window: { addEventListener: (name: string, fn: (event: any) => void) => { listeners[name] = fn; }, removeEventListener() {} },
+    document: {
+      getElementById: (id: string) => id === 'screen-gameplay' ? { classList: { contains: () => true } } : null,
+      querySelectorAll: () => []
+    }
+  });
+  try {
+    const input = new KeyboardInputManager(() => false, () => { starts++; }, () => { releases++; }, () => {}, () => 'RHB', () => {});
+    const space = { key: ' ', code: 'Space' };
+    listeners.keydown(space);
+    assert.equal(starts, 1);
+    setGamePaused(true);
+    input.cancelHeldInputs();
+    listeners.keyup(space);
+    setGamePaused(false);
+    listeners.keyup(space);
+    assert.equal(releases, 0);
+    listeners.keydown(space);
+    listeners.keyup(space);
+    assert.equal(starts, 2);
+    assert.equal(releases, 1);
+    input.destroy();
+  } finally {
+    setGamePaused(false);
+    Object.assign(globalThis, { window: originalWindow, document: originalDocument });
+  }
+});
+
+test('interrupting a bowling run-up restores controls without delivering', () => {
+  const originalDocument = globalThis.document;
+  const previousRunUp = globalAutoAssistConfig.isRunUpActive;
+  const previousStart = globalAutoAssistConfig.runUpStartTime;
+  let removed = 0;
+  let controlsRestored = 0;
+  let keysCleared = 0;
+  let touchCleared = 0;
+  let bowlerReset = 0;
+  Object.assign(globalThis, { document: { getElementById: (id: string) => {
+    if (id === 'bowler-runup-indicator') return { remove: () => { removed++; } };
+    if (id === 'control-bowling') return { classList: { remove: () => { controlsRestored++; } } };
+    return null;
+  } } });
+  try {
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.keyboardInputManager = { cancelHeldInputs: () => { keysCleared++; } };
+    ui.touchBattingControls = { cancelPointer: () => { touchCleared++; } };
+    ui.gameScene = { resetBowlerMesh: () => { bowlerReset++; } };
+    ui.userBowlingInProgress = true;
+    ui.isBallActive = true;
+    ui.bowlingPointerId = 12;
+    globalAutoAssistConfig.isRunUpActive = true;
+    globalAutoAssistConfig.runUpStartTime = 123;
+    ui.interruptControls();
+    assert.equal(ui.isBallActive, false);
+    assert.equal(ui.userBowlingInProgress, false);
+    assert.equal(ui.bowlingPointerId, null);
+    assert.equal(globalAutoAssistConfig.isRunUpActive, false);
+    assert.equal(globalAutoAssistConfig.runUpStartTime, undefined);
+    assert.deepEqual([removed, controlsRestored, keysCleared, touchCleared, bowlerReset], [1, 1, 1, 1, 1]);
+    ui.endUserBowlingDelivery();
+    assert.equal(ui.isBallActive, false);
+  } finally {
+    globalAutoAssistConfig.isRunUpActive = previousRunUp;
+    globalAutoAssistConfig.runUpStartTime = previousStart;
+    Object.assign(globalThis, { document: originalDocument });
   }
 });
 

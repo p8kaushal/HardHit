@@ -35,6 +35,9 @@ export class UIManager {
   private deliveryStarted = false;
   private deliveryGeneration = 0;
   private recordedSummary: MatchState | null = null;
+  private userBowlingInProgress = false;
+  private bowlingPointerId: number | null = null;
+  private pitchPointerId: number | null = null;
   
   // Selections
   private selectedShotType: ShotType = 'grounded';
@@ -104,21 +107,20 @@ export class UIManager {
     canvas.addEventListener('pointercancel', () => { this.isPointerDown = false; });
 
     const pitchMap = document.getElementById('bowling-pitch-map')!;
-    let pitchPointer: number | null = null;
     const updatePitchMap = (event: PointerEvent) => {
       const rect = pitchMap.getBoundingClientRect();
       this.setBowlingTarget(bowlingTargetFromScreen((event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height));
     };
     pitchMap.addEventListener('pointerdown', event => {
-      if (this.isBallActive || pitchPointer !== null) return;
+      if (this.isBallActive || this.pitchPointerId !== null) return;
       event.preventDefault();
-      pitchPointer = event.pointerId;
+      this.pitchPointerId = event.pointerId;
       pitchMap.setPointerCapture(event.pointerId);
       updatePitchMap(event);
     });
-    pitchMap.addEventListener('pointermove', event => { if (event.pointerId === pitchPointer) updatePitchMap(event); });
-    pitchMap.addEventListener('pointerup', event => { if (event.pointerId === pitchPointer) pitchPointer = null; });
-    pitchMap.addEventListener('pointercancel', event => { if (event.pointerId === pitchPointer) pitchPointer = null; });
+    pitchMap.addEventListener('pointermove', event => { if (event.pointerId === this.pitchPointerId) updatePitchMap(event); });
+    pitchMap.addEventListener('pointerup', event => { if (event.pointerId === this.pitchPointerId) this.pitchPointerId = null; });
+    pitchMap.addEventListener('pointercancel', event => { if (event.pointerId === this.pitchPointerId) this.pitchPointerId = null; });
 
     document.querySelectorAll<HTMLButtonElement>('.footwork-choice').forEach(button => button.addEventListener('click', () => {
       const footwork = button.dataset.footwork;
@@ -231,10 +233,11 @@ export class UIManager {
 
     // Hold/Release execute timing buttons
     const btnBowl = document.getElementById('btn-bowl-pitch')!;
-    btnBowl.addEventListener('mousedown', () => this.startUserBowlingDelivery());
-    btnBowl.addEventListener('touchstart', (e) => {
+    btnBowl.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      if (isGamePaused() || this.bowlingPointerId !== null) return;
       this.startUserBowlingDelivery();
+      if (this.userBowlingInProgress) this.bowlingPointerId = e.pointerId;
     });
 
     const btnBat = document.getElementById('btn-bat-swing')!;
@@ -291,8 +294,16 @@ export class UIManager {
     }
 
     // Global listeners
-    window.addEventListener('mouseup', () => this.endUserBowlingDelivery());
-    window.addEventListener('touchend', () => this.endUserBowlingDelivery());
+    window.addEventListener('pointerup', event => {
+      if (event.pointerId !== this.bowlingPointerId) return;
+      this.bowlingPointerId = null;
+      if (isGamePaused()) this.interruptControls();
+      else this.endUserBowlingDelivery();
+    });
+    window.addEventListener('pointercancel', event => {
+      if (event.pointerId === this.bowlingPointerId) this.interruptControls();
+    });
+    window.addEventListener('blur', () => this.interruptControls());
   }
 
   // --- Pointer & Aim Gesture Recognition ---
@@ -392,6 +403,7 @@ export class UIManager {
   public startUserBowlingDelivery(): void {
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     if (isPlayerBatting || this.isBallActive || globalAutoAssistConfig.isRunUpActive) return;
+    this.userBowlingInProgress = true;
 
     const pace = (document.getElementById('bowl-pace') as HTMLInputElement).valueAsNumber / 100;
     this.frontFootHeel = sampleFrontFootLanding(this.controller.getCurrentInnings().bowler.stats.bowling.accuracy, pace, Math.random());
@@ -436,7 +448,8 @@ export class UIManager {
   }
 
   public endUserBowlingDelivery(): void {
-    if (!globalAutoAssistConfig.isRunUpActive) return;
+    if (!this.userBowlingInProgress || !globalAutoAssistConfig.isRunUpActive) return;
+    this.userBowlingInProgress = false;
     
     globalAutoAssistConfig.isRunUpActive = false;
     
@@ -487,6 +500,23 @@ export class UIManager {
     this.deliverBall3D();
   }
 
+  public interruptControls(): void {
+    this.keyboardInputManager.cancelHeldInputs();
+    this.touchBattingControls.cancelPointer();
+    this.isPointerDown = false;
+    this.pitchPointerId = null;
+    this.bowlingPointerId = null;
+    if (!this.userBowlingInProgress) return;
+    this.userBowlingInProgress = false;
+    this.isBallActive = false;
+    globalAutoAssistConfig.isRunUpActive = false;
+    globalAutoAssistConfig.runUpStartTime = undefined;
+    document.getElementById('bowler-runup-indicator')?.remove();
+    const control = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
+    control?.classList.remove('hidden', 'panel-hidden');
+    this.gameScene.resetBowlerMesh();
+  }
+
   // --- Batting Swings ---
 
   private executeKeyboardBatSwing(): void {
@@ -494,6 +524,7 @@ export class UIManager {
   }
 
   public executeBattingSwingGesture(direction: number, type: ShotType, simulatedTiming?: number, contactZone?: number): void {
+    if (isGamePaused()) return;
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     if ((!isPlayerBatting && simulatedTiming === undefined) || !this.activeDelivery || this.activeShot) return;
     if (isPlayerBatting && !globalAutoAssistConfig.isDeliveryActive) return;

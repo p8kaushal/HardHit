@@ -14,7 +14,9 @@ document.addEventListener('keydown', () => gameSound.unlock(), { capture: true }
 const portrait = window.matchMedia('(orientation: portrait)');
 function updateGameplayPause(): void {
   const playing = document.getElementById('screen-gameplay')!.classList.contains('active');
-  setGamePaused(shouldPauseGameplay(playing, portrait.matches, document.hidden));
+  const paused = shouldPauseGameplay(playing, portrait.matches, document.hidden);
+  setGamePaused(paused);
+  if (paused) ui?.interruptControls();
 }
 portrait.addEventListener('change', updateGameplayPause);
 document.addEventListener('visibilitychange', updateGameplayPause);
