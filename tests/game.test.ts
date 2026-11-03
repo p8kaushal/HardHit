@@ -160,8 +160,8 @@ test('bowler camera screen directions map to the correct pitch coordinates', () 
   assert.ok(bowlingTargetFromScreen(0.5, 0).z < bowlingTargetFromScreen(0.5, 1).z);
   assert.deepEqual(bowlingTargetFromScreen(0.5, 0), { x: 0, z: -8.2 });
   assert.ok(Math.abs(bowlingTargetFromScreen(0.5, 1).z - 0.5) < 1e-9);
-  assert.equal(calculateBounceTarget('off', 'good', 'RHB').x, -0.45);
-  assert.equal(calculateBounceTarget('off', 'good', 'LHB').x, 0.45);
+  assert.equal(calculateBounceTarget('off', 'good', 'RHB').x, 0.45);
+  assert.equal(calculateBounceTarget('off', 'good', 'LHB').x, -0.45);
 });
 
 test('well-timed shots retain their selected direction on every bot tier', () => {
@@ -341,12 +341,12 @@ test('delivery variations affect pace and turn only after pitching', () => {
   const end = { x: 0, y: 0.85, z: BATTER_CREASE_Z };
   const bounceProgress = (bounce.z - release.z) / (end.z - release.z);
   assert.ok(Math.abs(getDeliveryFlightPosition(bounceProgress, release, bounce, end, 'offspin').x) < 1e-9);
-  assert.ok(getDeliveryFlightPosition(1, release, bounce, end, 'offspin').x > 0);
+  assert.ok(getDeliveryFlightPosition(1, release, bounce, end, 'offspin').x < 0);
   assert.equal(getDeliveryFlightPosition(1, release, bounce, end, 'offspin', 0).x, 0);
-  assert.ok(getDeliveryFlightPosition(1, release, bounce, end, 'offspin', 1).x > getDeliveryFlightPosition(1, release, bounce, end, 'offspin', 0.5).x);
-  assert.ok(getDeliveryFlightPosition(1, release, bounce, end, 'legspin').x < 0);
+  assert.ok(getDeliveryFlightPosition(1, release, bounce, end, 'offspin', 1).x < getDeliveryFlightPosition(1, release, bounce, end, 'offspin', 0.5).x);
+  assert.ok(getDeliveryFlightPosition(1, release, bounce, end, 'legspin').x > 0);
   assert.equal(getDeliveryFlightPosition(1, release, bounce, end, 'fast').x, 0);
-  const spinner = { ...delivery(0.5, 0.8), type: 'offspin' as const };
+  const spinner = { ...delivery(0.5, -0.8), type: 'offspin' as const };
   assert.equal(checkExtraBall(spinner).type, 'wide');
   assert.equal(checkExtraBall({ ...spinner, turn: 0 }).isExtra, false);
 });
@@ -414,7 +414,7 @@ test('bat contact and wide decisions use the delivered line at the crease', () =
   assert.equal(battingContactZone(straight, 0.5), 0.5);
   assert.ok(deliveryCreaseX(swinging) > 0);
   assert.ok(battingContactZone(swinging, 0.5) > 0.5);
-  assert.ok(battingContactZone(turning, 0.5) > 0.5);
+  assert.ok(battingContactZone(turning, 0.5) < 0.5);
   assert.ok(battingContactZone(straight, 0) < 0.5);
 });
 

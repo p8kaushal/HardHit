@@ -3,8 +3,8 @@ import * as BABYLON from 'babylonjs';
 
 export function calculateBounceTarget(line: string, length: string, hand: 'RHB' | 'LHB' = 'RHB'): BABYLON.Vector3 {
   let x = 0.0;
-  if (line.toLowerCase() === 'off') x = -0.45;
-  if (line.toLowerCase() === 'leg') x = 0.45;
+  if (line.toLowerCase() === 'off') x = 0.45;
+  if (line.toLowerCase() === 'leg') x = -0.45;
   if (line.toLowerCase() === 'middle') x = 0.0;
   if (hand === 'LHB') x = -x;
 
@@ -39,7 +39,9 @@ export function deliveryDurationMs(type: DeliveryType, pace = 0.5): number {
 
 export function deliveryTurn(type: DeliveryType, turn = 0.5): number {
   const strength = Math.max(0, Math.min(1, turn)) * 0.4;
-  return type === 'offspin' ? strength : type === 'legspin' ? -strength : 0;
+  // For a right-arm bowler, off-break moves from a right-hander's off
+  // side (positive X) towards leg; a leg-break turns the other way.
+  return type === 'offspin' ? -strength : type === 'legspin' ? strength : 0;
 }
 
 /** Approximate pre-bounce swing, measured in metres in world coordinates. */
@@ -342,20 +344,20 @@ export function checkExtraBall(delivery: DeliveryChoice, _batterHand: 'RHB' | 'L
 
 export function getLineTypeFromAimX(aimX: number, batterHand: 'RHB' | 'LHB' = 'RHB'): import('./types').LineType {
   if (batterHand === 'RHB') {
-    if (aimX < -0.2) return 'off';
-    if (aimX > 0.2) return 'leg';
-    return 'middle';
-  } else { // LHB
     if (aimX > 0.2) return 'off';
     if (aimX < -0.2) return 'leg';
+    return 'middle';
+  } else { // LHB
+    if (aimX < -0.2) return 'off';
+    if (aimX > 0.2) return 'leg';
     return 'middle';
   }
 }
 
 export function getAimXFromLineType(line: import('./types').LineType, batterHand: 'RHB' | 'LHB' = 'RHB'): number {
   let target = 0;
-  if (line === 'off') target = -0.45;
-  if (line === 'leg') target = 0.45;
+  if (line === 'off') target = 0.45;
+  if (line === 'leg') target = -0.45;
   return batterHand === 'LHB' ? -target : target;
 }
 
