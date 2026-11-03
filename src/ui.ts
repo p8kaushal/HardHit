@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { BallOutcome, DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 import { suggestedShotDirection, TouchBattingControls } from './touch-controls';
 import { initBowlingAdjustmentReadouts, isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
@@ -613,7 +613,7 @@ export class UIManager {
 
       if (lastBall && lastBall.shot && !lastBall.missed && !lastBall.isWicket && !lastBall.isExtra) {
         shotDistanceMeters = this.gameScene.getShotDistance();
-        hasBounced = globalAutoAssistConfig.hasBounced || false;
+        hasBounced = this.gameScene.shotBoundaryOnFull ? false : (globalAutoAssistConfig.hasBounced || false);
         
         const runs = evaluateFinalOutcome(shotDistanceMeters, hasBounced, this.gameScene.shotReachedBoundary);
         
@@ -712,7 +712,7 @@ export class UIManager {
       const theta_shot = (outcome.shot.direction * Math.PI) / 4 - Math.PI / 2;
       const quality = Math.max(0, 1 - Math.abs(outcome.shot.timing - 0.5) * 2 - Math.abs(outcome.shot.contactZone - 0.5)) * footworkFactor(outcome.shot.footwork, outcome.delivery.length);
       const batterPower = this.controller.getCurrentInnings().batter.stats.batting.power;
-      const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, {x:0, y:0, z:0}, {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower);
+      const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, deliveryVelocityAtCrease(outcome.delivery), {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower);
       
       this.gameScene.animateHitPath(outcome.distance, outcome.shot.direction, vOut);
       this.controller.setCameraMode('follow_shot');

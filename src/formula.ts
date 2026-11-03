@@ -62,6 +62,18 @@ export function deliveryCreaseX(delivery: DeliveryChoice): number {
   return delivery.aimTarget.x + deliverySwingAtCrease(delivery.type, delivery.swing, delivery.aimTarget.z) + deliveryTurn(delivery.type, delivery.turn);
 }
 
+/** Approximate incoming velocity at contact from the same path used on screen. */
+export function deliveryVelocityAtCrease(delivery: DeliveryChoice): { x: number; y: number; z: number } {
+  const start = { x: 0.6, y: 1.9, z: 10 };
+  const bounce = { x: delivery.aimTarget.x, y: 0.06, z: delivery.aimTarget.z };
+  const end = { x: delivery.aimTarget.x, y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
+  const sample = (progress: number) => getDeliveryFlightPosition(progress, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
+  const before = sample(0.99);
+  const atCrease = sample(1);
+  const seconds = deliveryDurationMs(delivery.type, delivery.pace) / 1000 * 0.01;
+  return { x: (atCrease.x - before.x) / seconds, y: (atCrease.y - before.y) / seconds, z: (atCrease.z - before.z) / seconds };
+}
+
 /** Simplified pad and stump geometry, in metres, for a missed delivery. */
 export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'LHB', offeredShot: boolean): 'lbw' | 'bowled' | null {
   if (delivery.releaseTiming > 0.95) return null;
@@ -135,7 +147,8 @@ export function bowlingReleaseTiming(elapsedMs: number): number {
 /** Early and late releases deviate in opposite directions; accuracy limits the error. */
 export function bowlingExecutionTarget(target: { x: number; z: number }, timing: number, accuracy: number): { x: number; z: number } {
   const error = (Math.max(0, Math.min(1, timing)) - 0.5) * 2;
-  const inaccuracy = 1 - Math.max(0, Math.min(100, accuracy)) / 100;
+  // Skill reduces release error, but a mistimed release still changes the ball.
+  const inaccuracy = 0.25 + 0.75 * (1 - Math.max(0, Math.min(100, accuracy)) / 100);
   return {
     x: Math.max(-1.5, Math.min(1.5, target.x + error * inaccuracy * 0.3)),
     z: Math.max(-8.2, Math.min(0.5, target.z - error * inaccuracy))
@@ -520,7 +533,7 @@ export function calculateShotTrajectory(
   _t_input: number,
   _t_ideal: number,
   theta_shot: number,
-  _V_in: { x: number, y: number, z: number },
+  V_in: { x: number, y: number, z: number },
   _V_bat: { x: number, y: number, z: number },
   _isRHB: boolean = true,
   _isHuman: boolean = false,
@@ -576,10 +589,15 @@ export function calculateShotTrajectory(
   // same flight for every successful shot of a given type.
   const quality = Math.max(0, Math.min(1, Number.isFinite(Q) ? Q : 0));
   const powerFactor = 0.75 + Math.max(0, Math.min(100, batterPower)) / 200;
-  const speedFactor = (0.55 + 0.45 * quality) * powerFactor;
+  const incomingSpeed = Math.hypot(V_in.x, V_in.y, V_in.z);
+  const incomingFactor = incomingSpeed > 0 ? Math.max(0.9, Math.min(1.08, 0.9 + incomingSpeed * 0.003)) : 1;
+  const speedFactor = (0.55 + 0.45 * quality) * powerFactor * incomingFactor;
   Vx *= speedFactor;
   Vy *= speedFactor;
   Vz *= speedFactor;
+  // Poor contact carries more of the incoming ball's lateral movement.
+  Vx += V_in.x * 0.12 * (1 - quality);
+  Vz += V_in.z * 0.03 * (1 - quality);
   
   return { x: Vx, y: Vy, z: Vz };
 }

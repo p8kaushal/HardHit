@@ -5,6 +5,7 @@ export interface BallState {
   velocity: { x: number; y: number; z: number };
   hasBounced: boolean;
   reachedBoundary: boolean;
+  boundaryOnFull?: boolean;
   stopped: boolean;
 }
 
@@ -28,7 +29,7 @@ export function stepBall(state: BallState, dt: number): void {
   const b = 2 * (previous.x * dx + previous.z * dz);
   const c = previous.x * previous.x + previous.z * previous.z - 65 * 65;
   const discriminant = b * b - 4 * a * c;
-  const crossing = c >= 0 ? 0 : a > 0 && discriminant >= 0 ? (-b + Math.sqrt(discriminant)) / (2 * a) : Infinity;
+  const crossing = state.reachedBoundary ? Infinity : c >= 0 ? 0 : a > 0 && discriminant >= 0 ? (-b + Math.sqrt(discriminant)) / (2 * a) : Infinity;
   const impact = previous.y > 0.075 && p.y <= 0.075
     ? (previous.y - 0.075) / (previous.y - p.y)
     : previous.y <= 0.075 ? 0 : Infinity;
@@ -37,6 +38,7 @@ export function stepBall(state: BallState, dt: number): void {
     p.y = previous.y + (p.y - previous.y) * crossing;
     p.z = previous.z + dz * crossing;
     state.reachedBoundary = true;
+    state.boundaryOnFull = !state.hasBounced;
     state.stopped = false;
     return;
   }
@@ -51,6 +53,9 @@ export function stepBall(state: BallState, dt: number): void {
     v.x *= friction;
     v.z *= friction;
   }
-  state.reachedBoundary = crossing >= 0 && crossing <= 1;
+  if (crossing >= 0 && crossing <= 1) {
+    state.reachedBoundary = true;
+    state.boundaryOnFull = false;
+  }
   state.stopped = p.y <= 0.075 && Math.abs(v.y) < 0.45 && Math.hypot(v.x, v.z) < 0.3;
 }

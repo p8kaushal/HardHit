@@ -6,7 +6,7 @@ import { directionFromStick, suggestedShotDirection, TouchBattingControls } from
 import { stepBall, type BallState } from '../src/ball-physics';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliverySwingAtBounce, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery } from '../src/formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout } from '../src/game-clock';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
@@ -178,6 +178,14 @@ test('LBW considers pitch, impact, offered shot, stumps, handedness and no-balls
   assert.equal(resolveMissedDelivery(delivery(0.5, 0.7), 'RHB', false), null);
 });
 
+test('a mistimed stroke that misses the stumps is a dot, not an invented catch', () => {
+  const game = match();
+  const result = game.recordBall(delivery(0.5, 0.7), { direction: 0, type: 'power', timing: 0, contactZone: 0.5 });
+  assert.equal(result.missed, true);
+  assert.equal(result.isWicket, false);
+  assert.equal(game.getCurrentInnings().wicketsLost, 0);
+});
+
 test('bowling meter maps its midpoint to ideal release and clamps extremes', () => {
   assert.equal(bowlingReleaseTiming(-100), 0);
   assert.equal(bowlingReleaseTiming(1200), 0.5);
@@ -187,7 +195,8 @@ test('bowling meter maps its midpoint to ideal release and clamps extremes', () 
 test('bowling release timing affects the executed target in a predictable way', () => {
   const target = { x: 0, z: -3.5 };
   assert.deepEqual(bowlingExecutionTarget(target, 0.5, 50), target);
-  assert.deepEqual(bowlingExecutionTarget(target, 0, 100), target);
+  assert.notDeepEqual(bowlingExecutionTarget(target, 0, 100), target);
+  assert.ok(Math.abs(bowlingExecutionTarget(target, 0, 100).z - target.z) < Math.abs(bowlingExecutionTarget(target, 0, 0).z - target.z));
   const early = bowlingExecutionTarget(target, 0.2, 50);
   const late = bowlingExecutionTarget(target, 0.8, 50);
   assert.ok(early.x < 0 && late.x > 0);
@@ -337,6 +346,17 @@ test('shot quality affects exit speed without changing direction', () => {
   assert.ok(Math.abs(clean.x / clean.z - mistimed.x / mistimed.z) < 1e-9);
 });
 
+test('incoming delivery speed and movement influence the resulting shot', () => {
+  const fast = deliveryVelocityAtCrease({ ...delivery(0.5), pace: 1 });
+  const slow = deliveryVelocityAtCrease({ ...delivery(0.5), type: 'slow' });
+  const swinging = deliveryVelocityAtCrease({ ...delivery(0.5), swing: 1 });
+  assert.ok(Math.abs(fast.z) > Math.abs(slow.z));
+  assert.ok(swinging.x < 0);
+  const shot = (incoming: typeof fast) => calculateShotTrajectory(0.6, 0.5, 0.5, -Math.PI / 2, incoming, { x: 0, y: 0, z: 0 });
+  assert.notEqual(shot(fast).z, shot(slow).z);
+  assert.ok(shot(swinging).x < shot({ ...swinging, x: 0 }).x);
+});
+
 test('footwork choice changes the timing window for short and full balls', () => {
   assert.ok(footworkFactor('front_foot', 'full') > footworkFactor('back_foot', 'full'));
   assert.ok(footworkFactor('back_foot', 'short') > footworkFactor('front_foot', 'short'));
@@ -418,6 +438,23 @@ test('rope crossing and bounce are resolved in their actual order within a physi
   assert.equal(landsFirst.reachedBoundary, true);
   assert.equal(landsFirst.hasBounced, true);
   assert.equal(evaluateFinalOutcome(65, landsFirst.hasBounced, landsFirst.reachedBoundary), 4);
+});
+
+test('a six remains in flight beyond the rope until its landing distance is known', () => {
+  const ball: BallState = {
+    position: { x: 0, y: 1, z: BATTER_CREASE_Z },
+    velocity: { x: 0, y: 20, z: 31 },
+    hasBounced: false, reachedBoundary: false, stopped: false
+  };
+  let ropeDistance = 0;
+  for (let i = 0; i < 1200 && !ball.hasBounced; i++) {
+    stepBall(ball, 1 / 120);
+    if (ball.reachedBoundary && !ropeDistance) ropeDistance = ball.position.z - BATTER_CREASE_Z;
+  }
+  assert.equal(ball.boundaryOnFull, true);
+  assert.equal(ball.reachedBoundary, true);
+  assert.equal(ball.hasBounced, true);
+  assert.ok(ball.position.z - BATTER_CREASE_Z > ropeDistance + 5);
 });
 
 test('delivery animation advances at the same speed at 30 and 60 fps', () => {

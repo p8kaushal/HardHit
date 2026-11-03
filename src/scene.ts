@@ -54,6 +54,7 @@ export class GameScene {
   private shotPhysics: BallState | null = null;
   private physicsAccumulator = 0;
   public shotReachedBoundary = false;
+  public shotBoundaryOnFull = false;
   private ballPathPoints: BABYLON.Vector3[] = [];
   
   constructor(canvasElementId: string) {
@@ -919,12 +920,13 @@ export class GameScene {
       while (this.physicsAccumulator >= step) {
         stepBall(this.shotPhysics, step);
         this.physicsAccumulator -= step;
-        if (this.shotPhysics.stopped || this.shotPhysics.reachedBoundary) break;
+        if (this.shotPhysics.stopped || (this.shotPhysics.reachedBoundary && (!this.shotPhysics.boundaryOnFull || this.shotPhysics.hasBounced))) break;
       }
       globalAutoAssistConfig.hasBounced = this.shotPhysics.hasBounced;
       this.shotReachedBoundary = this.shotPhysics.reachedBoundary;
+      this.shotBoundaryOnFull = this.shotPhysics.boundaryOnFull ?? false;
       this.ballMesh.position.copyFrom(this.currentBallPos);
-      if (this.shotPhysics.stopped || this.shotPhysics.reachedBoundary) {
+      if (this.shotPhysics.stopped || (this.shotPhysics.reachedBoundary && (!this.shotPhysics.boundaryOnFull || this.shotPhysics.hasBounced))) {
         this.endDeliveryCycle();
         return;
       }
@@ -985,6 +987,7 @@ export class GameScene {
     this.currentBallPos = startPoint.clone();
     this.shotOrigin = startPoint.clone();
     this.shotReachedBoundary = false;
+    this.shotBoundaryOnFull = false;
     this.shotPhysics = { position: this.currentBallPos, velocity: currentVelocity, hasBounced: false, reachedBoundary: false, stopped: false };
     this.physicsAccumulator = 0;
     
