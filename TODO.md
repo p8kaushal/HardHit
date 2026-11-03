@@ -16,6 +16,7 @@
 
 ## Remaining foundations
 
+- [x] Use a regulation-sized ball for physical ground and wicket calculations; retain an enlarged render for readability.
 - [ ] Calibrate ball and bat parameters against measured cricket data; replace the current timing-based contact approximation with spatial bat/ball contact.
 - [x] Record a sampled front-foot landing separately from release timing and use it for front-foot no-balls.
 - [ ] Calibrate front-foot variability, add a visible delivery-stride/foot replay and cover back-foot faults, wides, LBW and free-hit edge cases.

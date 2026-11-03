@@ -2,8 +2,12 @@ import * as BABYLON from 'babylonjs';
 import { gameNow, isGamePaused } from './game-clock';
 import { CameraMode, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BATTER_CREASE_Z, batterContactProgress, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryDurationMs, deliveryReleaseX, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
+import { BALL_RADIUS_METERS, BATTER_CREASE_Z, batterContactProgress, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryDurationMs, deliveryReleaseX, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
 import { stepBall, type BallState } from './ball-physics';
+
+// A larger visible ball improves phone readability; physics uses the real radius.
+const BALL_VISUAL_RADIUS = 0.075;
+const BALL_VISUAL_OFFSET = BALL_VISUAL_RADIUS - BALL_RADIUS_METERS;
 
 export class GameScene {
   public scene: BABYLON.Scene;
@@ -480,7 +484,7 @@ export class GameScene {
     const ballMat = new BABYLON.StandardMaterial('ballMat', this.scene);
     ballMat.diffuseColor = new BABYLON.Color3(0.85, 0.1, 0.1);
     
-    this.ballMesh = BABYLON.MeshBuilder.CreateSphere('cricketBall', { diameter: 0.15 }, this.scene);
+    this.ballMesh = BABYLON.MeshBuilder.CreateSphere('cricketBall', { diameter: BALL_VISUAL_RADIUS * 2 }, this.scene);
     this.ballMesh.material = ballMat;
     this.ballMesh.setEnabled(false);
   }
@@ -514,13 +518,13 @@ export class GameScene {
     const delivery = { aimTarget, type, line: 'middle' as const, length: 'good' as const, releaseTiming: 0.5, overTheWicket, bowlingArm: globalAutoAssistConfig.bowlerArm || 'Right' };
     const startX = deliveryReleaseX(delivery);
     const release = { x: startX, y: 1.9, z: 10.0 };
-    const bounce = { x: targetX, y: 0.06, z: bounceZ };
+    const bounce = { x: targetX, y: BALL_RADIUS_METERS, z: bounceZ };
     const end = { x: deliveryBaseCreaseX(delivery), y: deliveryArrivalHeight(bounceZ, type, pace), z: BATTER_CREASE_Z };
     
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
       const pos = getDeliveryFlightPosition(progress, release, bounce, end, type, turn, swing, pace);
-      points.push(new BABYLON.Vector3(pos.x, pos.y, pos.z));
+      points.push(new BABYLON.Vector3(pos.x, pos.y + BALL_VISUAL_OFFSET, pos.z));
     }
 
     return points;
@@ -922,11 +926,11 @@ export class GameScene {
         
       const startX = deliveryReleaseX(delivery || { bowlingArm: globalAutoAssistConfig.bowlerArm });
       const release = { x: startX, y: 1.9, z: 10.0 };
-      const bounce = { x: targetX, y: 0.06, z: targetZ };
+      const bounce = { x: targetX, y: BALL_RADIUS_METERS, z: targetZ };
       const end = { x: delivery ? deliveryBaseCreaseX(delivery) : targetX, y: deliveryArrivalHeight(targetZ, delivery?.type, delivery?.pace), z: BATTER_CREASE_Z };
       
       const pos = getDeliveryFlightPosition(progress, release, bounce, end, delivery?.type ?? 'medium', delivery?.turn, delivery?.swing, delivery?.pace);
-      ball.position.set(pos.x, pos.y, pos.z);
+      ball.position.set(pos.x, pos.y + BALL_VISUAL_OFFSET, pos.z);
       if (progress >= contactProgress && this.onBallArrivedCallback) this.onBallArrivedCallback();
     }
   }
@@ -946,15 +950,17 @@ export class GameScene {
       this.shotReachedBoundary = this.shotPhysics.reachedBoundary;
       this.shotBoundaryOnFull = this.shotPhysics.boundaryOnFull ?? false;
       this.ballMesh.position.copyFrom(this.currentBallPos);
+      this.ballMesh.position.y += BALL_VISUAL_OFFSET;
       if (this.shotPhysics.stopped || (this.shotPhysics.reachedBoundary && (!this.shotPhysics.boundaryOnFull || this.shotPhysics.hasBounced))) {
         this.endDeliveryCycle();
         return;
       }
 
-      this.ballPathPoints.push(this.currentBallPos.clone());
+      this.ballPathPoints.push(this.ballMesh.position.clone());
       if (this.ballPathPoints.length > 10) this.ballPathPoints.shift();
 
       this.ballMesh.position.copyFrom(this.currentBallPos);
+      this.ballMesh.position.y += BALL_VISUAL_OFFSET;
 
       // Dynamically track the ball mesh and its high trajectory arc
       if (globalAutoAssistConfig.isBallInPlay) {
@@ -986,6 +992,7 @@ export class GameScene {
     
     // Set startPoint to the actual batter's position (crease anchor Z = -8.8)
     const startPoint = this.ballMesh?.position.clone() ?? new BABYLON.Vector3(this.batterRoot?.position.x || 0, 0.4, this.batterRoot?.position.z || -8.8);
+    if (this.ballMesh) startPoint.y -= BALL_VISUAL_OFFSET;
     
     // Only render/position the marker when valid bat-ball contact occurs in pitch/outfield space (Z > -10.0m)
     if (this.hudAvatarRoot && startPoint.z > -10.0) {
@@ -1004,7 +1011,7 @@ export class GameScene {
       currentVelocity.x = -currentVelocity.x;
     }
 
-    this.ballPathPoints = [startPoint.clone()];
+    this.ballPathPoints = [startPoint.add(new BABYLON.Vector3(0, BALL_VISUAL_OFFSET, 0))];
     this.currentBallPos = startPoint.clone();
     this.shotOrigin = startPoint.clone();
     this.shotReachedBoundary = false;

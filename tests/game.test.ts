@@ -6,7 +6,7 @@ import { directionFromStick, suggestedShotDirection, TouchBattingControls } from
 import { stepBall, type BallState } from '../src/ball-physics';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
+import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
@@ -491,8 +491,8 @@ test('a well-hit lofted shot can clear the boundary before bouncing', () => {
   for (let i = 0; i < 600 && z < 65 && !bounced; i++) {
     velocity.y *= BALL_AIR_DAMPING;
     velocity.z *= BALL_AIR_DAMPING;
-    if (y < 0.075) { bounced = true; break; }
-    if (y > 0.075) velocity.y -= 9.81 / 60;
+    if (y < BALL_RADIUS_METERS) { bounced = true; break; }
+    if (y > BALL_RADIUS_METERS) velocity.y -= 9.81 / 60;
     y += velocity.y / 60;
     z += velocity.z / 60;
   }
@@ -525,17 +525,26 @@ test('rope crossing and bounce are resolved in their actual order within a physi
     velocity: { x: 30, y: -4, z: 0 },
     hasBounced: false, reachedBoundary: false, stopped: false
   });
-  const clearsRope = nearRope(0.09);
+  const clearsRope = nearRope(BALL_RADIUS_METERS + 0.015);
   stepBall(clearsRope, 0.01);
   assert.equal(clearsRope.reachedBoundary, true);
   assert.equal(clearsRope.hasBounced, false);
   assert.equal(evaluateFinalOutcome(65, clearsRope.hasBounced, clearsRope.reachedBoundary), 6);
 
-  const landsFirst = nearRope(0.08);
+  const landsFirst = nearRope(BALL_RADIUS_METERS + 0.005);
   stepBall(landsFirst, 0.01);
   assert.equal(landsFirst.reachedBoundary, true);
   assert.equal(landsFirst.hasBounced, true);
   assert.equal(evaluateFinalOutcome(65, landsFirst.hasBounced, landsFirst.reachedBoundary), 4);
+});
+
+test('physical ground contact uses a regulation-sized ball radius', () => {
+  const circumference = 2 * Math.PI * BALL_RADIUS_METERS;
+  assert.ok(circumference >= 0.224 && circumference <= 0.229);
+  const ball: BallState = { position: { x: 0, y: BALL_RADIUS_METERS + 0.01, z: 0 }, velocity: { x: 0, y: -1, z: 0 }, hasBounced: false, reachedBoundary: false, stopped: false };
+  stepBall(ball, 0.02);
+  assert.equal(ball.hasBounced, true);
+  assert.equal(ball.position.y, BALL_RADIUS_METERS);
 });
 
 test('a six remains in flight beyond the rope until its landing distance is known', () => {

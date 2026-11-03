@@ -1,4 +1,4 @@
-import { BALL_AIR_DAMPING, frameIndependentDamping } from './formula';
+import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, frameIndependentDamping } from './formula';
 
 export interface BallState {
   position: { x: number; y: number; z: number };
@@ -30,9 +30,9 @@ export function stepBall(state: BallState, dt: number): void {
   const c = previous.x * previous.x + previous.z * previous.z - 65 * 65;
   const discriminant = b * b - 4 * a * c;
   const crossing = state.reachedBoundary ? Infinity : c >= 0 ? 0 : a > 0 && discriminant >= 0 ? (-b + Math.sqrt(discriminant)) / (2 * a) : Infinity;
-  const impact = previous.y > 0.075 && p.y <= 0.075
-    ? (previous.y - 0.075) / (previous.y - p.y)
-    : previous.y <= 0.075 ? 0 : Infinity;
+  const impact = previous.y > BALL_RADIUS_METERS && p.y <= BALL_RADIUS_METERS
+    ? (previous.y - BALL_RADIUS_METERS) / (previous.y - p.y)
+    : previous.y <= BALL_RADIUS_METERS ? 0 : Infinity;
   if (crossing >= 0 && crossing <= 1 && crossing < impact) {
     p.x = previous.x + dx * crossing;
     p.y = previous.y + (p.y - previous.y) * crossing;
@@ -43,8 +43,8 @@ export function stepBall(state: BallState, dt: number): void {
     return;
   }
 
-  if (p.y <= 0.075) {
-    p.y = 0.075;
+  if (p.y <= BALL_RADIUS_METERS) {
+    p.y = BALL_RADIUS_METERS;
     state.hasBounced = true;
     if (v.y < 0) v.y = Math.abs(v.y) * 0.55;
     // Settle small hops and apply grass friction while the ball is on the turf.
@@ -57,5 +57,5 @@ export function stepBall(state: BallState, dt: number): void {
     state.reachedBoundary = true;
     state.boundaryOnFull = false;
   }
-  state.stopped = p.y <= 0.075 && Math.abs(v.y) < 0.45 && Math.hypot(v.x, v.z) < 0.3;
+  state.stopped = p.y <= BALL_RADIUS_METERS && Math.abs(v.y) < 0.45 && Math.hypot(v.x, v.z) < 0.3;
 }

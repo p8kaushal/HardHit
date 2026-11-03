@@ -20,6 +20,7 @@ Play a biggest-six duel against a bot. Each batter faces six legal deliveries; t
   - `Lofted / Power Shot` (Risk-reward high-exit-angle stroke for maximums)
 - **Precision Timing & Placement**: Swing timing paired with directional shot placement controls.
 - **Ball Flight and Boundary Scoring**: Watch the ball travel across the field; a shot that clears the boundary before bouncing scores six.
+- **Ball Size**: Physics uses a 3.6 cm ball radius. The on-screen ball is enlarged for visibility on small screens.
 - **Batter Position**: Before release, use the movement buttons or I/J/K/L to step forward, left, back or right. The stance locks during the delivery and affects contact timing and reach.
 - **Bowling Side**: Select over or around the wicket before bowling. The selected side changes the release position and incoming angle.
 - **Front-foot No-balls**: A simplified front-foot landing is sampled from bowler accuracy and pace separately from release timing. A no-ball reports the estimated overstep; the foot animation and calibration are still planned.
