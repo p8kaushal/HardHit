@@ -1,5 +1,5 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
+import { evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, deliveryCreaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
@@ -290,7 +290,7 @@ export class MatchController {
 
     const ballNumber = innings.ballsBowled + 1;
 
-    const extra = checkExtraBall(delivery, innings.batter.batterHand || 'RHB');
+    let extra = checkExtraBall(delivery, innings.batter.batterHand || 'RHB');
     
     let isWicket = false;
     let wicketReason = '';
@@ -313,6 +313,15 @@ export class MatchController {
       }
     }
 
+    const wicketResult = shot ? evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier) : null;
+    if (wicketResult) missed = wicketResult.missed ?? false;
+    if (shot && Math.abs(deliveryCreaseX(delivery)) > 1.25) missed = true;
+    // A ball contacted by the bat is not a wide, provided it is within reach.
+    if (extra.type === 'wide' && shot && !missed && Math.abs(deliveryCreaseX(delivery)) <= 1.25) {
+      extra = { isExtra: false, type: null };
+    }
+    if (extra.type === 'wide') missed = true;
+
     if (extra.isExtra) {
       innings.score += 1; // +1 run penalty
       innings.isNextFreeHit = isFreeHit || extra.type === 'noball';
@@ -324,35 +333,16 @@ export class MatchController {
       }
       distance = 0;
       console.log(`[GAME EVENT] Extra ball penalty: ${extra.type?.toUpperCase()}. Innings score: ${innings.score}.`);
-    } else if (shot === null) {
+    }
+    if (!extra.isExtra && shot === null) {
       const dismissal = isFreeHit ? null : resolveMissedDelivery(delivery, innings.batter.batterHand || 'RHB', false);
       isWicket = dismissal !== null;
       wicketReason = dismissal === 'lbw' ? 'LBW' : dismissal === 'bowled' ? 'Bowled' : 'Missed delivery!';
       distance = 0;
       console.log(`[GAME EVENT] Missed delivery. Ball number ${ballNumber}`);
-    } else {
-      // Regular ball
-      const wicketResult = evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier);
+    } else if (shot && wicketResult && extra.type !== 'wide') {
       isWicket = wicketResult.isWicket;
-      wicketReason = wicketResult.reason;
-      missed = wicketResult.missed ?? false;
-
-      // 4. Bounding Box Bypass & Contact Guarantee
-      if (globalAutoAssistConfig.delta_t !== undefined) {
-        
-        let botTier = 'Medium';
-        if (innings.bowler.id.includes('rookie')) botTier = 'Rookie';
-        if (innings.bowler.id.includes('hard')) botTier = 'Hard';
-        
-        const resolution = resolveShot(globalAutoAssistConfig.delta_t, botTier, shot.type, delivery.length);
-
-        if (resolution.contact) {
-          isWicket = false;
-          wicketReason = '';
-          wicketResult.isEdgeFallback = false;
-        }
-        globalAutoAssistConfig.delta_t = undefined; // Reset
-      }
+      wicketReason = extra.type === 'noball' ? 'Penalty - No ball! (Free Hit next)' : wicketResult.reason;
       
       if (!isWicket && !missed) {
         const distResult = calculateDistance(innings.batter, innings.bowler, delivery, shot, wicketResult.safeWindowMs, wicketResult.isEdgeFallback, assistMultiplier);
@@ -365,7 +355,7 @@ export class MatchController {
       }
 
       // Check Free Hit survival rules
-      if (isWicket && isFreeHit) {
+      if (isWicket && (isFreeHit || extra.type === 'noball')) {
         isWicket = false;
         wicketReason = `Free Hit Survival! Batter mistimed shot but is not out. Original reason: ${wicketReason}`;
         console.log(`[GAME EVENT] Batter survived a dismissal due to active Free Hit!`);
@@ -421,7 +411,7 @@ export class MatchController {
 
       const innings = this.getCurrentInnings();
       const lastBall = innings.balls[innings.balls.length - 1];
-      if (!lastBall || !lastBall.shot || lastBall.isWicket || lastBall.isExtra) return 0;
+      if (!lastBall || !lastBall.shot || lastBall.missed || lastBall.isWicket || lastBall.extraType === 'wide') return 0;
       if (lastBall.runs !== undefined) return lastBall.runs;
       
       // Evaluate outcome using formula

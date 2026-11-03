@@ -191,7 +191,7 @@ test('leaderboard tolerates corrupt storage and sorts old and new scores', () =>
 
 test('release timing and line distinguish legal balls, wides and no-balls', () => {
   assert.deepEqual(checkExtraBall(delivery(0.5)), { isExtra: false, type: null });
-  assert.equal(checkExtraBall(delivery(0)).type, 'wide');
+  assert.equal(checkExtraBall(delivery(0)).isExtra, false);
   assert.equal(checkExtraBall(delivery(1)).type, 'noball');
   assert.equal(checkExtraBall(delivery(0.5, 1)).type, 'wide');
 });
@@ -316,13 +316,13 @@ test('well-timed shots retain their selected direction on every bot tier', () =>
 test('extras do not consume a legal ball and only no-balls start a free hit', () => {
   const game = match();
   const innings = game.getCurrentInnings();
-  game.recordBall(delivery(0), null);
+  game.recordBall(delivery(0, 1), null);
   assert.equal(innings.ballsBowled, 0);
   assert.equal(innings.score, 1);
   assert.equal(innings.isNextFreeHit, false);
   game.recordBall(delivery(1), null);
   assert.equal(innings.isNextFreeHit, true);
-  game.recordBall(delivery(0), null);
+  game.recordBall(delivery(0, 1), null);
   assert.equal(innings.isNextFreeHit, true);
   const legal = game.recordBall(delivery(0.5), null);
   assert.equal(legal.isFreeHit, true);
@@ -331,10 +331,40 @@ test('extras do not consume a legal ball and only no-balls start a free hit', ()
   assert.equal(innings.score, 3);
 });
 
+test('bat contact cancels a wide and counts the delivery as legal', () => {
+  const game = match();
+  const shot = { direction: 0, type: 'lofted' as const, timing: 0.5, contactZone: 0.5 };
+  const result = game.recordBall(delivery(0.5, 1), shot);
+  assert.equal(result.isExtra, false);
+  assert.equal(result.missed, false);
+  assert.equal(game.getCurrentInnings().ballsBowled, 1);
+  assert.equal(game.finalizeBallOutcome(85, false, true), 6);
+  assert.equal(game.getCurrentInnings().score, 6);
+  const unreachable = game.recordBall(delivery(0.5, 1.4), shot);
+  assert.equal(unreachable.extraType, 'wide');
+  assert.equal(unreachable.missed, true);
+  assert.equal(game.getCurrentInnings().ballsBowled, 1);
+});
+
+test('a hit off a no-ball scores as well as the penalty and preserves the free hit', () => {
+  const game = match();
+  const shot = { direction: 0, type: 'power' as const, timing: 0.5, contactZone: 0.5 };
+  const result = game.recordBall(delivery(1), shot);
+  const innings = game.getCurrentInnings();
+  assert.equal(result.extraType, 'noball');
+  assert.equal(result.missed, false);
+  assert.equal(innings.ballsBowled, 0);
+  assert.equal(innings.score, 1);
+  assert.equal(game.finalizeBallOutcome(95, false, true), 6);
+  assert.equal(innings.score, 7);
+  assert.equal(innings.biggestSix, 95);
+  assert.equal(innings.isNextFreeHit, true);
+});
+
 test('six legal deliveries finish the innings without counting extras', () => {
   const game = match();
   const innings = game.getCurrentInnings();
-  game.recordBall(delivery(0), null);
+  game.recordBall(delivery(0, 1), null);
   for (let i = 0; i < 6; i++) game.recordBall(delivery(0.5), null);
   assert.equal(innings.ballsBowled, 6);
   assert.equal(innings.balls.length, 7);

@@ -352,9 +352,7 @@ export function calculateDistance(
  * Check for wide/no-ball based on release timing.
  */
 export function checkExtraBall(delivery: DeliveryChoice, _batterHand: 'RHB' | 'LHB' = 'RHB'): { isExtra: boolean; type: 'wide' | 'noball' | null } {
-  if (delivery.releaseTiming < 0.05) {
-    return { isExtra: true, type: 'wide' };
-  } else if (delivery.releaseTiming > 0.95) {
+  if (delivery.releaseTiming > 0.95) {
     return { isExtra: true, type: 'noball' };
   }
 

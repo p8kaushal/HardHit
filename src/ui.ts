@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { BallOutcome, DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, checkExtraBall, deliveryDurationMs, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 import { suggestedShotDirection, TouchBattingControls } from './touch-controls';
 import { initBowlingAdjustmentReadouts, isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
@@ -625,7 +625,7 @@ export class UIManager {
       let shotDistanceMeters = 0;
       let hasBounced = false;
 
-      if (lastBall && lastBall.shot && !lastBall.missed && !lastBall.isWicket && !lastBall.isExtra) {
+      if (lastBall && lastBall.shot && !lastBall.missed && !lastBall.isWicket && lastBall.extraType !== 'wide') {
         shotDistanceMeters = this.gameScene.getShotDistance();
         hasBounced = this.gameScene.shotBoundaryOnFull ? false : (globalAutoAssistConfig.hasBounced || false);
         
@@ -644,11 +644,12 @@ export class UIManager {
            title = `Dot Ball`;
            desc = `Fielded safely. 0 runs.`;
         }
+        if (lastBall.extraType === 'noball') desc += ' No-ball: one penalty run and a free hit.';
         // Step 2: Freeze the tracking camera target on ball's final location and display scoring result banner for exactly 2.0 seconds
         this.showResultToast(title, desc);
       }
 
-      if (lastBall && lastBall.shot && !lastBall.missed && !lastBall.isWicket && !lastBall.isExtra) {
+      if (lastBall && lastBall.shot && !lastBall.missed && !lastBall.isWicket && lastBall.extraType !== 'wide') {
         this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced, this.gameScene.shotReachedBoundary);
         this.updateHUD();
       } else if (lastBall) {
@@ -714,7 +715,7 @@ export class UIManager {
     let title = '';
     let desc = '';
 
-    if (checkExtraBall(outcome.delivery, this.controller.getCurrentInnings().batter.batterHand || 'RHB').isExtra) {
+    if (outcome.isExtra && (!outcome.shot || outcome.missed || outcome.extraType === 'wide')) {
       title = outcome.wicketReason || 'Extra Ball!';
       desc = 'Bowler committed an illegal delivery. Extra ball!';
       this.gameScene.animateMissWicket(false);
@@ -816,7 +817,7 @@ export class UIManager {
     }
     
     // Legal balls count, wickets, runs score, biggest six
-    const legalCount = currentInn.balls.filter(b => !checkExtraBall(b.delivery, currentInn.batter.batterHand || 'RHB').isExtra).length;
+    const legalCount = currentInn.ballsBowled;
     
     const ballsCountEl = document.getElementById('hud-balls-count');
     if (ballsCountEl) ballsCountEl.innerText = `${legalCount}/6`;
@@ -859,8 +860,8 @@ export class UIManager {
           } else if (outcome.isExtra || outcome.extraType) {
             // Blue dot: Extra ball (Wide / No-ball)
             dot.className = 'over-dot blue extra';
-            dot.textContent = outcome.extraType === 'wide' ? 'WD' : (outcome.extraType === 'noball' ? 'NB' : 'EX');
-            dot.title = `Ball ${i + 1}: Extra Delivery (${outcome.extraType ? outcome.extraType.toUpperCase() : 'Extra'} +1 Run)`;
+            dot.textContent = outcome.extraType === 'wide' ? 'WD' : (outcome.extraType === 'noball' ? `NB${outcome.runs || ''}` : 'EX');
+            dot.title = `Ball ${i + 1}: ${outcome.extraType === 'noball' ? 'No-ball' : 'Wide'} (+1 penalty${outcome.runs ? `, ${outcome.runs} off the bat` : ''})`;
           } else if (outcome.isFreeHit && !outcome.runs) {
             // Blue dot: Free hit delivery
             dot.className = 'over-dot blue extra free-hit';
@@ -1167,8 +1168,8 @@ export class UIManager {
         dot.title = `Ball ${idx + 1}: Wicket - ${ball.wicketReason || 'Out'}`;
       } else if (ball.isExtra || ball.extraType) {
         dot.className = 'mini-dot extra';
-        dot.textContent = ball.extraType === 'wide' ? 'WD' : 'NB';
-        dot.title = `Ball ${idx + 1}: Extra Delivery (+1 Run)`;
+        dot.textContent = ball.extraType === 'wide' ? 'WD' : `NB${ball.runs || ''}`;
+        dot.title = `Ball ${idx + 1}: Extra (+1 penalty${ball.runs ? `, ${ball.runs} off the bat` : ''})`;
       } else if (ball.runs === 6) {
         dot.className = 'mini-dot six';
         dot.textContent = `${Math.round(ball.distance)}m`;
