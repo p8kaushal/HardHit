@@ -1,5 +1,34 @@
 # Gameplay to-do
 
+Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. Unchecked items are not verified or complete.
+
+## Match reliability and presentation — current priority
+
+- [x] Prevent repeated rendering of the same match summary from duplicating its leaderboard entry; cover successive matches.
+- [ ] Test persistence and summary behavior through repeated rematches and lobby returns in the browser.
+- [ ] Exercise repeated full matches, interactive batting, no-balls/free hits, wides, wickets and sudden-death presentation in a real browser; verify sound and errors.
+- [ ] Test pause, background, focus loss, rotation and pointer cancellation during held batting and bowling input; avoid stuck or unintended actions.
+- [ ] Show sudden-death deliveries and their deciding outcome alongside the regular innings in the summary.
+- [ ] Replace global delivery flags and loosely typed renderer callbacks incrementally with typed, cancellable match events and immutable delivery snapshots.
+- [ ] Remove obsolete diagnostic paths and duplicate UI/screen handling after verifying callers; do not discard useful tests.
+
+## Rules, shot and delivery fidelity
+
+- [ ] Document contest-specific scoring and compare wide, no-ball, free-hit, bowled and LBW decisions with applicable laws; add decision-table tests for both hands, offered/no shot and bat/pad order.
+- [ ] Clearly identify estimated runs in the no-fielder prototype and design fielding/running before claiming realistic non-boundary scoring.
+- [ ] Consolidate authored delivery, contact, shot flight and wicket projection around shared coordinates, time, units and sampled inputs; eliminate competing legacy distance paths where safe.
+- [ ] Build traceable calibration fixtures for pace, bounce, swing, spin, contact speed, launch angle and six carry, including symmetry and frame-rate checks; document assumptions and confidence.
+- [ ] Model landing/obstructions or label estimated unobstructed carry, and review hard distance caps and boundary geometry.
+- [ ] Improve bot delivery variety to include spin and swing, use reproducible seeded inputs, and measure legal-ball, shot, wicket and scoring distributions by difficulty.
+
+## Controls, performance and release
+
+- [ ] Automate landscape phone/tablet viewport and control-accessibility checks for batting and bowling, including safe areas and browser chrome; test actual iOS and Android hardware separately.
+- [ ] Profile real-device frame time, loading, input latency and memory; investigate fixed-step catch-up and bundle size before selecting optimization or changing renderer.
+- [ ] Add CI, clean-install/build and production smoke checks, deployment configuration and rollback; select staging/production hosting when needed.
+- [ ] Design and build server-authoritative 1v1, replayable event logs, private rooms, reconnects, latency handling and two-client tests after offline match behavior is stable.
+- [ ] Improve readable gameplay feedback, accessibility, audio and lightweight event-synchronized animations after control and physics priorities are met.
+
 ## Batter positioning before delivery
 
 - [x] Add touch and keyboard controls for moving the batter left/right and a limited distance forward/back before release.
