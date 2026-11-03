@@ -505,9 +505,7 @@ export class GameScene {
     const steps = 60;
     
     const targetX = aimTarget.x;
-    // We get targetZ from the same marker logic. For bot, it's bounceMarker Z.
-    // We will just use the bounce marker Z or compute it.
-    const bounceZ = this.bounceMarker ? this.bounceMarker.position.z : aimTarget.z;
+    const bounceZ = aimTarget.z;
     
     const startX = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
     const release = { x: startX, y: 1.9, z: 10.0 };
@@ -592,6 +590,7 @@ export class GameScene {
     turn = 0.5,
     swing = 0
   ): void {
+    this.clearBallTrail();
     this.onBallArrivedCallback = onArrived;
     this.onBallResolvedCallback = onResolved;
     this.onBallCreaseCrossedCallback = onCreaseCrossed || null;
@@ -772,6 +771,11 @@ export class GameScene {
     this.updateTrail(trailPoints, new BABYLON.Color3(0.9, 0.9, 0.4));
   }
 
+  private clearBallTrail(): void {
+    this.ballTrail?.dispose();
+    this.ballTrail = null;
+  }
+
   private updateTrail(points: BABYLON.Vector3[], color: BABYLON.Color3): void {
     if (points.length < 2) return;
     const padding = this.trailVertices.length - points.length;
@@ -834,10 +838,7 @@ export class GameScene {
       this.predictionPath.dispose();
       this.predictionPath = null;
     }
-    if (this.ballTrail) {
-      this.ballTrail.dispose();
-      this.ballTrail = null;
-    }
+    this.clearBallTrail();
 
     const onResolved = this.onBallResolvedCallback;
     this.onBallResolvedCallback = null;
@@ -972,6 +973,7 @@ export class GameScene {
 
   public animateHitPath(distance: number, direction: number, V_out?: { x: number, y: number, z: number }): void {
     this.isAnimatingBall = false;
+    this.clearBallTrail();
     this.ballMesh?.setEnabled(true);
     
     // Transition active camera to follow_shot trajectory view immediately upon bat contact
@@ -1015,6 +1017,8 @@ export class GameScene {
 
   public animateMissWicket(isWicket: boolean): void {
     this.isAnimatingBall = false;
+    this.clearBallTrail();
+    this.bounceMarker?.setEnabled(false);
     this.ballMesh?.setEnabled(false);
     
     if (isWicket && this.batterRoot) {

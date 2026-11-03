@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { BallOutcome, DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
 import { KeyboardInputManager } from './input';
 import { suggestedShotDirection, TouchBattingControls } from './touch-controls';
 import { initBowlingAdjustmentReadouts, isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
@@ -409,7 +409,7 @@ export class UIManager {
       length: executedTarget.z < -6.5 ? 'yorker' : (executedTarget.z < -4.5 ? 'full' : (executedTarget.z < -2.5 ? 'good' : (executedTarget.z < -0.5 ? 'short' : 'bouncer'))),
       type: this.selectedBowlType,
       releaseTiming: timing,
-      pace: spin ? 0.5 : (document.getElementById('bowl-pace') as HTMLInputElement).valueAsNumber / 100,
+      pace: (document.getElementById('bowl-pace') as HTMLInputElement).valueAsNumber / 100,
       turn: spin ? (document.getElementById('bowl-turn') as HTMLInputElement).valueAsNumber / 100 : 0,
       swing: spin ? 0 : (document.getElementById('bowl-swing') as HTMLInputElement).valueAsNumber / 100
     };
@@ -948,7 +948,7 @@ export class UIManager {
       this.activeDelivery = botChooseDelivery(state.bot, this.controller.botDifficulty, innings.batter.batterHand || 'RHB');
       this.touchBattingControls.setLocked(false);
       this.touchBattingControls.setSuggestion(suggestedShotDirection(this.activeDelivery));
-      this.gameScene.updateBounceMarker(this.activeDelivery.aimTarget);
+      this.gameScene.updateBounceMarker(deliveryPitchPoint(this.activeDelivery));
       globalAutoAssistConfig.currentDelivery = this.activeDelivery;
 
       if (this.botDeliveryTimer) clearGameTimeout(this.botDeliveryTimer);

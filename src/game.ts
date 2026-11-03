@@ -568,6 +568,19 @@ export class MatchController {
             description: 'Decided via Tie-Break Ladder Tier 1 (Wicket Preservation)',
             marginText: `Won via Fewer Wickets Lost: ${winWickets} vs ${loseWickets} wickets lost`
           };
+        } else if (inn1.biggestSix === 0 && inn2.biggestSix === 0) {
+          if (inn1.score === inn2.score) {
+            this.state.tieBreakerActive = true;
+            this.setupSuddenDeath();
+            return;
+          }
+          winnerId = inn1.score > inn2.score ? inn1.batter.id : inn2.batter.id;
+          tieBreakDetails = {
+            deciderTier: 'runs',
+            tierLabel: 'Runs Scored Decider',
+            description: 'Neither batter hit a six; wickets were level',
+            marginText: `Won on runs: ${Math.max(inn1.score, inn2.score)} vs ${Math.min(inn1.score, inn2.score)}`
+          };
         } else {
           // Compare actual sixes before considering aggregate carry distance.
           const secondSix = (innings: Innings): number =>

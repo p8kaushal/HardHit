@@ -6,7 +6,7 @@ import { directionFromStick, suggestedShotDirection, TouchBattingControls } from
 import { stepBall, type BallState } from '../src/ball-physics';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery } from '../src/formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
@@ -254,6 +254,8 @@ test('keyboard bowling starts at good length and updates the aim marker', () => 
   try {
     const input = new KeyboardInputManager(() => false, () => {}, () => {}, () => {}, () => 'RHB', (x, z) => positions.push([x, z]));
     assert.equal(input.intent.aimZ, -3.5);
+    assert.equal(input.getBowlingLineLabel(0), 'Off Side');
+    assert.equal(input.getBowlingLineLabel(2), 'Leg Side');
     listeners.keydown({ key: 'ArrowLeft', code: 'ArrowLeft' });
     listeners.keydown({ key: 'ArrowUp', code: 'ArrowUp' });
     assert.deepEqual(positions, [[0.8, -3.5], [0.8, -5.5]]);
@@ -544,6 +546,7 @@ test('delivery trajectory reaches the bounce point and the batter crease', () =>
 test('delivery variations affect pace and turn only after pitching', () => {
   assert.ok(deliveryDurationMs('fast') < deliveryDurationMs('slow'));
   assert.ok(deliveryDurationMs('fast', 1) < deliveryDurationMs('fast', 0));
+  assert.ok(deliveryDurationMs('offspin', 1) < deliveryDurationMs('offspin', 0));
   const release = { x: 0, y: 1.9, z: 10 };
   const bounce = { x: 0, y: 0.06, z: -3.5 };
   const end = { x: 0, y: 0.85, z: BATTER_CREASE_Z };
@@ -582,6 +585,19 @@ test('pace swing develops in the air and spin turn only after the bounce', () =>
   assert.equal(checkExtraBall({ ...delivery(0.5, -0.7), swing: 1 }).type, 'wide');
 });
 
+test('pitch marker matches the actual bounce for pace, swing and spin', () => {
+  const release = { x: 0.6, y: 1.9, z: 10 };
+  for (const ball of [delivery(0.5, -0.2), { ...delivery(0.5, 0.3), swing: -0.8 }, { ...delivery(0.5, -0.3), type: 'legspin' as const, turn: 1 }]) {
+    const bounce = { x: ball.aimTarget.x, y: 0.06, z: ball.aimTarget.z };
+    const end = { x: ball.aimTarget.x, y: 0.8, z: BATTER_CREASE_Z };
+    const progress = (bounce.z - release.z) / (end.z - release.z);
+    const actual = getDeliveryFlightPosition(progress, release, bounce, end, ball.type, ball.turn, ball.swing, ball.pace);
+    const marker = deliveryPitchPoint(ball);
+    assert.ok(Math.abs(actual.x - marker.x) < 1e-9);
+    assert.ok(Math.abs(actual.z - marker.z) < 1e-9);
+  }
+});
+
 test('delivery height is continuous at the pitch and rises after impact', () => {
   const release = { x: 0, y: 1.9, z: 10 };
   const bounce = { x: 0, y: 0.06, z: -3.5 };
@@ -603,7 +619,7 @@ test('delivery type switches between speed and swing or spin controls', () => {
     updateBowlingAdjustmentVisibility('fast');
     assert.deepEqual(hidden, { 'bowl-pace-control': false, 'bowl-swing-control': false, 'bowl-turn-control': true });
     updateBowlingAdjustmentVisibility('offspin');
-    assert.deepEqual(hidden, { 'bowl-pace-control': true, 'bowl-swing-control': true, 'bowl-turn-control': false });
+    assert.deepEqual(hidden, { 'bowl-pace-control': false, 'bowl-swing-control': true, 'bowl-turn-control': false });
   } finally {
     Object.assign(globalThis, { document: originalDocument });
   }
@@ -718,6 +734,29 @@ test('tie breaks compare second sixes before total carry and exclude fours', () 
   (game as any).resolveMatch();
   assert.equal(game.state.winnerId, first.batter.id);
   assert.equal(game.state.tieBreakDetails?.deciderTier, 'second_biggest_six');
+});
+
+test('without a six and with equal wickets, runs decide instead of aggregate distance', () => {
+  const game = match();
+  const [first, second] = game.state.innings;
+  const hit = (distance: number, runs: number): BallOutcome => ({
+    ballNumber: 1, delivery: delivery(0.5), shot: null, distance, runs,
+    isWicket: false, wicketReason: '', isFreeHit: false, isExtra: false, extraType: null
+  });
+  first.balls = [hit(60, 2)]; first.score = 2;
+  second.balls = [hit(20, 4)]; second.score = 4;
+  (game as any).resolveMatch();
+  assert.equal(game.state.winnerId, second.batter.id);
+  assert.equal(game.state.tieBreakDetails?.deciderTier, 'runs');
+  assert.match(game.state.tieBreakDetails?.marginText ?? '', /4 vs 2/);
+});
+
+test('without a six, equal wickets and equal runs lead to sudden death', () => {
+  const game = match();
+  game.state.currentInningsIndex = 1;
+  game.state.innings[0].balls = [{ ballNumber: 1, delivery: delivery(0.5), shot: null, distance: 30, runs: 0, isWicket: false, wicketReason: '', isFreeHit: false, isExtra: false, extraType: null }];
+  (game as any).resolveMatch();
+  assert.equal(game.state.tieBreakerActive, true);
 });
 
 test('fully tied innings start one-ball sudden death', () => {

@@ -62,6 +62,14 @@ export function deliveryCreaseX(delivery: DeliveryChoice): number {
   return delivery.aimTarget.x + deliverySwingAtCrease(delivery.type, delivery.swing, delivery.aimTarget.z) + deliveryTurn(delivery.type, delivery.turn);
 }
 
+/** Actual pitch point, including any movement before the bounce. */
+export function deliveryPitchPoint(delivery: DeliveryChoice): { x: number; z: number } {
+  return {
+    x: delivery.aimTarget.x + deliverySwingAtBounce(delivery.type, delivery.swing, delivery.aimTarget.z),
+    z: delivery.aimTarget.z
+  };
+}
+
 /** Approximate incoming velocity at contact from the same path used on screen. */
 export function deliveryVelocityAtCrease(delivery: DeliveryChoice): { x: number; y: number; z: number } {
   const start = { x: 0.6, y: 1.9, z: 10 };

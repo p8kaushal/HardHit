@@ -184,8 +184,8 @@ export class KeyboardInputManager {
 
   public getBowlingLineLabel(idx: number): string {
     const hand = this.getBatterHandedness();
-    if (idx === 0) return hand === 'RHB' ? 'Leg Side' : 'Off Side';
-    if (idx === 2) return hand === 'RHB' ? 'Off Side' : 'Leg Side';
+    if (idx === 0) return hand === 'RHB' ? 'Off Side' : 'Leg Side';
+    if (idx === 2) return hand === 'RHB' ? 'Leg Side' : 'Off Side';
     return 'Middle';
   }
 
