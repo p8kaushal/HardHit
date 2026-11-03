@@ -30,8 +30,10 @@ export class GameScene {
   public static CREASE_ANCHOR = new BABYLON.Vector3(0.0, 0.0, BATTER_CREASE_Z);
   public playerCreaseOffset = new BABYLON.Vector3(-0.35, 0.0, 0.0);
   private bowlerRoot: BABYLON.TransformNode | null = null;
-        public batterRoot: BABYLON.TransformNode | null = null;
-    public batMesh: BABYLON.Mesh | null = null;
+  private bowlerLegs: BABYLON.Mesh[] = [];
+  private bowlerArms: BABYLON.Mesh[] = [];
+  public batterRoot: BABYLON.TransformNode | null = null;
+  public batMesh: BABYLON.Mesh | null = null;
 
 
   // Animation state
@@ -83,9 +85,15 @@ export class GameScene {
         }
         if (globalAutoAssistConfig.isRunUpActive) {
           this.updateBowlerRunUp();
+        } else {
+          this.bowlerLegs.forEach(leg => { leg.rotation.x = 0; });
+          this.bowlerArms.forEach(arm => { arm.rotation.x = 0; });
         }
         if (globalAutoAssistConfig.isDeliveryActive) {
           this.updateBallFlight();
+        }
+        if ((globalAutoAssistConfig.isDeliveryActive || globalAutoAssistConfig.isBallInPlay || this.isAnimatingBall) && this.ballMesh) {
+          this.ballMesh.rotation.x += Math.min(this.engine.getDeltaTime(), 50) * 0.012;
         }
         if (this.isAnimatingBall && this.isBotBatting) {
           if (this.ballMesh && this.ballMesh.position.z <= -7.5 && !this.hasBotSwung) {
@@ -165,6 +173,7 @@ export class GameScene {
   }
 
   private buildStadium(): void {
+    this.scene.clearColor = new BABYLON.Color4(0.46, 0.67, 0.82, 1);
     // Ground
     const grassMaterial = new BABYLON.StandardMaterial('grassMat', this.scene);
     grassMaterial.diffuseColor = new BABYLON.Color3(0.12, 0.42, 0.16);
@@ -172,6 +181,55 @@ export class GameScene {
 
     const outfield = BABYLON.MeshBuilder.CreateGround('outfield', { width: 140, height: 140 }, this.scene);
     outfield.material = grassMaterial;
+
+    const stripeMat = new BABYLON.StandardMaterial('mownGrassMat', this.scene);
+    stripeMat.diffuseColor = new BABYLON.Color3(0.15, 0.46, 0.19);
+    stripeMat.specularColor = BABYLON.Color3.Black();
+    for (let i = -3; i <= 3; i++) {
+      const stripe = BABYLON.MeshBuilder.CreateGround(`mownStripe${i}`, { width: 140, height: 10 }, this.scene);
+      stripe.position.set(0, 0.005, i * 20);
+      stripe.material = stripeMat;
+      stripe.isPickable = false;
+    }
+
+    // Low-detail stands sit outside the 65 m rope and never affect the ball simulation.
+    const standColors = ['#223b52', '#46657a', '#d0c9ae'];
+    standColors.forEach((color, i) => {
+      const material = new BABYLON.StandardMaterial(`standMat${i}`, this.scene);
+      material.diffuseColor = BABYLON.Color3.FromHexString(color);
+      material.specularColor = BABYLON.Color3.Black();
+      const stand = BABYLON.MeshBuilder.CreateTorus(`standTier${i}`, { diameter: 148 + i * 7, thickness: 5, tessellation: 48 }, this.scene);
+      stand.position.y = 2 + i * 3;
+      stand.material = material;
+      stand.isPickable = false;
+    });
+    const seatingMat = new BABYLON.StandardMaterial('seatingMat', this.scene);
+    seatingMat.diffuseColor = BABYLON.Color3.FromHexString('#6b8692');
+    seatingMat.specularColor = BABYLON.Color3.Black();
+    for (let i = 0; i < 32; i++) {
+      const angle = i * Math.PI * 2 / 32;
+      const panel = BABYLON.MeshBuilder.CreateBox(`seatingPanel${i}`, { width: 5, height: 0.65, depth: 0.12 }, this.scene);
+      panel.position.set(Math.sin(angle) * 76, 5.8, Math.cos(angle) * 76);
+      panel.rotation.y = angle;
+      panel.material = seatingMat;
+      panel.isPickable = false;
+    }
+    const floodlightMat = new BABYLON.StandardMaterial('floodlightMat', this.scene);
+    floodlightMat.diffuseColor = BABYLON.Color3.FromHexString('#dce5e5');
+    for (let i = 0; i < 4; i++) {
+      const angle = Math.PI / 4 + i * Math.PI / 2;
+      const x = Math.sin(angle) * 80;
+      const z = Math.cos(angle) * 80;
+      const pole = BABYLON.MeshBuilder.CreateCylinder(`lightPole${i}`, { height: 20, diameter: 0.35, tessellation: 6 }, this.scene);
+      pole.position.set(x, 10, z);
+      pole.material = seatingMat;
+      pole.isPickable = false;
+      const lamps = BABYLON.MeshBuilder.CreateBox(`floodlights${i}`, { width: 5, height: 1.5, depth: 0.5 }, this.scene);
+      lamps.position.set(x, 20, z);
+      lamps.rotation.y = angle;
+      lamps.material = floodlightMat;
+      lamps.isPickable = false;
+    }
 
     // Boundary Rope
     const ropeMat = new BABYLON.StandardMaterial('ropeMat', this.scene);
@@ -261,6 +319,12 @@ export class GameScene {
       stump.position.set(position.x + (i * 0.12), stumpHeight / 2, position.z);
       stump.material = stumpMat;
     }
+    for (let i = -1; i <= 0; i++) {
+      const bail = BABYLON.MeshBuilder.CreateCylinder(`bail_${position.z}_${i}`, { height: 0.12, diameter: 0.025, tessellation: 6 }, this.scene);
+      bail.rotation.z = Math.PI / 2;
+      bail.position.set(position.x + (i + 0.5) * 0.12, stumpHeight + 0.015, position.z);
+      bail.material = stumpMat;
+    }
   }
 
   private setupCameras(): void {
@@ -314,112 +378,74 @@ export class GameScene {
   }
 
   private buildCharacters(): void {
-    // Scene-Graph Duplicate Audit & Purge
-    const purgeNames = ['batter', 'player', 'batsman', 'avatar', 'preview', 'capsule'];
-    
-    // 2. Purge Preview Overlays & Camera Attachments
-    this.scene.meshes.forEach(m => {
-      const lowerName = m.name.toLowerCase();
-      const isPreview = lowerName.includes('preview') || lowerName.includes('avatar');
-      const isCharacter = purgeNames.some(pn => lowerName.includes(pn));
-      const nearCamera = m.position.z < -19.0 || m.position.x > 1.0;
-      const isParentedToCamera = m.parent === this.primaryCamera || (m.parent && m.parent.name.includes('cameraPivot'));
+    const material = (name: string, color: string) => {
+      const result = new BABYLON.StandardMaterial(name, this.scene);
+      result.diffuseColor = BABYLON.Color3.FromHexString(color);
+      result.specularColor = new BABYLON.Color3(0.06, 0.06, 0.06);
+      return result;
+    };
+    const blue = material('batterKit', '#174e98');
+    const green = material('bowlerKit', '#2d7b57');
+    const trousers = material('trousers', '#e5e1d4');
+    const skin = material('skin', '#b98260');
+    const helmet = material('helmet', '#18334d');
+    const pads = material('pads', '#f2eee0');
+    const shoes = material('shoes', '#293d49');
+    const batWood = material('batWood', '#cda36a');
+    const grip = material('batGrip', '#344b5e');
 
-      if (isPreview && nearCamera) {
-        m.dispose();
-      }
-      if (isCharacter && isParentedToCamera) {
-        m.dispose();
-      }
+    const part = (_name: string, parent: BABYLON.TransformNode, mesh: BABYLON.Mesh, mat: BABYLON.Material, x: number, y: number, z: number) => {
+      mesh.parent = parent;
+      mesh.position.set(x, y, z);
+      mesh.material = mat;
+      mesh.isPickable = false;
+      return mesh;
+    };
+    const limb = (name: string, parent: BABYLON.TransformNode, mat: BABYLON.Material, x: number, y: number, z: number, height: number, diameter: number) =>
+      part(name, parent, BABYLON.MeshBuilder.CreateCylinder(name, { height, diameter, tessellation: 8 }, this.scene), mat, x, y, z);
+    const ball = (name: string, parent: BABYLON.TransformNode, mat: BABYLON.Material, x: number, y: number, z: number, diameter: number) =>
+      part(name, parent, BABYLON.MeshBuilder.CreateSphere(name, { diameter, segments: 8 }, this.scene), mat, x, y, z);
+    const box = (name: string, parent: BABYLON.TransformNode, mat: BABYLON.Material, x: number, y: number, z: number, width: number, height: number, depth: number) =>
+      part(name, parent, BABYLON.MeshBuilder.CreateBox(name, { width, height, depth }, this.scene), mat, x, y, z);
+
+    const bowler = new BABYLON.TransformNode('bowlerRoot', this.scene);
+    bowler.position.set(0.6, 0, 11.5);
+    limb('bowlerTorso', bowler, green, 0, 1.24, 0, 0.68, 0.43);
+    ball('bowlerHead', bowler, skin, 0, 1.77, 0, 0.28);
+    const bowlerLeftArm = limb('bowlerLArm', bowler, green, -0.3, 1.25, 0, 0.62, 0.13);
+    bowlerLeftArm.rotation.z = -0.2;
+    const bowlerRightArm = limb('bowlerRArm', bowler, green, 0.3, 1.25, 0, 0.62, 0.13);
+    bowlerRightArm.rotation.z = 0.2;
+    this.bowlerArms = [bowlerLeftArm, bowlerRightArm];
+    this.bowlerLegs = [-1, 1].map((side, i) => {
+      const leg = limb(`bowlerLeg${i}`, bowler, trousers, side * 0.13, 0.47, 0, 0.84, 0.16);
+      box(`bowlerShoe${i}`, bowler, shoes, side * 0.13, 0.06, 0.04, 0.18, 0.1, 0.28);
+      return leg;
     });
+    this.bowlerRoot = bowler;
 
-    const batterNodes = this.scene.meshes.filter(m => purgeNames.some(pn => m.name.toLowerCase().includes(pn)));
-    batterNodes.forEach(m => m.dispose());
-    
-    const batterTransforms = this.scene.transformNodes.filter(t => purgeNames.some(pn => t.name.toLowerCase().includes(pn)));
-    batterTransforms.forEach(t => t.dispose());
-
-    // --------------------------------------------------------
-    // Dedicated Bowler Mesh Hierarchy
-    // --------------------------------------------------------
-    const bowlerRoot = new BABYLON.TransformNode("bowlerRoot", this.scene);
-    bowlerRoot.position.set(0.6, 0.0, 11.5);
-    bowlerRoot.parent = null;
-
-    const bowlerMat = new BABYLON.StandardMaterial('bowlerMat', this.scene);
-    bowlerMat.diffuseColor = new BABYLON.Color3(0.2, 0.6, 0.2); // Green
-    bowlerMat.alpha = 1.0;
-
-    const bowlerTorso = BABYLON.MeshBuilder.CreateCylinder('bowlerTorso', { height: 1.2, diameter: 0.4 }, this.scene);
-    bowlerTorso.parent = bowlerRoot;
-    bowlerTorso.position = new BABYLON.Vector3(0, 1.2, 0);
-    bowlerTorso.material = bowlerMat;
-
-    const bowlerHead = BABYLON.MeshBuilder.CreateSphere('bowlerHead', { diameter: 0.35 }, this.scene);
-    bowlerHead.parent = bowlerRoot;
-    bowlerHead.position = new BABYLON.Vector3(0, 1.95, 0);
-    bowlerHead.material = bowlerMat;
-
-    const bowlerLeftArm = BABYLON.MeshBuilder.CreateCylinder('bowlerLArm', { height: 0.6, diameter: 0.15 }, this.scene);
-    bowlerLeftArm.parent = bowlerRoot;
-    bowlerLeftArm.position = new BABYLON.Vector3(-0.3, 1.4, 0);
-    bowlerLeftArm.rotation.z = Math.PI / 8;
-    bowlerLeftArm.material = bowlerMat;
-
-    const bowlerRightArm = BABYLON.MeshBuilder.CreateCylinder('bowlerRArm', { height: 0.6, diameter: 0.15 }, this.scene);
-    bowlerRightArm.parent = bowlerRoot;
-    bowlerRightArm.position = new BABYLON.Vector3(0.3, 1.4, 0);
-    bowlerRightArm.rotation.z = -Math.PI / 8;
-    bowlerRightArm.material = bowlerMat;
-
-    this.bowlerRoot = bowlerRoot;
-
-    // --------------------------------------------------------
-    // Unified Batter (Physical presence at crease)
-    // --------------------------------------------------------
-    const batterRoot = new BABYLON.TransformNode("batterRoot", this.scene);
-    batterRoot.position.set(-0.35, 0.0, -8.8);
-    batterRoot.parent = null;
-
-    const batterBlueMat = new BABYLON.StandardMaterial('batterBlueMat', this.scene);
-    batterBlueMat.diffuseColor = new BABYLON.Color3(0.1, 0.3, 0.85); // Blue jersey
-    batterBlueMat.alpha = 1.0;
-
-    const bTorso = BABYLON.MeshBuilder.CreateCylinder('batterTorso', { height: 1.2, diameter: 0.4 }, this.scene);
-    bTorso.parent = batterRoot;
-    bTorso.position = new BABYLON.Vector3(0, 1.2, 0);
-    bTorso.material = batterBlueMat;
-
-    const bHead = BABYLON.MeshBuilder.CreateSphere('batterHead', { diameter: 0.35 }, this.scene);
-    bHead.parent = batterRoot;
-    bHead.position = new BABYLON.Vector3(0, 1.9, 0);
-    bHead.material = batterBlueMat;
-    
-    const bArms = BABYLON.MeshBuilder.CreateCylinder('batterArms', { height: 0.6, diameter: 0.15 }, this.scene);
-    bArms.parent = batterRoot;
-    bArms.position = new BABYLON.Vector3(0, 0.8, 0); // zero x/z
-    bArms.material = batterBlueMat;
-
-    // True Pitch Bat
-    const batMat = new BABYLON.StandardMaterial('batMat', this.scene);
-    batMat.diffuseColor = new BABYLON.Color3(0.65, 0.5, 0.3);
-
-    const bBat = BABYLON.MeshBuilder.CreateBox('batMesh', { width: 0.08, height: 0.9, depth: 0.04 }, this.scene);
-    bBat.parent = batterRoot;
-    bBat.position.set(0, 0.7, 0); // zero x/z
-    bBat.rotation.z = -0.4;
-    bBat.material = batMat;
-    
-    this.batMesh = bBat;
-
-    batterRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
-    batterRoot.rotation = new BABYLON.Vector3(0, Math.PI, 0);
-
-    this.batterRoot = batterRoot;
-    // We do NOT set position here again to keep it ONCE as instructed, 
-    // but the prompt says: Set its position ONCE at initialization: batterRoot.position.set(-0.35, 0.0, -8.8);
-        this.updateBatterPosition();
-
+    const batter = new BABYLON.TransformNode('batterRoot', this.scene);
+    batter.position.set(-0.35, 0, -8.8);
+    limb('batterTorso', batter, blue, 0, 1.23, 0, 0.67, 0.42);
+    ball('batterHead', batter, skin, 0, 1.76, 0, 0.27);
+    const cap = ball('batterHelmet', batter, helmet, 0, 1.84, 0, 0.29);
+    cap.scaling.y = 0.75;
+    box('helmetPeak', batter, helmet, 0, 1.81, 0.15, 0.26, 0.035, 0.16);
+    [-1, 1].forEach((side, i) => {
+      limb(`batterLeg${i}`, batter, trousers, side * 0.13, 0.48, 0, 0.86, 0.17);
+      box(`batterPad${i}`, batter, pads, side * 0.13, 0.38, 0.095, 0.19, 0.57, 0.1);
+      box(`batterShoe${i}`, batter, shoes, side * 0.13, 0.06, 0.06, 0.18, 0.1, 0.3);
+      const arm = limb(`batterArm${i}`, batter, blue, side * 0.27, 1.18, 0.07, 0.58, 0.13);
+      arm.rotation.z = side * 0.24;
+      ball(`batterGlove${i}`, batter, pads, side * 0.3, 0.89, 0.13, 0.16);
+    });
+    const bat = box('batMesh', batter, batWood, 0.36, 0.48, 0.2, 0.22, 0.64, 0.065);
+    bat.rotation.z = -0.2;
+    limb('batHandle', bat, grip, 0, 0.44, 0, 0.27, 0.05);
+    this.batMesh = bat;
+    batter.rotation.y = Math.PI;
+    this.batterRoot = batter;
+    this.updateBatterPosition();
   }
 
   public setBatterHandedness(hand: 'RHB' | 'LHB'): void {
@@ -468,6 +494,13 @@ export class GameScene {
     
     this.ballMesh = BABYLON.MeshBuilder.CreateSphere('cricketBall', { diameter: BALL_VISUAL_RADIUS * 2 }, this.scene);
     this.ballMesh.material = ballMat;
+    const seamMat = new BABYLON.StandardMaterial('ballSeamMat', this.scene);
+    seamMat.diffuseColor = BABYLON.Color3.FromHexString('#e8d8bf');
+    const seam = BABYLON.MeshBuilder.CreateTorus('ballSeam', { diameter: BALL_VISUAL_RADIUS * 2, thickness: 0.006, tessellation: 20 }, this.scene);
+    seam.parent = this.ballMesh;
+    seam.rotation.z = Math.PI / 3;
+    seam.material = seamMat;
+    seam.isPickable = false;
     this.ballMesh.setEnabled(false);
   }
 
@@ -783,6 +816,12 @@ export class GameScene {
 
   public animateBatterSwing(_directionAngle: number, successCallback: () => void): void {
     if (this.batMesh && this.batterRoot) {
+      const batter = this.batterRoot;
+      const bodySwing = BABYLON.Animation.CreateAndStartAnimation(
+        'batterBodySwing', batter, 'rotation.y', 60, 9, Math.PI, Math.PI + 0.35,
+        BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+      );
+      bodySwing?.onAnimationEndObservable.add(() => { batter.rotation.y = Math.PI; });
       // Temporarily rotate batter and bat to swing (9 frames at 60fps = 0.15s)
       const swingAnim = BABYLON.Animation.CreateAndStartAnimation(
         'batterSwing',
@@ -841,6 +880,8 @@ export class GameScene {
     this.bowlerRoot.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
     this.bowlerRoot.rotation = new BABYLON.Vector3(0, Math.PI, 0);
     this.bowlerRoot.position = new BABYLON.Vector3(0.6, 0.0, 11.5);
+    this.bowlerLegs.forEach(leg => { leg.rotation.x = 0; });
+    this.bowlerArms.forEach(arm => { arm.rotation.x = 0; });
     
     // Ensure no ball meshes or other unintended geometries are parented
     const children = this.bowlerRoot.getChildren();
@@ -874,6 +915,8 @@ export class GameScene {
     this.bowlerRoot.position.y = bounce;
     this.bowlerRoot.rotation.x = Math.sin(progress * Math.PI * 16) * 0.2;
     this.bowlerRoot.position.x = deliveryReleaseX(globalAutoAssistConfig.currentDelivery || { bowlingArm: globalAutoAssistConfig.bowlerArm });
+    this.bowlerLegs.forEach((leg, i) => { leg.rotation.x = Math.sin(progress * Math.PI * 8 + i * Math.PI) * 0.3; });
+    this.bowlerArms.forEach((arm, i) => { arm.rotation.x = Math.sin(progress * Math.PI * 8 + i * Math.PI) * -0.25; });
   }
 
   public updateBallFlight(): void {
