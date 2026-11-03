@@ -44,14 +44,19 @@ export class UIManager {
 
   // Result Toast Auto-dismiss Timer
   private toastDismissTimer: any = null;
-  private botDeliveryTimer: any = null;
+  private botDeliveryTimer: number | null = null;
   private cancelBattingRunUp: (() => void) | null = null;
 
-  public setController(controller: MatchController) {
+  private cancelPendingDelivery(): void {
     this.deliveryGeneration++;
     this.cancelBattingRunUp?.();
     this.cancelBattingRunUp = null;
-    if (this.botDeliveryTimer) clearGameTimeout(this.botDeliveryTimer);
+    if (this.botDeliveryTimer !== null) clearGameTimeout(this.botDeliveryTimer);
+    this.botDeliveryTimer = null;
+  }
+
+  public setController(controller: MatchController) {
+    this.cancelPendingDelivery();
     this.batterPosition = { x: 0, z: 0 };
     this.batterPositionLocked = false;
     this.controller = controller;
@@ -960,9 +965,7 @@ export class UIManager {
   }
 
   public setupActiveTurn(): void {
-    this.cancelBattingRunUp?.();
-    this.cancelBattingRunUp = null;
-    this.deliveryGeneration++;
+    this.cancelPendingDelivery();
     this.deliveryStarted = false;
     this.isBallActive = false;
     const state = this.controller.state;
@@ -1019,8 +1022,10 @@ export class UIManager {
       this.gameScene.updateBounceMarker(deliveryPitchPoint(this.activeDelivery));
       globalAutoAssistConfig.currentDelivery = this.activeDelivery;
 
-      if (this.botDeliveryTimer) clearGameTimeout(this.botDeliveryTimer);
+      const generation = this.deliveryGeneration;
       this.botDeliveryTimer = setGameTimeout(() => {
+        if (generation !== this.deliveryGeneration) return;
+        this.botDeliveryTimer = null;
         this.deliverBall3D();
       }, 1500);
     } else {
@@ -1256,9 +1261,7 @@ export class UIManager {
   public handleRematch(): void {
     this.batterPosition = { x: 0, z: 0 };
     this.batterPositionLocked = false;
-    this.cancelBattingRunUp?.();
-    this.cancelBattingRunUp = null;
-    this.deliveryGeneration++;
+    this.cancelPendingDelivery();
     this.deliveryStarted = false;
     // 1. Hide summary modal
     const modal = document.getElementById('match-summary-modal');
@@ -1275,10 +1278,6 @@ export class UIManager {
     this.activeDelivery = null;
     this.activeShot = null;
     this.isBallActive = false;
-    if (this.botDeliveryTimer) {
-      clearGameTimeout(this.botDeliveryTimer);
-      this.botDeliveryTimer = null;
-    }
     this.hideResultToast();
 
     // 4. Reset HUD & 6-Ball Over Tracker to 6 unbowled gray dots
@@ -1328,6 +1327,7 @@ export class UIManager {
   }
 
   public handleReturnToLobby(): void {
+    this.cancelPendingDelivery();
     // 1. Hide summary modal
     const modal = document.getElementById('match-summary-modal');
     if (modal) {

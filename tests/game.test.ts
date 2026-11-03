@@ -10,6 +10,7 @@ import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, batterContactPro
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout, shouldPauseGameplay } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
+import { UIManager } from '../src/ui';
 import { moveBatter } from '../src/batter-position';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
 
@@ -98,6 +99,35 @@ test('pause freezes gameplay time and scheduled deliveries', () => {
   } finally {
     setGamePaused(false);
     Object.assign(globalThis, { performance: originalPerformance, window: originalWindow, clearTimeout: originalClearTimeout });
+  }
+});
+
+test('returning to the lobby cancels a pending bot delivery and run-up', () => {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalClearTimeout = globalThis.clearTimeout;
+  const queue = new Map<number, () => void>();
+  let next = 0;
+  let runUpCancelled = 0;
+  Object.assign(globalThis, {
+    document: { getElementById: () => null, querySelectorAll: () => [] },
+    window: { setTimeout: (fn: () => void) => { const id = ++next; queue.set(id, fn); return id; } },
+    clearTimeout: (id: number) => queue.delete(id)
+  });
+  try {
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.deliveryGeneration = 3;
+    ui.cancelBattingRunUp = () => { runUpCancelled++; };
+    ui.botDeliveryTimer = setGameTimeout(() => { throw new Error('delivery survived lobby return'); }, 1500);
+    ui.gameScene = { setCameraMode() {} };
+    ui.refreshLobbyView = () => {};
+    ui.handleReturnToLobby();
+    assert.equal(runUpCancelled, 1);
+    assert.equal(ui.deliveryGeneration, 4);
+    assert.equal(ui.botDeliveryTimer, null);
+    assert.equal(queue.size, 0);
+  } finally {
+    Object.assign(globalThis, { document: originalDocument, window: originalWindow, clearTimeout: originalClearTimeout });
   }
 });
 
