@@ -1,6 +1,10 @@
-// Gameplay time stops while the device is in portrait orientation.
+// Gameplay time stops while play is obscured or the device is in portrait.
 let pausedAt: number | null = null;
 let pausedDuration = 0;
+
+export function shouldPauseGameplay(playing: boolean, portrait: boolean, hidden: boolean): boolean {
+  return playing && (portrait || hidden);
+}
 
 export function gameNow(): number {
   return (pausedAt ?? performance.now()) - pausedDuration;

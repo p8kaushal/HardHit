@@ -167,6 +167,8 @@ export class MatchController {
   public state!: MatchState;
   public readonly botDifficulty: 'Rookie' | 'Medium' | 'Hard';
   private transitionPending = false;
+  private transitionGeneration = 0;
+  private transitionOverlay: HTMLElement | null = null;
 
   constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard') {
     this.botDifficulty = botDifficulty;
@@ -176,7 +178,10 @@ export class MatchController {
 
   public reset(): void {
     if (globalAutoAssistConfig.isBallInPlay) return;
+    this.transitionGeneration++;
     this.transitionPending = false;
+    this.transitionOverlay?.parentNode?.removeChild(this.transitionOverlay);
+    this.transitionOverlay = null;
     const player = getOrCreatePlayer();
     const bot = createBotPlayer(this.botDifficulty);
     this.state = this.createInitialMatchState(player, bot);
@@ -448,6 +453,8 @@ export class MatchController {
 
       // Overlay
       const overlay = document.createElement('div');
+      this.transitionOverlay = overlay;
+      const generation = this.transitionGeneration;
       overlay.id = 'innings-transition-overlay';
       overlay.style.position = 'absolute';
       overlay.style.top = '0';
@@ -476,9 +483,11 @@ export class MatchController {
       }
 
       setTimeout(() => {
+        if (generation !== this.transitionGeneration) return;
         if (overlay.parentNode) {
           overlay.parentNode.removeChild(overlay);
         }
+        this.transitionOverlay = null;
         this.transitionPending = false;
         
         // If we are at an even index (0, 2, 4), move to the next innings

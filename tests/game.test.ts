@@ -8,7 +8,7 @@ import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
 import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
-import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout } from '../src/game-clock';
+import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout, shouldPauseGameplay } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
 import { moveBatter } from '../src/batter-position';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
@@ -55,7 +55,15 @@ test('sound effects unlock on input and respect mute without interrupting play',
   storage.delete('hardhit_sound_muted');
 });
 
-test('portrait pause freezes gameplay time and scheduled deliveries', () => {
+test('gameplay pauses when hidden or in portrait, and resumes only when both clear', () => {
+  assert.equal(shouldPauseGameplay(true, false, false), false);
+  assert.equal(shouldPauseGameplay(true, true, false), true);
+  assert.equal(shouldPauseGameplay(true, false, true), true);
+  assert.equal(shouldPauseGameplay(true, true, true), true);
+  assert.equal(shouldPauseGameplay(false, true, true), false);
+});
+
+test('pause freezes gameplay time and scheduled deliveries', () => {
   const originalPerformance = globalThis.performance;
   const originalWindow = globalThis.window;
   const originalClearTimeout = globalThis.clearTimeout;
@@ -916,6 +924,34 @@ test('a finished innings schedules only one transition', () => {
     assert.equal(timers.length, 1);
     timers[0]();
     assert.equal(game.state.currentInningsIndex, 1);
+  } finally {
+    Object.assign(globalThis, { document: originalDocument, setTimeout: originalSetTimeout });
+  }
+});
+
+test('reset invalidates a pending innings transition and removes its overlay', () => {
+  const game = match();
+  const originalDocument = globalThis.document;
+  const originalSetTimeout = globalThis.setTimeout;
+  const timers: Array<() => void> = [];
+  let removed = 0;
+  Object.assign(globalThis, {
+    document: {
+      createElement: () => ({ style: {}, parentNode: { removeChild() { removed++; } } }),
+      getElementById: () => null,
+      body: { appendChild() {} }
+    },
+    setTimeout: (callback: () => void) => { timers.push(callback); return 0; }
+  });
+  try {
+    for (let i = 0; i < 6; i++) game.recordBall(delivery(0.5), null);
+    game.handleInningsCompletion();
+    game.reset();
+    assert.equal(removed, 1);
+    timers[0]();
+    assert.equal(game.state.status, 'toss');
+    assert.equal(game.state.currentInningsIndex, 0);
+    assert.equal(removed, 1);
   } finally {
     Object.assign(globalThis, { document: originalDocument, setTimeout: originalSetTimeout });
   }

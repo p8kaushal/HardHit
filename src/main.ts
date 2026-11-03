@@ -1,7 +1,7 @@
 import { getOrCreatePlayer, MatchController } from './game';
 import { UIManager, renderProfile, renderLeaderboard } from './ui';
 import { runBotSimulation } from './simulate';
-import { setGamePaused } from './game-clock';
+import { setGamePaused, shouldPauseGameplay } from './game-clock';
 import { gameSound } from './sound';
 
 let controller: MatchController | null = null;
@@ -12,11 +12,12 @@ document.addEventListener('pointerdown', () => gameSound.unlock(), { capture: tr
 document.addEventListener('keydown', () => gameSound.unlock(), { capture: true });
 
 const portrait = window.matchMedia('(orientation: portrait)');
-function updateOrientation(): void {
+function updateGameplayPause(): void {
   const playing = document.getElementById('screen-gameplay')!.classList.contains('active');
-  setGamePaused(playing && portrait.matches);
+  setGamePaused(shouldPauseGameplay(playing, portrait.matches, document.hidden));
 }
-portrait.addEventListener('change', updateOrientation);
+portrait.addEventListener('change', updateGameplayPause);
+document.addEventListener('visibilitychange', updateGameplayPause);
 
 function loadLobbyProfile(): void {
   const player = getOrCreatePlayer();
@@ -28,7 +29,7 @@ function showScreen(screenId: string): void {
   const screens = document.querySelectorAll('.screen');
   screens.forEach(s => s.classList.remove('active'));
   document.getElementById(screenId)!.classList.add('active');
-  updateOrientation();
+  updateGameplayPause();
 }
 
 function initLobby(): void {
