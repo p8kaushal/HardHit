@@ -22,6 +22,9 @@ export function initBowlingAdjustmentReadouts(): void {
       output.textContent = name === 'swing'
         ? value === 0 ? 'STRAIGHT' : `${value < 0 ? '←' : '→'} ${Math.abs(value)}%`
         : `${value}%`;
+      input.setAttribute('aria-valuetext', name === 'swing'
+        ? value === 0 ? 'Straight' : `${Math.abs(value)} percent ${value < 0 ? 'left' : 'right'}`
+        : `${value} percent`);
     };
     input.addEventListener('input', update);
     update();

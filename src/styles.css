@@ -3092,3 +3092,58 @@ body { min-height: 100dvh; }
   #control-bowling .bowling-adjustment input { min-height: 18px; }
   #control-bowling .right-dock .size-large { min-height: 32px; }
 }
+
+/* Pace is a vertical intensity meter; movement stays horizontal. */
+.bowling-settings { display: flex; align-items: stretch; gap: .5rem; width: 100%; }
+.bowling-settings .pace-control {
+  flex: 0 0 3.1rem;
+  align-items: center;
+  gap: .1rem;
+  color: white;
+  font-size: .58rem;
+  font-weight: 800;
+}
+.pace-control output { color: #70e4ff; font-size: .65rem; }
+.pace-control input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 28px;
+  height: clamp(60px, 26dvh, 125px);
+  padding: 0;
+  background: transparent;
+  touch-action: none;
+}
+.pace-control input[type="range"]::-webkit-slider-runnable-track {
+  width: 9px;
+  border-radius: 6px;
+  background: linear-gradient(to top, #31d87d, #d6e64b 40%, #ffb63e 70%, #f04a58);
+}
+.pace-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-radius: 5px;
+  background: #1d2a3a;
+  margin-left: -6px;
+}
+.pace-control input[type="range"]::-moz-range-track {
+  width: 9px;
+  border-radius: 6px;
+  background: linear-gradient(to top, #31d87d, #d6e64b 40%, #ffb63e 70%, #f04a58);
+}
+.pace-control input[type="range"]::-moz-range-thumb { width: 18px; height: 10px; border: 2px solid #fff; border-radius: 5px; background: #1d2a3a; }
+.bowling-movement { display: flex; flex: 1; min-width: 0; flex-direction: column; justify-content: space-between; gap: .3rem; }
+.bowling-movement .movement-control { width: 100%; }
+.movement-directions { display: flex; justify-content: space-between; color: #f6d34d; font-size: .9rem; line-height: 1; padding: 0 .3rem; }
+.movement-directions span { color: #fff; }
+.bowling-movement .action-btn-row, .bowling-movement .size-large { width: 100%; }
+@media (orientation: landscape) and (max-height: 320px) {
+  .bowling-settings { gap: .2rem; }
+  .bowling-settings .pace-control { flex-basis: 2.2rem; }
+  .pace-control input[type="range"] { height: clamp(55px, 29dvh, 90px); }
+  .movement-directions { font-size: .75rem; }
+  .bowling-movement { gap: .1rem; }
+}

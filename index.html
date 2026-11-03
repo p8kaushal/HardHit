@@ -452,12 +452,15 @@
               </div>
             </div>
 
-            <label id="bowl-pace-control" class="bowling-adjustment"><span class="adjustment-title">PACE <output id="bowl-pace-value">50%</output></span><input id="bowl-pace" type="range" min="0" max="100" value="50" aria-label="Bowling pace intensity"><span class="adjustment-ends">LOW <span>HIGH</span></span></label>
-            <label id="bowl-swing-control" class="bowling-adjustment"><span class="adjustment-title">SWING <output id="bowl-swing-value">STRAIGHT</output></span><input id="bowl-swing" type="range" min="-100" max="100" value="0" aria-label="Swing direction and amount from bowler's view"><span class="adjustment-ends">LEFT <span>RIGHT</span></span></label>
-            <label id="bowl-turn-control" class="bowling-adjustment hidden"><span class="adjustment-title">TURN <output id="bowl-turn-value">50%</output></span><input id="bowl-turn" type="range" min="0" max="100" value="50" aria-label="Spin turn intensity"><span class="adjustment-ends">LOW <span>HIGH</span></span></label>
-
-            <div class="action-btn-row">
-              <button id="btn-bowl-pitch" class="btn primary-btn size-large">HOLD &amp; RELEASE</button>
+            <div class="bowling-settings">
+              <label id="bowl-pace-control" class="bowling-adjustment pace-control"><span>PACE</span><output id="bowl-pace-value">50%</output><input id="bowl-pace" type="range" min="0" max="100" value="50" aria-label="Bowling pace intensity" aria-orientation="vertical"><span class="pace-low">LOW</span></label>
+              <div class="bowling-movement">
+                <label id="bowl-swing-control" class="bowling-adjustment movement-control"><span class="adjustment-title">SWING <output id="bowl-swing-value">STRAIGHT</output></span><span class="movement-directions" aria-hidden="true">↙ <span>↑</span> ↘</span><input id="bowl-swing" type="range" min="-100" max="100" value="0" aria-label="Swing direction and amount from bowler's view"><span class="adjustment-ends">LEFT <span>RIGHT</span></span></label>
+                <label id="bowl-turn-control" class="bowling-adjustment movement-control hidden"><span class="adjustment-title">TURN <output id="bowl-turn-value">50%</output></span><input id="bowl-turn" type="range" min="0" max="100" value="50" aria-label="Spin turn intensity"><span class="adjustment-ends">LOW <span>HIGH</span></span></label>
+                <div class="action-btn-row">
+                  <button id="btn-bowl-pitch" class="btn primary-btn size-large">HOLD &amp; RELEASE</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
