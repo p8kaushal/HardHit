@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './
 import { GameScene } from './scene';
 import { BallOutcome, DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { BATTER_CONTACT_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget } from './formula';
+import { BATTER_CONTACT_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget, sampleFrontFootLanding } from './formula';
 import { moveBatter, type BatterPosition } from './batter-position';
 import { KeyboardInputManager } from './input';
 import { suggestedShotDirection, TouchBattingControls } from './touch-controls';
@@ -39,6 +39,7 @@ export class UIManager {
   private selectedShotType: ShotType = 'grounded';
   private selectedBowlType: 'fast' | 'medium' | 'slow' | 'offspin' | 'legspin' = 'fast';
   private overTheWicket = true;
+  private frontFootHeel = -0.08;
   public isBannerActive: boolean = false;
 
   // Result Toast Auto-dismiss Timer
@@ -386,6 +387,9 @@ export class UIManager {
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     if (isPlayerBatting || this.isBallActive || globalAutoAssistConfig.isRunUpActive) return;
 
+    const pace = (document.getElementById('bowl-pace') as HTMLInputElement).valueAsNumber / 100;
+    this.frontFootHeel = sampleFrontFootLanding(this.controller.getCurrentInnings().bowler.stats.bowling.accuracy, pace, Math.random());
+
     this.isBallActive = true; 
     globalAutoAssistConfig.isRunUpActive = true;
     globalAutoAssistConfig.runUpStartTime = gameNow();
@@ -459,6 +463,7 @@ export class UIManager {
       overTheWicket: this.overTheWicket,
       bowlingArm: this.controller.getCurrentInnings().bowler.bowlingArm || 'Right',
       releaseTiming: timing,
+      frontFootHeel: this.frontFootHeel,
       pace: (document.getElementById('bowl-pace') as HTMLInputElement).valueAsNumber / 100,
       turn: spin ? (document.getElementById('bowl-turn') as HTMLInputElement).valueAsNumber / 100 : 0,
       swing: spin ? 0 : (document.getElementById('bowl-swing') as HTMLInputElement).valueAsNumber / 100
@@ -694,7 +699,7 @@ export class UIManager {
            title = `Dot Ball`;
            desc = `Fielded safely. 0 runs.`;
         }
-        if (lastBall.extraType === 'noball') desc += ' No-ball: one penalty run and a free hit.';
+        if (lastBall.extraType === 'noball') desc += ` No-ball: front foot ${((lastBall.delivery.frontFootHeel ?? 0) * 100).toFixed(1)} cm over; one penalty and a free hit.`;
         // Step 2: Freeze the tracking camera target on ball's final location and display scoring result banner for exactly 2.0 seconds
         this.showResultToast(title, desc);
       }
@@ -772,7 +777,9 @@ export class UIManager {
 
     if (outcome.isExtra && (!outcome.shot || outcome.missed || outcome.extraType === 'wide')) {
       title = outcome.wicketReason || 'Extra Ball!';
-      desc = 'Bowler committed an illegal delivery. Extra ball!';
+      desc = outcome.extraType === 'noball'
+        ? `Front foot ${((outcome.delivery.frontFootHeel ?? 0) * 100).toFixed(1)} cm over the line. Extra ball and free hit.`
+        : 'Wide delivery. One penalty run and an extra ball.';
       this.gameScene.animateMissWicket(false);
       this.showResultToast(title, desc);
     } else if (outcome.isWicket) {

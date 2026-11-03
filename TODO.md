@@ -17,6 +17,7 @@
 ## Remaining foundations
 
 - [ ] Calibrate ball and bat parameters against measured cricket data; replace the current timing-based contact approximation with spatial bat/ball contact.
-- [ ] Replace timing-derived no-balls with a modeled front-foot decision and complete wide, LBW and free-hit cases.
+- [x] Record a sampled front-foot landing separately from release timing and use it for front-foot no-balls.
+- [ ] Calibrate front-foot variability, add a visible delivery-stride/foot replay and cover back-foot faults, wides, LBW and free-hit edge cases.
 - [ ] Profile frame pacing and input latency on real phones and tablets; build repeatable multi-device gameplay tests.
 - [ ] Add basic character animations after the control and physics foundations are stable, followed by authoritative real-player multiplayer.

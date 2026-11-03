@@ -77,6 +77,20 @@ export function deliveryCreaseX(delivery: DeliveryChoice): number {
   return deliveryBaseCreaseX(delivery) + deliverySwingAtCrease(delivery.type, delivery.swing, delivery.aimTarget.z) + deliveryTurn(delivery.type, delivery.turn);
 }
 
+/** Approximate heel position at front-foot landing, behind the crease negative. */
+export function sampleFrontFootLanding(accuracy: number, pace: number, sample: number): number {
+  const skill = Math.max(0, Math.min(100, accuracy)) / 100;
+  const effort = Math.max(0, Math.min(1, pace));
+  const spread = 0.04 + (1 - skill) * 0.10;
+  const random = Math.max(0, Math.min(1, sample));
+  return -0.08 + (effort - 0.5) * 0.04 + (random * 2 - 1) * spread;
+}
+
+/** A heel at or beyond the line leaves no modeled part of the foot behind it. */
+export function isFrontFootNoBall(delivery: Pick<DeliveryChoice, 'frontFootHeel'>): boolean {
+  return delivery.frontFootHeel !== undefined && Number.isFinite(delivery.frontFootHeel) && delivery.frontFootHeel >= 0;
+}
+
 /** Actual pitch point, including any movement before the bounce. */
 export function deliveryPitchPoint(delivery: DeliveryChoice): { x: number; z: number } {
   return {
@@ -113,7 +127,7 @@ export function deliveryVelocityAtCrease(delivery: DeliveryChoice): { x: number;
 
 /** Simplified pad and stump geometry, in metres, for a missed delivery. */
 export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'LHB', offeredShot: boolean): 'lbw' | 'bowled' | null {
-  if (delivery.releaseTiming > 0.95) return null;
+  if (isFrontFootNoBall(delivery)) return null;
   const ballRadius = 0.036;
   const stumpHalfWidth = 0.1143;
   const stumpHeight = 0.711;
@@ -386,10 +400,10 @@ export function calculateDistance(
 }
 
 /**
- * Check for wide/no-ball based on release timing.
+ * Check the modeled front-foot landing and the line at the batter.
  */
 export function checkExtraBall(delivery: DeliveryChoice, _batterHand: 'RHB' | 'LHB' = 'RHB'): { isExtra: boolean; type: 'wide' | 'noball' | null } {
-  if (delivery.releaseTiming > 0.95) {
+  if (isFrontFootNoBall(delivery)) {
     return { isExtra: true, type: 'noball' };
   }
 

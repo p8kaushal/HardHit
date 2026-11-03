@@ -330,7 +330,7 @@ export class MatchController {
       if (extra.type === 'wide') {
         wicketReason = 'Penalty - Wide ball!';
       } else {
-        wicketReason = 'Penalty - No ball! (Free Hit next)';
+        wicketReason = 'Front-foot no-ball! (Free hit next)';
       }
       distance = 0;
       console.log(`[GAME EVENT] Extra ball penalty: ${extra.type?.toUpperCase()}. Innings score: ${innings.score}.`);
@@ -343,7 +343,7 @@ export class MatchController {
       console.log(`[GAME EVENT] Missed delivery. Ball number ${ballNumber}`);
     } else if (shot && wicketResult && extra.type !== 'wide') {
       isWicket = wicketResult.isWicket;
-      wicketReason = extra.type === 'noball' ? 'Penalty - No ball! (Free Hit next)' : wicketResult.reason;
+      wicketReason = extra.type === 'noball' ? 'Front-foot no-ball! (Free hit next)' : wicketResult.reason;
       
       if (!isWicket && !missed) {
         const distResult = calculateDistance(innings.batter, innings.bowler, delivery, shot, wicketResult.safeWindowMs, wicketResult.isEdgeFallback, assistMultiplier);

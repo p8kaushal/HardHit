@@ -52,6 +52,7 @@ export interface DeliveryChoice {
   swing?: number;        // -1 to 1, left/right from the bowler's view
   overTheWicket?: boolean;
   bowlingArm?: 'Right' | 'Left';
+  frontFootHeel?: number; // metres from the popping crease; non-negative is over the line
   batterPosition?: { x: number; z: number }; // metres from the starting stance at release
 }
 

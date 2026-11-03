@@ -6,7 +6,7 @@ import { directionFromStick, suggestedShotDirection, TouchBattingControls } from
 import { stepBall, type BallState } from '../src/ball-physics';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery } from '../src/formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
@@ -211,18 +211,28 @@ test('leaderboard tolerates corrupt storage and sorts old and new scores', () =>
   assert.deepEqual(readLeaderboard().map(entry => [entry.biggestSix, entry.wicketsLost]), [[80, 3], [75.5, 1], [75.5, 2]]);
 });
 
-test('release timing and line distinguish legal balls, wides and no-balls', () => {
+test('front-foot landing and line distinguish legal balls, wides and no-balls', () => {
   assert.deepEqual(checkExtraBall(delivery(0.5)), { isExtra: false, type: null });
   assert.equal(checkExtraBall(delivery(0)).isExtra, false);
-  assert.equal(checkExtraBall(delivery(1)).type, 'noball');
+  assert.equal(checkExtraBall(delivery(1)).isExtra, false);
+  assert.equal(checkExtraBall({ ...delivery(0.5), frontFootHeel: 0 }).type, 'noball');
   assert.equal(checkExtraBall(delivery(0.5, 1)).type, 'wide');
+});
+
+test('front-foot landing is independent of release timing and captured for replay', () => {
+  const heel = sampleFrontFootLanding(50, 1, 1);
+  assert.ok(heel > 0);
+  assert.ok(sampleFrontFootLanding(100, 0.5, 1) < 0);
+  assert.equal(checkExtraBall({ ...delivery(0.1), frontFootHeel: heel }).type, 'noball');
+  assert.equal(checkExtraBall({ ...delivery(0.9), frontFootHeel: heel }).type, 'noball');
+  assert.equal(checkExtraBall({ ...delivery(1), frontFootHeel: -0.01 }).isExtra, false);
 });
 
 test('LBW considers pitch, impact, offered shot, stumps, handedness and no-balls', () => {
   const turning = { ...delivery(0.5, 0.25), type: 'offspin' as const, turn: 1 };
   assert.equal(resolveMissedDelivery(turning, 'RHB', true), 'lbw');
   assert.equal(resolveMissedDelivery({ ...turning, batterPosition: { x: 0.6, z: 0 } }, 'RHB', true), 'bowled');
-  assert.equal(resolveMissedDelivery({ ...turning, releaseTiming: 1 }, 'RHB', true), null);
+  assert.equal(resolveMissedDelivery({ ...turning, frontFootHeel: 0.01 }, 'RHB', true), null);
   const outsideLeg = { ...delivery(0.5, -0.25), type: 'legspin' as const, turn: 1 };
   assert.equal(resolveMissedDelivery(outsideLeg, 'RHB', true), null);
   const outsideOff = { ...turning, aimTarget: { x: 0.54, z: -3.5 } };
@@ -345,7 +355,7 @@ test('extras do not consume a legal ball and only no-balls start a free hit', ()
   assert.equal(innings.ballsBowled, 0);
   assert.equal(innings.score, 1);
   assert.equal(innings.isNextFreeHit, false);
-  game.recordBall(delivery(1), null);
+  game.recordBall({ ...delivery(1), frontFootHeel: 0.01 }, null);
   assert.equal(innings.isNextFreeHit, true);
   game.recordBall(delivery(0, 1), null);
   assert.equal(innings.isNextFreeHit, true);
@@ -374,7 +384,7 @@ test('bat contact cancels a wide and counts the delivery as legal', () => {
 test('a hit off a no-ball scores as well as the penalty and preserves the free hit', () => {
   const game = match();
   const shot = { direction: 0, type: 'power' as const, timing: 0.5, contactZone: 0.5 };
-  const result = game.recordBall(delivery(1), shot);
+  const result = game.recordBall({ ...delivery(1), frontFootHeel: 0.01 }, shot);
   const innings = game.getCurrentInnings();
   assert.equal(result.extraType, 'noball');
   assert.equal(result.missed, false);

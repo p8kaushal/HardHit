@@ -1,5 +1,5 @@
 import { Player, DeliveryChoice, ShotChoice, ShotType } from './types';
-import { deliveryContactPoint, getAimXFromLineType } from './formula';
+import { deliveryContactPoint, getAimXFromLineType, sampleFrontFootLanding } from './formula';
 
 
 // Unused constants removed
@@ -58,6 +58,7 @@ export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium
     length,
     type: deliveryType,
     releaseTiming,
+    frontFootHeel: sampleFrontFootLanding(bowler.stats.bowling.accuracy, 0.5, Math.random()),
     bowlingArm: bowler.bowlingArm || 'Right',
     overTheWicket: Math.random() > 0.3
   };
