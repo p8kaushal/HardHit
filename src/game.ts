@@ -4,6 +4,10 @@ import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
 
+export function inningsBallLimit(tieBreakerActive: boolean): number {
+  return tieBreakerActive ? 1 : 6;
+}
+
 export const globalAutoAssistConfig: { 
   isRookie: boolean, 
   currentDelivery: DeliveryChoice | null, 
@@ -401,7 +405,7 @@ export class MatchController {
     }
 
     // A regular contest always gives each batter six legal deliveries.
-    const maxBalls = this.state.tieBreakerActive ? 1 : 6;
+    const maxBalls = inningsBallLimit(this.state.tieBreakerActive);
     if (innings.ballsBowled >= maxBalls) {
       innings.finished = true;
       console.log(`[GAME EVENT] Innings completed. Legal balls: ${innings.ballsBowled}. Wickets: ${innings.wicketsLost}. Biggest Six: ${innings.biggestSix}m.`);

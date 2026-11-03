@@ -1,4 +1,4 @@
-import { MatchController, globalAutoAssistConfig, initBattingDelivery } from './game';
+import { MatchController, globalAutoAssistConfig, initBattingDelivery, inningsBallLimit } from './game';
 import { GameScene } from './scene';
 import { BallOutcome, DeliveryChoice, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
@@ -885,9 +885,10 @@ export class UIManager {
     
     // Legal balls count, wickets, runs score, biggest six
     const legalCount = currentInn.ballsBowled;
+    const ballLimit = inningsBallLimit(state.tieBreakerActive);
     
     const ballsCountEl = document.getElementById('hud-balls-count');
-    if (ballsCountEl) ballsCountEl.innerText = `${legalCount}/6`;
+    if (ballsCountEl) ballsCountEl.innerText = `${legalCount}/${ballLimit}`;
 
     const wicketsCountEl = document.getElementById('hud-wickets-count');
     if (wicketsCountEl) wicketsCountEl.innerText = `${currentInn.wicketsLost}`;
@@ -902,7 +903,7 @@ export class UIManager {
     const tracker = document.getElementById('over-tracker');
     if (tracker) {
       const balls = currentInn.balls;
-      const totalSlots = Math.max(6, balls.length);
+      const totalSlots = balls.length + Math.max(0, ballLimit - legalCount);
 
       // Ensure tracker has exact number of slots (at least 6)
       while (tracker.children.length < totalSlots) {

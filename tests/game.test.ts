@@ -404,6 +404,50 @@ test('extras do not consume a legal ball and only no-balls start a free hit', ()
   assert.equal(innings.score, 3);
 });
 
+test('the over display keeps upcoming legal balls after extras and shows the sudden-death limit', () => {
+  const game = match();
+  const innings = game.getCurrentInnings();
+  const originalDocument = globalThis.document;
+  const count = { innerText: '' };
+  const children: any[] = [];
+  const tracker = {
+    children,
+    appendChild: (child: any) => { children.push(child); },
+    removeChild: () => { children.pop(); },
+    querySelectorAll: () => children,
+    get lastChild() { return children[children.length - 1]; }
+  };
+  Object.assign(globalThis, { document: {
+    getElementById: (id: string) => id === 'hud-balls-count' ? count : id === 'over-tracker' ? tracker : null,
+    createElement: () => ({ className: '', textContent: '', title: '' })
+  } });
+  try {
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.controller = game;
+    game.recordBall(delivery(0, 1), null);
+    ui.updateHUD();
+    assert.equal(count.innerText, '0/6');
+    assert.equal(children.length, 7);
+    assert.equal(children[0].textContent, 'WD');
+    assert.match(children[6].title, /Upcoming/);
+
+    innings.balls = [];
+    innings.ballsBowled = 0;
+    game.state.tieBreakerActive = true;
+    game.recordBall(delivery(0, 1), null);
+    ui.updateHUD();
+    assert.equal(count.innerText, '0/1');
+    assert.equal(children.length, 2);
+    assert.match(children[1].title, /Upcoming/);
+    game.recordBall(delivery(0.5), null);
+    ui.updateHUD();
+    assert.equal(count.innerText, '1/1');
+    assert.equal(children.length, 2);
+  } finally {
+    Object.assign(globalThis, { document: originalDocument });
+  }
+});
+
 test('bat contact cancels a wide and counts the delivery as legal', () => {
   const game = match();
   const shot = { direction: 0, type: 'lofted' as const, timing: 0.5, contactZone: 0.5 };
@@ -916,7 +960,7 @@ test('a tied match completes both sudden-death innings and awards draw progressi
       body: { appendChild() {} }
     },
     performance: { now: () => now },
-    window: { setTimeout: (callback: () => void) => { timers.push(() => { now += 2000; callback(); }); return timers.length; } }
+    window: { setTimeout: (callback: () => void) => { timers.push(() => { now += 2100; callback(); }); return timers.length; } }
   });
   try {
     for (const legalBalls of [6, 6, 1, 1]) {
@@ -951,7 +995,7 @@ test('a finished innings schedules only one transition', () => {
       body: { appendChild() {} }
     },
     performance: { now: () => now },
-    window: { setTimeout: (callback: () => void) => { timers.push(() => { now += 2000; callback(); }); return timers.length; } }
+    window: { setTimeout: (callback: () => void) => { timers.push(() => { now += 2100; callback(); }); return timers.length; } }
   });
   try {
     for (let i = 0; i < 6; i++) game.recordBall(delivery(0.5), null);
@@ -989,7 +1033,7 @@ test('an innings transition waits for gameplay to resume', () => {
     timers.shift()!();
     assert.equal(game.state.currentInningsIndex, 0);
     setGamePaused(false);
-    now += 2000;
+    now += 2100;
     timers.shift()!();
     assert.equal(game.state.currentInningsIndex, 1);
   } finally {
@@ -1013,7 +1057,7 @@ test('reset invalidates a pending innings transition and removes its overlay', (
       body: { appendChild() {} }
     },
     performance: { now: () => now },
-    window: { setTimeout: (callback: () => void) => { timers.push(() => { now += 2000; callback(); }); return timers.length; } }
+    window: { setTimeout: (callback: () => void) => { timers.push(() => { now += 2100; callback(); }); return timers.length; } }
   });
   try {
     for (let i = 0; i < 6; i++) game.recordBall(delivery(0.5), null);
