@@ -1,6 +1,6 @@
 import { MatchController, globalAutoAssistConfig, initBattingDelivery, inningsBallLimit } from './game';
 import { GameScene } from './scene';
-import { BallOutcome, DeliveryChoice, Player, ShotChoice, ShotType } from './types';
+import { BallOutcome, DeliveryChoice, MatchState, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
 import { BATTER_CONTACT_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget, sampleFrontFootLanding } from './formula';
 import { moveBatter, type BatterPosition } from './batter-position';
@@ -34,6 +34,7 @@ export class UIManager {
   private activeShot: ShotChoice | null = null;
   private deliveryStarted = false;
   private deliveryGeneration = 0;
+  private recordedSummary: MatchState | null = null;
   
   // Selections
   private selectedShotType: ShotType = 'grounded';
@@ -1207,13 +1208,16 @@ export class UIManager {
     this.renderMiniTracker('summary-bot-tracker', botInnings?.balls || []);
 
     // 5. Save personal best to Leaderboard
-    addLeaderboardEntry({
-      date: new Date().toLocaleDateString(),
-      opponent: state.bot.name,
-      biggestSix: playerInnings?.biggestSix ?? 0,
-      wicketsLost: playerInnings ? playerInnings.wicketsLost : 0,
-      outcome: state.winnerId === state.player.id ? 'WON' : (state.winnerId === state.bot.id ? 'LOST' : 'TIED')
-    });
+    if (this.recordedSummary !== state) {
+      addLeaderboardEntry({
+        date: new Date().toLocaleDateString(),
+        opponent: state.bot.name,
+        biggestSix: playerInnings?.biggestSix ?? 0,
+        wicketsLost: playerInnings ? playerInnings.wicketsLost : 0,
+        outcome: state.winnerId === state.player.id ? 'WON' : (state.winnerId === state.bot.id ? 'LOST' : 'TIED')
+      });
+      this.recordedSummary = state;
+    }
 
     // 6. Show the modal overlay
     const modal = document.getElementById('match-summary-modal');

@@ -131,6 +131,38 @@ test('returning to the lobby cancels a pending bot delivery and run-up', () => {
   }
 });
 
+test('showing the same match summary twice records one leaderboard entry', () => {
+  const key = 'six_hitting_contest_leaderboard';
+  const previous = storage.get(key);
+  const originalDocument = globalThis.document;
+  storage.delete(key);
+  Object.assign(globalThis, { document: { getElementById: () => null } });
+  try {
+    const game = match();
+    game.state.status = 'completed';
+    game.state.winnerId = game.state.player.id;
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.controller = game;
+    ui.recordedSummary = null;
+    ui.hideResultToast = () => {};
+    ui.keyboardInputManager = { closeHelpModal() {} };
+    ui.showGameOverScreen();
+    ui.showGameOverScreen();
+    assert.equal(readLeaderboard().length, 1);
+
+    game.reset();
+    game.setTossResult(game.state.player.id, 'bat');
+    game.startMatch();
+    game.state.status = 'completed';
+    game.state.winnerId = game.state.bot.id;
+    ui.showGameOverScreen();
+    assert.equal(readLeaderboard().length, 2);
+  } finally {
+    if (previous === undefined) storage.delete(key); else storage.set(key, previous);
+    Object.assign(globalThis, { document: originalDocument });
+  }
+});
+
 test('touch stick maps eight directions and ignores its dead zone', () => {
   assert.equal(directionFromStick(0, 0), null);
   assert.equal(directionFromStick(0.1, 0.1), null);
