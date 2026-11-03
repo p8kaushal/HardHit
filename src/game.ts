@@ -582,22 +582,18 @@ export class MatchController {
             marginText: `Won on runs: ${Math.max(inn1.score, inn2.score)} vs ${Math.min(inn1.score, inn2.score)}`
           };
         } else {
-          // Compare actual sixes before considering aggregate carry distance.
-          const secondSix = (innings: Innings): number =>
-            innings.balls.filter(ball => ball.runs === 6)
-              .map(ball => ball.distance).sort((a, b) => b - a)[1] || 0;
-          const second1 = secondSix(inn1);
-          const second2 = secondSix(inn2);
+          const sixes1 = inn1.balls.filter(ball => ball.runs === 6).length;
+          const sixes2 = inn2.balls.filter(ball => ball.runs === 6).length;
           const total1 = inn1.balls.reduce((sum, ball) => sum + ball.distance, 0);
           const total2 = inn2.balls.reduce((sum, ball) => sum + ball.distance, 0);
 
-          if (Math.abs(second1 - second2) > 0.01) {
-            winnerId = second1 > second2 ? inn1.batter.id : inn2.batter.id;
+          if (sixes1 !== sixes2) {
+            winnerId = sixes1 > sixes2 ? inn1.batter.id : inn2.batter.id;
             tieBreakDetails = {
-              deciderTier: 'second_biggest_six',
-              tierLabel: '2nd Biggest Six Decider',
-              description: 'Decided by the second-biggest six',
-              marginText: `Won via 2nd Biggest Six: ${Math.max(second1, second2).toFixed(1)}m vs ${Math.min(second1, second2).toFixed(1)}m`
+              deciderTier: 'six_count',
+              tierLabel: 'Sixes Hit Decider',
+              description: 'Biggest six and wickets were level; more sixes win',
+              marginText: `Won on sixes: ${Math.max(sixes1, sixes2)} vs ${Math.min(sixes1, sixes2)}`
             };
           } else if (Math.abs(total1 - total2) > 0.01) {
             winnerId = total1 > total2 ? inn1.batter.id : inn2.batter.id;

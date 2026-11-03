@@ -24,7 +24,7 @@ A mobile-first, cross-device multiplayer cricket game centered on a single duel 
   - **Primary metric**: the single largest six hit across a player's innings wins the match.
   - **Full-over innings**: each batter receives six legal deliveries. A dismissal counts as a wicket but does not forfeit the remaining deliveries.
   - **Bowler's win condition**: suppress the batter's biggest six through line, length, variation and release execution. Wickets remain a tie-break factor.
-  - **Tie-break ladder**: biggest six, then fewer wickets. If neither batter hits a six and wickets are level, higher runs win; equal runs go to sudden death. When the biggest six is tied, compare the second-biggest six, then total distance, then sudden death.
+  - **Tie-break ladder**: biggest six, then fewer wickets. If neither batter hits a six and wickets are level, higher runs win; equal runs go to sudden death. When the biggest six and wickets are tied, compare the number of sixes; only if those counts are equal compare total hit distance, then sudden death.
   - This also gives you a natural highlight-reel share moment ("360m six!") and a clean leaderboard sort key (biggest six, wickets as secondary sort).
 
 ## 4. Bowling system

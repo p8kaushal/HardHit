@@ -721,7 +721,7 @@ test('recording a bot delivery preserves the line the batter actually saw', () =
   assert.equal(game.getCurrentInnings().balls[0].delivery.aimTarget.x, 0.7);
 });
 
-test('tie breaks compare second sixes before total carry and exclude fours', () => {
+test('with equal biggest six and wickets, more sixes beat greater total distance', () => {
   const game = match();
   const [first, second] = game.state.innings;
   const hit = (distance: number, runs: number): BallOutcome => ({
@@ -733,7 +733,19 @@ test('tie breaks compare second sixes before total carry and exclude fours', () 
   second.balls = [hit(80, 6), hit(59, 4), hit(50, 4)];
   (game as any).resolveMatch();
   assert.equal(game.state.winnerId, first.batter.id);
-  assert.equal(game.state.tieBreakDetails?.deciderTier, 'second_biggest_six');
+  assert.equal(game.state.tieBreakDetails?.deciderTier, 'six_count');
+});
+
+test('total distance decides only after the number of sixes is tied', () => {
+  const game = match();
+  const [first, second] = game.state.innings;
+  const hit = (distance: number, runs: number): BallOutcome => ({ ballNumber: 1, delivery: delivery(0.5), shot: null, distance, runs, isWicket: false, wicketReason: '', isFreeHit: false, isExtra: false, extraType: null });
+  first.biggestSix = second.biggestSix = 80;
+  first.balls = [hit(80, 6), hit(20, 4)];
+  second.balls = [hit(80, 6), hit(40, 4)];
+  (game as any).resolveMatch();
+  assert.equal(game.state.winnerId, second.batter.id);
+  assert.equal(game.state.tieBreakDetails?.deciderTier, 'total_carry');
 });
 
 test('without a six and with equal wickets, runs decide instead of aggregate distance', () => {

@@ -94,7 +94,7 @@ export interface Innings {
 export type CameraMode = 'bowler_eye' | 'batter_eye' | 'follow_shot' | 'stadium_wide';
 
 export interface TieBreakDetails {
-  deciderTier: 'biggest_six' | 'wickets' | 'runs' | 'total_carry' | 'second_biggest_six' | 'sudden_death' | 'draw';
+  deciderTier: 'biggest_six' | 'wickets' | 'runs' | 'six_count' | 'total_carry' | 'second_biggest_six' | 'sudden_death' | 'draw';
   tierLabel: string;
   description: string;
   marginText: string;
