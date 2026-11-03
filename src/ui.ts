@@ -8,6 +8,7 @@ import { suggestedShotDirection, TouchBattingControls } from './touch-controls';
 import { initBowlingAdjustmentReadouts, isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
 import { addLeaderboardEntry, readLeaderboard } from './leaderboard';
 import { clearGameTimeout, gameNow, isGamePaused, setGameTimeout } from './game-clock';
+import { gameSound } from './sound';
 
 export class UIManager {
   private controller: MatchController;
@@ -61,6 +62,7 @@ export class UIManager {
       (x, z) => this.setBowlingTarget({ x, z })
     );
     this.initEventListeners();
+    this.gameScene.onDeliveryBounce = () => gameSound.play('bounce');
     initBowlingAdjustmentReadouts();
     updateBowlingAdjustmentVisibility(this.keyboardInputManager.intent.deliveryType);
     this.touchBattingControls = new TouchBattingControls(
@@ -206,6 +208,17 @@ export class UIManager {
     });
 
     // Help button and modal listeners
+    const soundButton = document.getElementById('btn-sound-toggle') as HTMLButtonElement;
+    const updateSoundButton = () => {
+      soundButton.textContent = gameSound.isMuted ? '🔇' : '🔊';
+      const label = gameSound.isMuted ? 'Unmute sound' : 'Mute sound';
+      soundButton.setAttribute('aria-label', label);
+      soundButton.setAttribute('aria-pressed', String(gameSound.isMuted));
+      soundButton.title = label;
+    };
+    updateSoundButton();
+    soundButton.addEventListener('click', () => { gameSound.setMuted(!gameSound.isMuted); updateSoundButton(); });
+
     const btnHelpToggle = document.getElementById('btn-help-toggle');
     if (btnHelpToggle) {
       btnHelpToggle.addEventListener('click', (e) => {
@@ -505,6 +518,7 @@ export class UIManager {
     this.isBallActive = true;
     this.hideResultToast();
     this.deliveryStarted = true;
+    this.gameScene.prepareDeliverySound();
     const generation = this.deliveryGeneration;
     let arrived = false;
     let resolved = false;
@@ -620,6 +634,7 @@ export class UIManager {
         let title = `${runs} RUNS`;
         let desc = `Shot yielded ${runs} runs.`;
         if (runs === 6) {
+           gameSound.play('boundary');
            title = `SIX! ${(shotDistanceMeters || 0).toFixed(1)}m`;
            desc = `Cleared the boundary towards ${getDirectionName(lastBall.shot.direction)}!`;
         } else if (runs === 4) {
@@ -663,9 +678,10 @@ export class UIManager {
       // Bot is bowler
       (this.gameScene as any).onBallArrivedCallback = onArrivedCb;
       (this.gameScene as any).onBallResolvedCallback = onResolvedCb;
-      this.cancelBattingRunUp = initBattingDelivery(true, this.gameScene.scene.getMeshByName('cricketBall'));
+      this.cancelBattingRunUp = initBattingDelivery(true, this.gameScene.scene.getMeshByName('cricketBall'), () => gameSound.play('delivery'));
     } else {
       // Start delivery trajectory
+      gameSound.play('delivery');
       this.gameScene.animateDelivery(
         this.activeDelivery.aimTarget,
         this.activeDelivery.length,
@@ -704,11 +720,13 @@ export class UIManager {
       this.gameScene.animateMissWicket(false);
       this.showResultToast(title, desc);
     } else if (outcome.isWicket) {
+      gameSound.play(outcome.wicketReason === 'LBW' ? 'bounce' : 'wicket');
       title = 'WICKET!';
       desc = outcome.wicketReason;
       this.gameScene.animateMissWicket(true);
       this.showResultToast(title, desc);
     } else if (outcome.shot && !outcome.missed) {
+      gameSound.play('bat');
       const theta_shot = (outcome.shot.direction * Math.PI) / 4 - Math.PI / 2;
       const quality = Math.max(0, 1 - Math.abs(outcome.shot.timing - 0.5) * 2 - Math.abs(outcome.shot.contactZone - 0.5)) * footworkFactor(outcome.shot.footwork, outcome.delivery.length);
       const batterPower = this.controller.getCurrentInnings().batter.stats.batting.power;

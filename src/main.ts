@@ -2,9 +2,14 @@ import { getOrCreatePlayer, MatchController } from './game';
 import { UIManager, renderProfile, renderLeaderboard } from './ui';
 import { runBotSimulation } from './simulate';
 import { setGamePaused } from './game-clock';
+import { gameSound } from './sound';
 
 let controller: MatchController | null = null;
 let ui: UIManager | null = null;
+
+// Unlock audio on a real input gesture, before automatic bowling begins.
+document.addEventListener('pointerdown', () => gameSound.unlock(), { capture: true });
+document.addEventListener('keydown', () => gameSound.unlock(), { capture: true });
 
 const portrait = window.matchMedia('(orientation: portrait)');
 function updateOrientation(): void {

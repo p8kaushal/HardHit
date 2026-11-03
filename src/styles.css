@@ -3135,6 +3135,7 @@ body { min-height: 100dvh; }
   background: linear-gradient(to top, #31d87d, #d6e64b 40%, #ffb63e 70%, #f04a58);
 }
 .pace-control input[type="range"]::-moz-range-thumb { width: 18px; height: 10px; border: 2px solid #fff; border-radius: 5px; background: #1d2a3a; }
+.sound-toggle { width: 32px; height: 32px; font-size: 1rem; flex-shrink: 0; }
 .bowling-movement { display: flex; flex: 1; min-width: 0; flex-direction: column; justify-content: space-between; gap: .3rem; }
 .bowling-movement .movement-control { width: 100%; }
 .movement-directions { display: flex; justify-content: space-between; color: #f6d34d; font-size: .9rem; line-height: 1; padding: 0 .3rem; }

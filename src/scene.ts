@@ -48,6 +48,8 @@ export class GameScene {
   public isBotBatting: boolean = false;
   public hasBotSwung: boolean = false;
   public botBattingTriggerCallback: (() => void) | null = null;
+  public onDeliveryBounce: (() => void) | null = null;
+  private deliveryBouncePlayed = false;
   
   private currentBallPos: BABYLON.Vector3 | null = null;
   private shotOrigin: BABYLON.Vector3 | null = null;
@@ -481,6 +483,16 @@ export class GameScene {
 
   // --- Animation Mechanics ---
 
+  public prepareDeliverySound(): void { this.deliveryBouncePlayed = false; }
+
+  private notifyDeliveryBounce(progress: number, bounceZ: number): void {
+    const bounceProgress = (bounceZ - 10) / (BATTER_CREASE_Z - 10);
+    if (!this.deliveryBouncePlayed && progress >= bounceProgress) {
+      this.deliveryBouncePlayed = true;
+      this.onDeliveryBounce?.();
+    }
+  }
+
   public generateTrajectoryPoints(
     aimTarget: { x: number; z: number },
     type: DeliveryType,
@@ -688,6 +700,7 @@ export class GameScene {
       }
 
       this.ballAnimationTime += deliveryAnimationStep(this.engine.getDeltaTime(), currentSpeedScale);
+      this.notifyDeliveryBounce(this.ballAnimationTime / 60, aimTarget.z);
       const index = Math.floor(this.ballAnimationTime);
 
       if (this.timingRing && this.ballMesh) {
@@ -898,6 +911,7 @@ export class GameScene {
       
       const targetX = globalAutoAssistConfig.currentDelivery ? globalAutoAssistConfig.currentDelivery.aimTarget.x : 0;
       const targetZ = delivery?.aimTarget.z ?? -3.5;
+      this.notifyDeliveryBounce(progress, targetZ);
         
       const startX = globalAutoAssistConfig.bowlerArm === 'Left' ? -0.6 : 0.6;
       const release = { x: startX, y: 1.9, z: 10.0 };

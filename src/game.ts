@@ -706,7 +706,7 @@ export class MatchController {
   }
 }
 
-  export function initBattingDelivery(isBotBowler: boolean, ball: any): () => void {
+  export function initBattingDelivery(isBotBowler: boolean, ball: any, onRelease: () => void = () => {}): () => void {
     if (isBotBowler) {
       globalAutoAssistConfig.isRunUpActive = true;
       globalAutoAssistConfig.runUpStartTime = gameNow();
@@ -730,6 +730,7 @@ export class MatchController {
         }
         globalAutoAssistConfig.isRunUpActive = false;
         startBotDelivery(ball);
+        onRelease();
       }, 1200);
       return () => {
         clearGameTimeout(timer);

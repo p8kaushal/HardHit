@@ -9,6 +9,7 @@ import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
 import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout } from '../src/game-clock';
+import { SoundManager } from '../src/sound';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -19,6 +20,38 @@ Object.assign(globalThis, { localStorage: {
 
 const delivery = (timing: number, x = 0): DeliveryChoice => ({
   aimTarget: { x, z: -3.5 }, line: 'middle', length: 'good', type: 'fast', releaseTiming: timing
+});
+
+test('sound effects unlock on input and respect mute without interrupting play', () => {
+  storage.delete('hardhit_sound_muted');
+  let tones = 0;
+  const parameter = { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} };
+  const node = { connect() { return this; }, start() {}, stop() {} };
+  const context = {
+    state: 'running', currentTime: 0, sampleRate: 100,
+    destination: {},
+    createGain: () => ({ ...node, gain: { ...parameter } }),
+    createOscillator: () => { tones++; return { ...node, frequency: { ...parameter } }; },
+    createBuffer: () => ({ getChannelData: () => new Float32Array(50) }),
+    createBufferSource: () => ({ ...node, buffer: null }),
+    createBiquadFilter: () => ({ ...node, frequency: { value: 0 } }),
+    suspend() { this.state = 'suspended'; return Promise.resolve(); },
+    resume() { this.state = 'running'; return Promise.resolve(); }
+  };
+  const sounds = new SoundManager(() => context as unknown as AudioContext);
+  sounds.play('bat');
+  assert.equal(tones, 0);
+  sounds.unlock();
+  sounds.play('bat');
+  sounds.play('bounce');
+  assert.equal(tones, 2);
+  sounds.setMuted(true);
+  sounds.play('wicket');
+  assert.equal(tones, 2);
+  sounds.setMuted(false);
+  sounds.play('delivery');
+  assert.equal(tones, 3);
+  storage.delete('hardhit_sound_muted');
 });
 
 test('portrait pause freezes gameplay time and scheduled deliveries', () => {
