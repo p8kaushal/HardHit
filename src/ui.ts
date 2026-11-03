@@ -611,7 +611,7 @@ export class UIManager {
       let shotDistanceMeters = 0;
       let hasBounced = false;
 
-      if (lastBall && lastBall.shot && !lastBall.isWicket && !lastBall.isExtra) {
+      if (lastBall && lastBall.shot && !lastBall.missed && !lastBall.isWicket && !lastBall.isExtra) {
         shotDistanceMeters = this.gameScene.getShotDistance();
         hasBounced = globalAutoAssistConfig.hasBounced || false;
         
@@ -633,7 +633,7 @@ export class UIManager {
         this.showResultToast(title, desc);
       }
 
-      if (lastBall && lastBall.shot && !lastBall.isWicket && !lastBall.isExtra) {
+      if (lastBall && lastBall.shot && !lastBall.missed && !lastBall.isWicket && !lastBall.isExtra) {
         this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced, this.gameScene.shotReachedBoundary);
         this.updateHUD();
       } else if (lastBall) {
@@ -708,7 +708,7 @@ export class UIManager {
       desc = outcome.wicketReason;
       this.gameScene.animateMissWicket(true);
       this.showResultToast(title, desc);
-    } else if (outcome.shot) {
+    } else if (outcome.shot && !outcome.missed) {
       const theta_shot = (outcome.shot.direction * Math.PI) / 4 - Math.PI / 2;
       const quality = Math.max(0, 1 - Math.abs(outcome.shot.timing - 0.5) * 2 - Math.abs(outcome.shot.contactZone - 0.5)) * footworkFactor(outcome.shot.footwork, outcome.delivery.length);
       const batterPower = this.controller.getCurrentInnings().batter.stats.batting.power;

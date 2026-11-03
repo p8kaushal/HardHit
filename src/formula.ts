@@ -62,6 +62,33 @@ export function deliveryCreaseX(delivery: DeliveryChoice): number {
   return delivery.aimTarget.x + deliverySwingAtCrease(delivery.type, delivery.swing, delivery.aimTarget.z) + deliveryTurn(delivery.type, delivery.turn);
 }
 
+/** Simplified pad and stump geometry, in metres, for a missed delivery. */
+export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'LHB', offeredShot: boolean): 'lbw' | 'bowled' | null {
+  if (delivery.releaseTiming > 0.95) return null;
+  const ballRadius = 0.036;
+  const stumpHalfWidth = 0.1143;
+  const stumpHeight = 0.711;
+  const impactZ = -8.4;
+  const progress = (impactZ - 10) / (BATTER_CREASE_Z - 10);
+  const start = { x: 0.6, y: 1.9, z: 10 };
+  const bounce = { x: delivery.aimTarget.x, y: 0.06, z: delivery.aimTarget.z };
+  const end = { x: delivery.aimTarget.x, y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
+  const impact = getDeliveryFlightPosition(progress, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
+  const wicket = getDeliveryFlightPosition(1, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
+  const hitsWicket = Math.abs(wicket.x) <= stumpHalfWidth + ballRadius && wicket.y <= stumpHeight + ballRadius;
+  if (!hitsWicket) return null;
+
+  // This is a simplified fixed stance; it represents a pad, not a full body mesh.
+  const hitsPad = Math.abs(impact.x) <= 0.30 + ballRadius && impact.y >= 0.18 && impact.y <= 1.05;
+  if (!hitsPad) return 'bowled';
+  const legSign = hand === 'RHB' ? -1 : 1;
+  const pitchX = delivery.aimTarget.x + deliverySwingAtBounce(delivery.type, delivery.swing, delivery.aimTarget.z);
+  if (pitchX * legSign > stumpHalfWidth + ballRadius) return null;
+  const impactInLine = Math.abs(impact.x) <= stumpHalfWidth + ballRadius;
+  const impactOutsideOff = impact.x * legSign < -(stumpHalfWidth + ballRadius);
+  return impactInLine || (!offeredShot && impactOutsideOff) ? 'lbw' : null;
+}
+
 /** Contact varies with timing and the line the ball actually reaches. */
 export function battingContactZone(delivery: DeliveryChoice, timing: number, baseContact?: number): number {
   const base = baseContact ?? 0.5 + (timing - 0.5) * 0.4;
@@ -171,7 +198,7 @@ export function evaluateWicket(
   delivery: DeliveryChoice,
   shot: ShotChoice,
   assistMultiplier: number = 0
-): { isWicket: boolean; reason: string; safeWindowMs: number; isEdgeFallback?: boolean; outerToleranceMs?: number } {
+): { isWicket: boolean; reason: string; safeWindowMs: number; isEdgeFallback?: boolean; outerToleranceMs?: number; missed?: boolean } {
   const shotRisk = SHOT_RISKS[shot.type];
   const ballThreat = getBallThreat(bowler, delivery);
   const techniqueResist = batter.stats.batting.technique / 100;
@@ -205,26 +232,18 @@ export function evaluateWicket(
   const isCleanHit = deviationMs <= safeWindowMs / 2;
   const isWithinTolerance = deviationMs <= outerToleranceMs;
   
-  let isWicket = !isWithinTolerance;
+  let isWicket = false;
   let isEdgeFallback = !isCleanHit && isWithinTolerance;
   let reason = '';
+  const missed = !isWithinTolerance;
 
   // Shot direction is the intended outgoing direction, not the incoming
   // ball's contact angle. Timing determines contact and must not rewrite aim.
   
-  if (!batter.isBot && bowler.isBot && bowler.rank === 'Bronze') {
-    isWicket = false;
-    if (!isCleanHit) {
-      isEdgeFallback = true;
-    }
-  }
-  
-  if (isWicket && !reason) {
-    if (shot.timing < 0.5) {
-      reason = shot.timing < 0.25 ? 'Bowled - played too early!' : 'LBW - beaten by length!';
-    } else {
-      reason = shot.timing > 0.75 ? 'Caught - top edge carried to the deep!' : 'Edged and Caught!';
-    }
+  if (missed) {
+    const dismissal = resolveMissedDelivery(delivery, batter.batterHand || 'RHB', true);
+    isWicket = dismissal !== null;
+    reason = dismissal === 'lbw' ? 'LBW' : dismissal === 'bowled' ? 'Bowled' : 'Missed delivery!';
   }
   
   return {
@@ -232,7 +251,8 @@ export function evaluateWicket(
     reason,
     safeWindowMs,
     isEdgeFallback,
-    outerToleranceMs
+    outerToleranceMs,
+    missed
   };
 }
 
@@ -297,17 +317,9 @@ export function calculateDistance(
     distance = 15.0 + Math.random() * 10.0; // 15 to 25 meters (safe 1-2 runs distance)
   }
   
-  // Miscue check: Lofted or Power shots falling below 12 meters are resolved as caught
-  let isMiscueWicket = false;
-  let miscueReason = '';
-  if (!isSafeEdge && (shot.type === 'power' || shot.type === 'lofted') && distance < 12.0 && distance > 0) {
-    if (!batter.isBot && bowler.isBot && bowler.rank === 'Bronze') {
-      // Forgive miscue wicket in Rookie mode
-    } else {
-      isMiscueWicket = true;
-      miscueReason = 'Caught! Miscued shot did not carry and was caught in the infield.';
-    }
-  }
+  // There are no simulated fielders yet, so a short hit cannot be called caught.
+  const isMiscueWicket = false;
+  const miscueReason = '';
 
   // Calibrate carry/roll equations so the resulting shot carries/rolls at least 25m to 55m.
   if (!batter.isBot && bowler.isBot && bowler.rank === 'Bronze') { // Rookie mode

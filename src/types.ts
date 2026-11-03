@@ -67,6 +67,7 @@ export interface BallOutcome {
   ballNumber: number;
   delivery: DeliveryChoice;
   shot: ShotChoice | null;
+  missed?: boolean; // A shot was attempted, but did not contact the ball.
   distance: number;
   runs?: number; // Set when a hit has finished travelling.
   isWicket: boolean;

@@ -1,5 +1,5 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { evaluateWicket, calculateDistance, checkExtraBall, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
+import { evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
@@ -295,6 +295,7 @@ export class MatchController {
     let isWicket = false;
     let wicketReason = '';
     let distance = 0;
+    let missed = shot === null;
 
     let assistMultiplier = 0;
     if (!innings.batter.isBot && innings.bowler.isBot) {
@@ -324,7 +325,9 @@ export class MatchController {
       distance = 0;
       console.log(`[GAME EVENT] Extra ball penalty: ${extra.type?.toUpperCase()}. Innings score: ${innings.score}.`);
     } else if (shot === null) {
-      wicketReason = 'Missed delivery!';
+      const dismissal = isFreeHit ? null : resolveMissedDelivery(delivery, innings.batter.batterHand || 'RHB', false);
+      isWicket = dismissal !== null;
+      wicketReason = dismissal === 'lbw' ? 'LBW' : dismissal === 'bowled' ? 'Bowled' : 'Missed delivery!';
       distance = 0;
       console.log(`[GAME EVENT] Missed delivery. Ball number ${ballNumber}`);
     } else {
@@ -332,6 +335,7 @@ export class MatchController {
       const wicketResult = evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier);
       isWicket = wicketResult.isWicket;
       wicketReason = wicketResult.reason;
+      missed = wicketResult.missed ?? false;
 
       // 4. Bounding Box Bypass & Contact Guarantee
       if (globalAutoAssistConfig.delta_t !== undefined) {
@@ -350,7 +354,7 @@ export class MatchController {
         globalAutoAssistConfig.delta_t = undefined; // Reset
       }
       
-      if (!isWicket) {
+      if (!isWicket && !missed) {
         const distResult = calculateDistance(innings.batter, innings.bowler, delivery, shot, wicketResult.safeWindowMs, wicketResult.isEdgeFallback, assistMultiplier);
         distance = distResult.distance;
         if (distResult.isMiscueWicket) {
@@ -377,6 +381,7 @@ export class MatchController {
       ballNumber,
       delivery,
       shot,
+      missed,
       distance,
       isWicket,
       wicketReason,

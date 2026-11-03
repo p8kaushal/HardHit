@@ -6,7 +6,7 @@ import { directionFromStick, suggestedShotDirection, TouchBattingControls } from
 import { stepBall, type BallState } from '../src/ball-physics';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
-import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliverySwingAtBounce, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition } from '../src/formula';
+import { BALL_AIR_DAMPING, BATTER_CREASE_Z, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryCreaseX, deliveryDurationMs, deliverySwingAtBounce, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout } from '../src/game-clock';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
@@ -161,6 +161,21 @@ test('release timing and line distinguish legal balls, wides and no-balls', () =
   assert.equal(checkExtraBall(delivery(0)).type, 'wide');
   assert.equal(checkExtraBall(delivery(1)).type, 'noball');
   assert.equal(checkExtraBall(delivery(0.5, 1)).type, 'wide');
+});
+
+test('LBW considers pitch, impact, offered shot, stumps, handedness and no-balls', () => {
+  const turning = { ...delivery(0.5, 0.25), type: 'offspin' as const, turn: 1 };
+  assert.equal(resolveMissedDelivery(turning, 'RHB', true), 'lbw');
+  assert.equal(resolveMissedDelivery({ ...turning, releaseTiming: 1 }, 'RHB', true), null);
+  const outsideLeg = { ...delivery(0.5, -0.25), type: 'legspin' as const, turn: 1 };
+  assert.equal(resolveMissedDelivery(outsideLeg, 'RHB', true), null);
+  const outsideOff = { ...turning, aimTarget: { x: 0.54, z: -3.5 } };
+  assert.equal(resolveMissedDelivery(outsideOff, 'RHB', true), null);
+  assert.equal(resolveMissedDelivery(outsideOff, 'RHB', false), 'lbw');
+  const leftOutsideOff = { ...outsideOff, aimTarget: { x: -0.54, z: -3.5 }, type: 'legspin' as const };
+  assert.equal(resolveMissedDelivery(leftOutsideOff, 'LHB', true), null);
+  assert.equal(resolveMissedDelivery(leftOutsideOff, 'LHB', false), 'lbw');
+  assert.equal(resolveMissedDelivery(delivery(0.5, 0.7), 'RHB', false), null);
 });
 
 test('bowling meter maps its midpoint to ideal release and clamps extremes', () => {
@@ -542,8 +557,7 @@ test('boundary scoring uses the rope crossing and bounce, not carry distance alo
 test('finalizing a six records its runs and biggest hit consistently', () => {
   const game = match();
   const innings = game.getCurrentInnings();
-  game.recordBall(delivery(0.5), null);
-  innings.balls[0].shot = { direction: 0, type: 'power', timing: 0.5, contactZone: 0.5 };
+  game.recordBall(delivery(0.5), { direction: 0, type: 'power', timing: 0.5, contactZone: 0.5 });
   assert.equal(game.finalizeBallOutcome(58, false, true), 6);
   assert.equal(game.finalizeBallOutcome(58, false, true), 6);
   assert.equal(innings.score, 6);
