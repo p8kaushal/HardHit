@@ -169,6 +169,7 @@ export class MatchController {
   private transitionPending = false;
   private transitionGeneration = 0;
   private transitionOverlay: HTMLElement | null = null;
+  private transitionTimer: number | null = null;
 
   constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard') {
     this.botDifficulty = botDifficulty;
@@ -180,6 +181,8 @@ export class MatchController {
     if (globalAutoAssistConfig.isBallInPlay) return;
     this.transitionGeneration++;
     this.transitionPending = false;
+    if (this.transitionTimer !== null) clearGameTimeout(this.transitionTimer);
+    this.transitionTimer = null;
     this.transitionOverlay?.parentNode?.removeChild(this.transitionOverlay);
     this.transitionOverlay = null;
     const player = getOrCreatePlayer();
@@ -482,8 +485,9 @@ export class MatchController {
         controlBowling.classList.add('hidden', 'panel-hidden');
       }
 
-      setTimeout(() => {
+      this.transitionTimer = setGameTimeout(() => {
         if (generation !== this.transitionGeneration) return;
+        this.transitionTimer = null;
         if (overlay.parentNode) {
           overlay.parentNode.removeChild(overlay);
         }

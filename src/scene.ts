@@ -1,5 +1,5 @@
 import * as BABYLON from 'babylonjs';
-import { gameNow, isGamePaused } from './game-clock';
+import { gameNow, isGamePaused, setGameTimeout } from './game-clock';
 import { CameraMode, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, batterContactProgress, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryDurationMs, deliveryReleaseX, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
@@ -1049,7 +1049,7 @@ export class GameScene {
     
     const onResolved = this.onBallResolvedCallback;
     this.onBallResolvedCallback = null;
-    setTimeout(() => {
+    setGameTimeout(() => {
       if (this.batterRoot) this.batterRoot.rotation.x = 0;
       onResolved?.();
     }, 1500);

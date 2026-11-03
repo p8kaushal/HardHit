@@ -711,7 +711,7 @@ export class UIManager {
         this.controller.handleInningsCompletion();
       }
 
-      setTimeout(() => {
+      setGameTimeout(() => {
         if (generation !== this.deliveryGeneration) return;
         // Step 3: Fade out and hide the result banner overlay completely
         this.hideResultToast();
@@ -821,18 +821,18 @@ export class UIManager {
     }
 
     if (this.toastDismissTimer) {
-      clearTimeout(this.toastDismissTimer);
+      clearGameTimeout(this.toastDismissTimer);
     }
 
     // Auto-dismiss after 4 seconds
-    this.toastDismissTimer = setTimeout(() => {
+    this.toastDismissTimer = setGameTimeout(() => {
       this.hideResultToast();
     }, 4000);
   }
 
   private hideResultToast(): void {
     if (this.toastDismissTimer) {
-      clearTimeout(this.toastDismissTimer);
+      clearGameTimeout(this.toastDismissTimer);
       this.toastDismissTimer = null;
     }
     const toast = document.getElementById('result-toast');

@@ -874,7 +874,9 @@ test('sudden death compares legal hits even when an extra came first', () => {
 test('a tied match completes both sudden-death innings and awards draw progression', () => {
   const game = match();
   const originalDocument = globalThis.document;
-  const originalSetTimeout = globalThis.setTimeout;
+  const originalWindow = globalThis.window;
+  const originalPerformance = globalThis.performance;
+  let now = originalPerformance.now();
   const timers: Array<() => void> = [];
   const parent = { removeChild() {} };
   Object.assign(globalThis, {
@@ -883,7 +885,8 @@ test('a tied match completes both sudden-death innings and awards draw progressi
       getElementById: () => null,
       body: { appendChild() {} }
     },
-    setTimeout: (callback: () => void) => { timers.push(callback); return 0; }
+    performance: { now: () => now },
+    window: { setTimeout: (callback: () => void) => { timers.push(() => { now += 2000; callback(); }); return timers.length; } }
   });
   try {
     for (const legalBalls of [6, 6, 1, 1]) {
@@ -900,14 +903,16 @@ test('a tied match completes both sudden-death innings and awards draw progressi
     assert.equal(game.state.tieBreakDetails?.deciderTier, 'draw');
     assert.equal(game.state.progression?.xpGained, 50);
   } finally {
-    Object.assign(globalThis, { document: originalDocument, setTimeout: originalSetTimeout });
+    Object.assign(globalThis, { document: originalDocument, window: originalWindow, performance: originalPerformance });
   }
 });
 
 test('a finished innings schedules only one transition', () => {
   const game = match();
   const originalDocument = globalThis.document;
-  const originalSetTimeout = globalThis.setTimeout;
+  const originalWindow = globalThis.window;
+  const originalPerformance = globalThis.performance;
+  let now = originalPerformance.now();
   const timers: Array<() => void> = [];
   Object.assign(globalThis, {
     document: {
@@ -915,7 +920,8 @@ test('a finished innings schedules only one transition', () => {
       getElementById: () => null,
       body: { appendChild() {} }
     },
-    setTimeout: (callback: () => void) => { timers.push(callback); return 0; }
+    performance: { now: () => now },
+    window: { setTimeout: (callback: () => void) => { timers.push(() => { now += 2000; callback(); }); return timers.length; } }
   });
   try {
     for (let i = 0; i < 6; i++) game.recordBall(delivery(0.5), null);
@@ -925,14 +931,49 @@ test('a finished innings schedules only one transition', () => {
     timers[0]();
     assert.equal(game.state.currentInningsIndex, 1);
   } finally {
-    Object.assign(globalThis, { document: originalDocument, setTimeout: originalSetTimeout });
+    Object.assign(globalThis, { document: originalDocument, window: originalWindow, performance: originalPerformance });
+  }
+});
+
+test('an innings transition waits for gameplay to resume', () => {
+  const game = match();
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalPerformance = globalThis.performance;
+  let now = originalPerformance.now();
+  const timers: Array<() => void> = [];
+  Object.assign(globalThis, {
+    document: {
+      createElement: () => ({ style: {}, parentNode: { removeChild() {} } }),
+      getElementById: () => null,
+      body: { appendChild() {} }
+    },
+    performance: { now: () => now },
+    window: { setTimeout: (callback: () => void) => { timers.push(callback); return timers.length; } }
+  });
+  try {
+    for (let i = 0; i < 6; i++) game.recordBall(delivery(0.5), null);
+    game.handleInningsCompletion();
+    setGamePaused(true);
+    now += 5000;
+    timers.shift()!();
+    assert.equal(game.state.currentInningsIndex, 0);
+    setGamePaused(false);
+    now += 2000;
+    timers.shift()!();
+    assert.equal(game.state.currentInningsIndex, 1);
+  } finally {
+    setGamePaused(false);
+    Object.assign(globalThis, { document: originalDocument, window: originalWindow, performance: originalPerformance });
   }
 });
 
 test('reset invalidates a pending innings transition and removes its overlay', () => {
   const game = match();
   const originalDocument = globalThis.document;
-  const originalSetTimeout = globalThis.setTimeout;
+  const originalWindow = globalThis.window;
+  const originalPerformance = globalThis.performance;
+  let now = originalPerformance.now();
   const timers: Array<() => void> = [];
   let removed = 0;
   Object.assign(globalThis, {
@@ -941,7 +982,8 @@ test('reset invalidates a pending innings transition and removes its overlay', (
       getElementById: () => null,
       body: { appendChild() {} }
     },
-    setTimeout: (callback: () => void) => { timers.push(callback); return 0; }
+    performance: { now: () => now },
+    window: { setTimeout: (callback: () => void) => { timers.push(() => { now += 2000; callback(); }); return timers.length; } }
   });
   try {
     for (let i = 0; i < 6; i++) game.recordBall(delivery(0.5), null);
@@ -953,6 +995,6 @@ test('reset invalidates a pending innings transition and removes its overlay', (
     assert.equal(game.state.currentInningsIndex, 0);
     assert.equal(removed, 1);
   } finally {
-    Object.assign(globalThis, { document: originalDocument, setTimeout: originalSetTimeout });
+    Object.assign(globalThis, { document: originalDocument, window: originalWindow, performance: originalPerformance });
   }
 });
