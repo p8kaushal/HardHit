@@ -43,7 +43,7 @@ try {
         return null;
         }).filter(Boolean);
       }), selectors);
-      if (issues.length || errors.length) throw new Error(`${viewport.width}×${viewport.height} ${role}:\n${[...issues, ...errors].join('\n')}`);
+      if (issues.length) throw new Error(`${viewport.width}×${viewport.height} ${role}:\n${issues.join('\n')}`);
       if (role === 'bowl') {
         await page.click('#bowl-side-group [data-side="around"]');
         if (await page.$eval('#bowl-side-group [data-side="around"]', el => el.getAttribute('aria-pressed')) !== 'true') throw new Error('Bowling side did not change');
@@ -56,9 +56,20 @@ try {
         if (!spinControls.turn || spinControls.swing || !spinControls.pace) throw new Error(`Incorrect spin controls: ${JSON.stringify(spinControls)}`);
         await page.click('#bowl-type-group [data-val="fast"]');
         if (await page.$eval('#bowl-swing-control', el => el.classList.contains('hidden'))) throw new Error('Swing control did not return for pace');
+        const release = await page.$('#btn-bowl-pitch');
+        const box = await release.boundingBox();
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.mouse.down();
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await page.mouse.up();
+        await page.waitForSelector('#over-tracker .over-dot:not(.upcoming)', { timeout: 30000 });
+      } else {
+        // Let a bot delivery resolve without a swing; this exercises batting's missed-ball path.
+        await page.waitForSelector('#over-tracker .over-dot:not(.upcoming)', { timeout: 30000 });
       }
+      if (errors.length) throw new Error(`${viewport.width}×${viewport.height} ${role} browser errors:\n${errors.join('\n')}`);
       await page.close();
-      console.log(`Browser smoke passed: ${viewport.width}×${viewport.height} ${role} controls`);
+      console.log(`Browser smoke passed: ${viewport.width}×${viewport.height} ${role} controls and first delivery`);
     }
   }
 } finally {
