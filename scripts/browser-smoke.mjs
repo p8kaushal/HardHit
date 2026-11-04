@@ -8,26 +8,59 @@ try {
   await server.listen();
   const address = server.httpServer.address();
   browser = await puppeteer.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1024, height: 768 });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  page.on('console', message => { if (message.type() === 'error') errors.push(`${message.text()} ${message.location().url ?? ''}`); });
-  page.on('response', response => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${response.url()}`); });
-  await page.goto(`http://127.0.0.1:${address.port}/`, { waitUntil: 'networkidle0' });
-  await page.waitForSelector('#screen-lobby.active');
-  await page.click('#btn-start-toss');
-  await page.waitForSelector('#screen-toss.active');
-  await page.click('#btn-toss-heads');
-  await page.waitForSelector('#toss-result-message:not(.hidden)', { timeout: 5000 });
-  const won = await page.$eval('#toss-choice-buttons', el => !el.classList.contains('hidden'));
-  await page.click(won ? '#btn-choice-bat' : '#btn-start-match');
-  await page.waitForSelector('#screen-gameplay.active');
-  await page.waitForSelector('#game-canvas');
-  // Give initialization and the first render a chance to report errors.
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  if (errors.length) throw new Error(`Browser errors:\n${errors.join('\n')}`);
-  console.log('Browser smoke passed: lobby → toss → gameplay (1024×768, headless Chromium).');
+  for (const viewport of [{ width: 667, height: 300 }, { width: 1024, height: 768 }]) {
+    for (const role of ['bat', 'bowl']) {
+      const page = await browser.newPage();
+      await page.setViewport({ ...viewport, isMobile: true, hasTouch: true });
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      page.on('console', message => { if (message.type() === 'error') errors.push(`${message.text()} ${message.location().url ?? ''}`); });
+      page.on('response', response => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${response.url()}`); });
+      await page.goto(`http://127.0.0.1:${address.port}/`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#screen-lobby.active');
+      await page.click('#btn-start-toss');
+      await page.waitForSelector('#screen-toss.active');
+      // Force only the toss in the test browser so each control layout is reachable.
+      await page.evaluate(() => { window.__smokeRandom = Math.random; Math.random = () => 0; });
+      await page.click('#btn-toss-heads');
+      await page.waitForSelector('#toss-choice-buttons:not(.hidden)', { timeout: 5000 });
+      await page.evaluate(() => { Math.random = window.__smokeRandom; delete window.__smokeRandom; });
+      await page.click(`#btn-choice-${role}`);
+      await page.waitForSelector('#screen-gameplay.active');
+      const selectors = role === 'bat'
+        ? ['#touch-stick', '.touch-batting-controls .batter-movement-grid [data-batter-move="left"]', '.touch-batting-controls .batter-movement-grid [data-batter-move="right"]', '.touch-batting-controls .footwork-control [data-footwork="front_foot"]', '.touch-batting-controls .footwork-control [data-footwork="back_foot"]', ...['lofted', 'grounded', 'power', 'defensive'].map(shot => `.touch-shot[data-shot="${shot}"]`)]
+        : ['#bowling-pitch-map', '#bowl-line-group button', '#bowl-length-group button', '#bowl-side-group button', '#bowl-type-group button', '#bowl-pace', '#bowl-swing', '#btn-bowl-pitch'];
+      const issues = await page.evaluate(selectors => selectors.flatMap(selector => {
+        const elements = [...document.querySelectorAll(selector)];
+        if (!elements.length) return [`${selector}: missing`];
+        return elements.map(el => {
+        const rect = el.getBoundingClientRect();
+        const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+        const hit = document.elementFromPoint(x, y);
+        if (!rect.width || !rect.height || rect.left < 0 || rect.top < 0 || rect.right > innerWidth || rect.bottom > innerHeight || !(hit === el || el.contains(hit))) {
+          return `${selector}: ${Math.round(rect.left)},${Math.round(rect.top)} ${Math.round(rect.width)}x${Math.round(rect.height)} (hit ${hit?.id || hit?.className || 'none'})`;
+        }
+        return null;
+        }).filter(Boolean);
+      }), selectors);
+      if (issues.length || errors.length) throw new Error(`${viewport.width}×${viewport.height} ${role}:\n${[...issues, ...errors].join('\n')}`);
+      if (role === 'bowl') {
+        await page.click('#bowl-side-group [data-side="around"]');
+        if (await page.$eval('#bowl-side-group [data-side="around"]', el => el.getAttribute('aria-pressed')) !== 'true') throw new Error('Bowling side did not change');
+        await page.click('#bowl-type-group [data-val="offspin"]');
+        const spinControls = await page.evaluate(() => ({
+          turn: !document.querySelector('#bowl-turn-control').classList.contains('hidden'),
+          swing: !document.querySelector('#bowl-swing-control').classList.contains('hidden'),
+          pace: document.querySelector('#bowl-pace').getBoundingClientRect().height > 0,
+        }));
+        if (!spinControls.turn || spinControls.swing || !spinControls.pace) throw new Error(`Incorrect spin controls: ${JSON.stringify(spinControls)}`);
+        await page.click('#bowl-type-group [data-val="fast"]');
+        if (await page.$eval('#bowl-swing-control', el => el.classList.contains('hidden'))) throw new Error('Swing control did not return for pace');
+      }
+      await page.close();
+      console.log(`Browser smoke passed: ${viewport.width}×${viewport.height} ${role} controls`);
+    }
+  }
 } finally {
   await browser?.close();
   await server.close();

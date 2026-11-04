@@ -6,7 +6,7 @@ Play a biggest-six duel against a bot. Each batter faces six legal deliveries; t
 
 The phased plan is approved for implementation. The current physics and umpiring are approximations, and physical-device validation remains open. Planned AI teammates will field automatically, with performance influenced by field settings and ratings related to the human all-rounder's performance.
 
-Run `npm run test:browser` for the headless Chromium lobby-to-gameplay smoke check. It starts and stops its own local server; it does not yet test a complete match or physical devices.
+Run `npm run test:browser` for headless Chromium lobby-to-gameplay and touch-control checks at 667×300 and 1024×768, for both batting and bowling. It starts and stops its own local server and browser; it does not yet test a complete match or physical devices.
 
 ---
 
