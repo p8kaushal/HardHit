@@ -151,6 +151,28 @@ test('the first run-up follows the newly selected bowling side, not the previous
   }
 });
 
+test('a delivery starting at time zero advances the visible ball', () => {
+  const oldStart = globalAutoAssistConfig.deliveryStartTime;
+  const oldDelivery = globalAutoAssistConfig.currentDelivery;
+  const oldActive = globalAutoAssistConfig.isDeliveryActive;
+  const scene = Object.create(GameScene.prototype) as any;
+  let moved = false;
+  scene.ballMesh = { position: { set: () => { moved = true; } } };
+  scene.notifyDeliveryBounce = () => {};
+  scene.onBallArrivedCallback = null;
+  try {
+    globalAutoAssistConfig.deliveryStartTime = 0;
+    globalAutoAssistConfig.currentDelivery = delivery(0.5);
+    globalAutoAssistConfig.isDeliveryActive = true;
+    scene.updateBallFlight();
+    assert.equal(moved, true);
+  } finally {
+    globalAutoAssistConfig.deliveryStartTime = oldStart;
+    globalAutoAssistConfig.currentDelivery = oldDelivery;
+    globalAutoAssistConfig.isDeliveryActive = oldActive;
+  }
+});
+
 test('sound effects unlock on input and respect mute without interrupting play', () => {
   storage.delete('hardhit_sound_muted');
   let sources = 0;
