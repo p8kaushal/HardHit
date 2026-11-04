@@ -47,6 +47,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [x] Identify timing assistance in the post-shot feedback on Rookie and Medium difficulty.
 - [x] Apply the same human-versus-bot timing assistance to contact decisions and shot-flight quality; keep the timing meter and recorded input unmodified.
 - [x] Show the opponent's configured bowling arm or batting hand instead of a hard-coded role; do not reveal the next delivery type.
+- [x] Label over-tracker entries and upcoming balls by legal ball number after extras, and distinguish a legal free-hit dot from an extra.
 - [ ] Verify run-up switching and batting timing feedback on physical phones and tablets, including repeated side changes and different shot timings.
 - [x] Prevent repeated rendering of the same match summary from duplicating its leaderboard entry; cover successive matches.
 - [ ] Test persistence and summary behavior through repeated rematches and lobby returns in the browser; a single rematch and lobby return have each been checked.

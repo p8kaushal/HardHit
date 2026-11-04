@@ -977,32 +977,33 @@ export class UIManager {
             // Red dot: Wicket
             dot.className = 'over-dot red wicket';
             dot.textContent = 'W';
-            dot.title = `Ball ${i + 1}: Wicket (${outcome.wicketReason || 'Dismissed'})`;
+            dot.title = `Ball ${outcome.ballNumber}: Wicket (${outcome.wicketReason || 'Dismissed'})`;
           } else if (outcome.isExtra || outcome.extraType) {
             // Blue dot: Extra ball (Wide / No-ball)
             dot.className = 'over-dot blue extra';
             dot.textContent = outcome.extraType === 'wide' ? 'WD' : (outcome.extraType === 'noball' ? `NB${outcome.runs || ''}` : 'EX');
-            dot.title = `Ball ${i + 1}: ${outcome.extraType === 'noball' ? 'No-ball' : 'Wide'} (+1 penalty${outcome.runs ? `, ${outcome.runs} off the bat` : ''})`;
+            dot.title = `Ball ${outcome.ballNumber}: ${outcome.extraType === 'noball' ? 'No-ball' : 'Wide'} (+1 penalty${outcome.runs ? `, ${outcome.runs} off the bat` : ''})`;
           } else if (outcome.isFreeHit && !outcome.runs) {
             // Blue dot: Free hit delivery
-            dot.className = 'over-dot blue extra free-hit';
+            dot.className = 'over-dot blue legal free-hit';
             dot.textContent = 'FH';
-            dot.title = `Ball ${i + 1}: Free Hit Delivery (Dot Ball - 0 runs)`;
+            dot.title = `Ball ${outcome.ballNumber}: Free Hit Delivery (Dot Ball - 0 runs)`;
           } else if (outcome.runs === 6) {
             // Gold dot: SIX scored (6 runs)
             dot.className = 'over-dot gold six';
             dot.textContent = '6';
-            dot.title = `Ball ${i + 1}: SIX! (${outcome.distance.toFixed(1)}m)`;
+            dot.title = `Ball ${outcome.ballNumber}: SIX! (${outcome.distance.toFixed(1)}m)`;
           } else {
             dot.className = 'over-dot green legal';
             dot.textContent = outcome.runs ? String(outcome.runs) : '•';
-            dot.title = `Ball ${i + 1}: ${outcome.runs || 0} runs`;
+            dot.title = `Ball ${outcome.ballNumber}: ${outcome.runs || 0} runs`;
           }
         } else {
           // Gray/Empty outline: Upcoming/unbowled
           dot.className = 'over-dot gray empty upcoming';
-          dot.textContent = `${i + 1}`;
-          dot.title = `Ball ${i + 1}: Upcoming`;
+          const upcomingBall = legalCount + (i - balls.length) + 1;
+          dot.textContent = `${upcomingBall}`;
+          dot.title = `Ball ${upcomingBall}: Upcoming`;
         }
       }
     }

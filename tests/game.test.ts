@@ -867,7 +867,19 @@ test('the over display keeps upcoming legal balls after extras and shows the sud
     assert.equal(count.innerText, '0/6');
     assert.equal(children.length, 7);
     assert.equal(children[0].textContent, 'WD');
+    assert.match(children[0].title, /^Ball 1:/);
+    assert.equal(children[1].textContent, '1');
+    assert.equal(children[6].textContent, '6');
     assert.match(children[6].title, /Upcoming/);
+
+    game.recordBall({ ...delivery(0.5), frontFootHeel: 0.01 }, null);
+    game.recordBall(delivery(0.5), null);
+    ui.updateHUD();
+    assert.match(children[1].title, /^Ball 1: No-ball/);
+    assert.match(children[2].title, /^Ball 1: Free Hit/);
+    assert.match(children[2].className, /\blegal\b/);
+    assert.doesNotMatch(children[2].className, /\bextra\b/);
+    assert.equal(children[3].textContent, '2');
 
     innings.balls = [];
     innings.ballsBowled = 0;
