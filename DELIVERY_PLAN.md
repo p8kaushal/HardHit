@@ -1,6 +1,8 @@
 # HardHit delivery plan
 
-This is the working plan for taking the existing offline prototype to a reliable mobile-first six-hitting duel and, after that foundation is ready, a deployable real-player 1v1 game. `TODO.md` tracks the current engineering tasks; this document defines priorities, verification and decision boundaries.
+This is the proposed plan for taking the existing offline prototype to a reliable mobile-first six-hitting duel and, after that foundation is ready, a deployable real-player 1v1 game. `TODO.md` tracks the implementation checklist; this document defines priorities, phase gates and decision boundaries.
+
+**Approval gate:** This plan is ready for user review. Do not start implementation phases until the user approves it. After approval, complete and verify phases in order, commit focused increments, and continue autonomously unless a decision or access listed below is needed. An approval of the plan is not approval for an unspecified paid service, public deployment or destructive action.
 
 ## Product constraints
 
@@ -12,7 +14,7 @@ This is the working plan for taking the existing offline prototype to a reliable
 
 ## Current baseline
 
-The repository is a TypeScript/Vite web app using Babylon.js. It has an offline bot match, landscape controls, pre-delivery batter movement, bowler-side selection, approximate flight and contact calculations, simplified LBW/wide/no-ball handling, sound effects and browser-local progress. These systems are prototypes: they have not been calibrated against a representative set of measured deliveries or verified on the user's physical devices. Current rules and deliberate simplifications are documented in `CRICKET_RULES.md`; rerun the automated tests and production build before relying on a baseline.
+The repository is a TypeScript/Vite web app using Babylon.js. It has an offline bot match, landscape controls, pre-delivery batter movement, bowler-side selection, approximate flight and contact calculations, simplified LBW/wide/no-ball handling, sound effects and browser-local progress. These systems are prototypes: they have not been calibrated against a representative set of measured deliveries or verified on the user's physical devices. Current rules and deliberate simplifications are documented in `CRICKET_RULES.md`. On 4 November 2026, the local baseline was 83 passing automated tests and a successful production build; rerun both before relying on it.
 
 An emulated landscape browser run completed a bot match through both overs, the summary and the rematch toss, with no reported browser errors. A separate run checked that wides preserve legal-ball counts. The lobby showed the saved result and XP after reload. A 667 × 300 browser viewport showed the bowling controls, including pace and spin; pointer and keyboard bowling each resolved after the input interruption fix. This is not physical-device verification. Match return to lobby, full interactive batting, repeated matches, multitouch and the remaining viewport matrix still need end-to-end checks.
 
@@ -40,89 +42,110 @@ For each bounded change:
 
 Use a task branch when doing substantial or parallel work; reuse the current checkout when suitable. Do not overwrite existing changes. Keep commits focused and avoid unrelated formatting churn. If a check fails, fix or explicitly isolate the failure before proceeding; do not mark an unverified feature complete.
 
-## Milestones, in order
+## Phased delivery plan
 
-### 1. Stabilize the existing match loop
+The goal is a credible six-hitting contest with responsive controls and explainable outcomes. "FIFA-like" is a long-term quality reference, not a claim that the present team, browser or prototype already matches a commercial sports simulation. Retain Babylon.js unless a measured comparison demonstrates that an engine migration is worth its cost.
 
-**Work**
+| Phase | Outcome | Status |
+|---|---|---|
+| 0 | Baseline and repeatable verification | Partially complete; harden before feature work |
+| 1 | Stable offline match and responsive controls | Partially implemented; end-to-end and device checks open |
+| 2 | Fair decisions and contest rules | Prototype; significant work open |
+| 3 | One shared, calibrated bowling trajectory | Prototype; significant work open |
+| 4 | Bat contact, six flight and scoring | Prototype; significant work open |
+| 5 | Credible offline opponents and non-boundary play | Basic bot exists; major work open |
+| 6 | Broadcast presentation, sound and performance | Basic presentation exists; refinement and device measurements open |
+| 7 | Real-player 1v1 | Not implemented |
+| 8 | Staging, deployment and operations | Not implemented |
 
-- Exercise full batting and bowling overs, innings transitions, extras, free hits, wickets, ties, sudden death, rematch, lobby return, profile persistence and sound/mute behavior.
-- Audit timers and state transitions so one delivery produces one resolution, a new match cannot inherit an old callback, and orientation changes or backgrounding do not silently consume balls.
-- Add regression tests for confirmed failures, including a repeatable headless/integration strategy where the environment supports it. Keep physical-device testing separate from viewport emulation.
-- Resolve contradictory or stale project documentation and remove diagnostic or obsolete code only after checking its use.
+### Phase 0 — trustworthy baseline
 
-**Exit criteria:** complete match flows work repeatedly without duplicate deliveries, stuck transitions, incorrect legal-ball counts or uncaught browser errors; automated tests and production build pass.
+- Record the current controls, match rules, browser matrix, existing known failures and baseline timings. Keep `CRICKET_RULES.md` and `TODO.md` synchronized with actual behavior.
+- Establish a supported repeatable browser/integration workflow that can start the app, play test scenarios, inspect errors and shut down its own processes. Add a reproducible seeded test mode or injectable inputs without exposing gameplay shortcuts in production.
+- Verify clean install, `npm test`, `npm run build`, asset/licence availability, production preview and a complete bot match. Audit repository instructions and preserve user files.
+- **Gate:** reproducible checks and a recorded baseline; a failing or unavailable device check is listed as open rather than described as passed.
 
-### 2. Cricket decisions and fair input
+### Phase 1 — reliable offline match and controls
 
-**Work**
+- Test both batting and bowling overs, toss, all ball outcomes, extras, wickets, sudden death, summary, rematch, lobby, leaderboard and saved profile over repeated matches. Ensure six legal balls per regular innings and one score resolution per delivery.
+- Replace fragile global delivery flags and timer coupling incrementally with typed match/delivery states, cancellable callbacks and immutable or versioned event snapshots. Handle backgrounding, focus loss, rotation, interrupted holds and new-match cleanup.
+- Verify direction locking, simultaneous aim/shot touch, batter movement and lock, bowling side, line/length, release meter, pace, swing and turn, including timing feedback and keyboard input. Correct any UI/physics direction mismatch.
+- Exercise a representative landscape matrix: a short phone viewport such as 667×300, common phone sizes, tablet including browser chrome, and desktop. Check control hit targets, safe areas and unobstructed pitch; portrait must pause and request rotation. Automated emulation does not replace physical iOS/Android/iPad testing.
+- **Gate:** repeated end-to-end scenarios and regression tests pass; each tested viewport has accessible controls and no duplicate ball or stuck state. Physical-device coverage remains explicitly open until available.
 
-- Review no-ball, wide, free-hit, bowled and LBW decisions against the applicable cricket laws and document deliberate contest-specific simplifications. Preserve a full six legal balls per innings.
-- Replace arbitrary decisions with explicit, inspectable state. The current front-foot landing is sampled from pace and accuracy; evaluate its fairness, calibrate the distribution, record the sampled value for replay, and give players understandable feedback. Add back-foot and other delivery faults only when they can be modeled coherently.
-- Make bat-versus-pad order, no-shot cases, ball trajectory to the wicket, batter movement and handedness part of a consistent decision path. A missed ball must not automatically become a wicket, and a no-ball hit must retain both bat runs and its penalty/free hit.
-- Keep current tiebreak rules in one tested place, including extra deliveries and sudden death.
+### Phase 2 — rules and fair execution
 
-**Exit criteria:** decision-table tests cover legal/illegal balls, offered/no shot, both handednesses, pitch and impact lines, wicket projection, extras, free hits and tiebreak precedence. UI feedback agrees with the stored result. Any remaining simplification is documented.
+- Turn `CRICKET_RULES.md` into tested decision tables for no-ball/wide precedence, free-hit chains, legal-ball counts, bat-before-pad, bowled, LBW, offered/no shot, impact and pitching lines, stump projection, stance and both hands/arms. Compare against the applicable MCC law and chosen T20 playing conditions; document intentional contest exceptions.
+- Make front-foot/no-ball behavior understandable and reproducible. Calibrate the current sampled landing against a defensible model, retain the sample in the delivery snapshot, and add only faults that can be represented coherently. Do not hide unexplained randomness from the player.
+- Keep the agreed biggest-six/wickets/six-count/distance/runs hierarchy in one tested rules module. Make result messaging and sudden-death scorecards match stored results, including no-balls and free hits.
+- **Gate:** table-driven tests cover legal/illegal deliveries and both hands, with adjudication, scoreboard and explanation agreeing. Remaining unsupported dismissals and approximations are documented.
 
-### 3. Delivery and shot physics
+### Phase 3 — bowling trajectory and pitch consistency
 
-**Work**
+- Define shared world coordinates, metres, seconds and constants, including release, popping crease, impact and actual rendered stumps. The current modeled contact/crease and rendered stump positions differ; measure and reconcile them before claiming accurate wicket projection.
+- Make a single sampled delivery path drive pitch marker, rendering, bounce, batter contact, sound and wicket projection. Include selected over/around side, bowling arm, stance, line/length, pace, swing and off/leg spin with mirrored sign tests.
+- Gather traceable, appropriately licensed measurements or research ranges for representative pace, spin, swing and bounce. Record source, units, uncertainty, fixture inputs and chosen tolerances before tuning; use reproducible tests rather than promising professional-grade accuracy from guessed coefficients.
+- Test stable simulation under frame-rate variation, interruption and device load; preserve player reaction time without hidden slowdowns.
+- **Gate:** fixture trajectories and visible markers agree within documented tolerances, direction/hand symmetry tests pass, and calibration limits are published.
 
-- Define a single set of units, coordinates and physical constants. Use the same trajectory for the pitch marker, rendering, contact, wicket projection, sound events and scoring.
-- Replace the current timing-and-reach approximation incrementally with a spatial bat/ball contact model. Include stance, footwork, swing phase, delivery pace, bounce, spin/swing, incoming velocity and shot selection. Preserve deliberate player aim for clean contact; explain mishits through the model rather than arbitrary redirection.
-- Calibrate ball speed, bounce/restitution, spin turn, swing, bat exit speed, launch angle and carry against traceable measurements or credible ranges. Track assumptions and units; do not present unvalidated estimates as real-world measurements.
-- Keep rope crossing, bounce order and simulated landing distance distinct. Account for stadium geometry before claiming an actual landing distance when a ball hits stands or an obstruction.
-- Add deterministic physics fixtures and invariant tests: finite values, plausible ranges, mirrored handedness/side cases, direction, spin/swing sign, timing and frame-rate independence. Compare representative scenarios before and after tuning.
+### Phase 4 — batting contact, six distance and scoring
 
-**Exit criteria:** repeatable scenarios agree with the documented model, the visible and scored paths agree, and parameter changes have measurable evidence. Remaining approximations and calibration gaps are explicit.
+- Build a spatial bat/ball interaction incrementally, incorporating incoming velocity, swing timing and phase, footwork, stance, shot type, bat orientation and contact point. Preserve intentional aim on clean strikes and explain mishits through the model; the timing meter must use the same effective timing as the outcome or explicitly explain assistance.
+- Use consistent fixed-step flight and event ordering for bounce, rope crossing and landing; distinguish carry, total distance and boundary outcome. Model stadium obstructions or clearly label an unobstructed estimate. Revisit the 130 m clamp only with evidence, bounded behavior and tests.
+- Calibrate representative shots, launch angles, exit speed and carry against traceable ranges; include extremes, both hands, all aim directions, pace/spin, boundary-on-full and missed-frame cases.
+- **Gate:** repeatable end-to-end fixtures connect input → contact → visible trajectory → score and distance, with no NaNs or inconsistent results. Report calibrated scope and deviations instead of a blanket realism claim.
 
-### 4. Mobile controls and performance
+### Phase 5 — credible offline play
 
-**Work**
+- Give the bot varied pace, swing and spin deliveries, selectable sides and skill-based batting; use seeded randomness and measured distributions. Keep the same inputs, rules and adjudication path as a human player.
+- Design and implement the minimum fielding/running behavior needed for plausible non-boundary outcomes, catches and relevant dismissals, without turning the product into a full match simulator. Until then, retain the explicit distance-estimate label. Decide exact control/automation details before implementation if they would materially change play.
+- Test difficulty distributions, no-ball and wide frequency, shot diversity and six opportunities; avoid impossible lines or a bot that wins through hidden advantages.
+- **Gate:** offline matches provide varied, fair and reproducible scenarios; outcomes are explainable and bot behavior is measured, not just anecdotal.
 
-- Test batting and bowling in landscape at short phone, common phone and tablet sizes, including safe-area insets, browser toolbars, orientation changes, touch cancellation and simultaneous aim/action inputs. Confirm every essential control is visible, reachable and does not hide the pitch.
-- Test the movement lock, shot-direction lock, bowling side, pace, swing/spin and timing controls for touch, mouse and keyboard. Check focus, labels, disabled state, mute and reduced-motion behavior.
-- Profile frame time, memory, loading, input latency and battery/thermal behavior on representative devices once available. Investigate expensive work and allocations before changing quality settings. Treat a stable 60 fps where hardware permits as a target, not a claim; ensure the simulation remains correct when frames are missed.
-- Add an automated viewport/control-visibility check to the project's supported test workflow where possible; keep a short manual device checklist for issues emulation cannot prove.
+### Phase 6 — broadcast feel, sound and performance
 
-**Exit criteria:** no essential controls are clipped in the tested matrix; input and orientation flows work; performance measurements and device limitations are recorded. Physical iOS and Android/iPad verification remains open until those devices are available.
+- Refine the existing original HardHit visual identity, stadium, batsman, bowler, equipment, basic stance/swing/run-up, broadcast scorebar and result cards. Use event-driven camera cuts only between decisions; keep the pitch and timing readable while aiming, bowling or batting.
+- Verify bat, bounce, bowling, wicket and crowd sounds on real devices, including unlock, mute, mixing and offline playback; retain asset attribution. Add an optional replay/highlight when it does not delay input or obscure the next ball.
+- Profile cold load, render frame time, input latency, memory and battery/thermal behavior on representative phones and tablets. Target smooth 60 fps where hardware permits; measure actual supported-device results. Reduce CPU/GPU work and bundle size from measurements; provide quality fallbacks as needed.
+- Check contrast, labels, focus, safe areas, touch sizes, reduced motion and non-color feedback.
+- **Gate:** all essential controls and match information remain visible and usable across the tested matrix, actual-device measurements are recorded, and cameras/audio do not interrupt play.
 
-### 5. Contest presentation and accessibility
+### Phase 7 — real-player 1v1
 
-**Work**
+- Design server-authoritative match states and a versioned protocol for private rooms, toss, both innings, ordered inputs, hidden bowling selection, deterministic randomness, results and replay. Select networking and hosting after cost, latency, security and deployment needs are known.
+- Implement authoritative validation and scoring, idempotent commands, latency policy, disconnect/reconnect and recovery; do not trust client-provided score, distance, timestamps or randomness. Preserve offline bot play.
+- Add private create/join first; defer public matchmaking, ranking and social features until that flow is stable. Avoid collecting more personal data than needed.
+- **Gate:** two independent clients complete repeatable matches with authoritative results; tests cover latency, jitter, packet loss/retries, disconnects, reconnects, duplicates, version mismatches and malicious inputs.
 
-- Improve the match HUD, pitch/shot feedback, biggest-six and landing-distance display, match summary and replay so the contest's primary objective is immediately clear.
-- Use a lightweight bowling-machine presentation where appropriate. Add basic, readable batter/bowler animations only after the preceding gameplay is stable; animation timing must follow simulation events rather than decide outcomes.
-- Refine synthesized sound or replace it with appropriately licensed assets, while preserving mute preference, autoplay behavior and offline use. Verify sound on actual devices when available.
-- Keep controls legible and usable without relying only on color; retain screen-reader labels and keyboard access.
+### Phase 8 — staging and release
 
-**Exit criteria:** a new player can understand and complete a full over, see why each delivery was scored, and mute audio. Presentation does not interfere with gameplay or the performance target.
+- Add CI for clean install, typecheck, tests, browser checks, production build and asset licence validation. Define release versions, environment configuration, observability, backups where applicable, rollback and incident handling.
+- Measure and optimize delivery size, loading and caching on mobile networks. The current Babylon chunk is about 1.09 MB gzip; profile before deciding whether to change engine or packaging.
+- Select an affordable staging/production target and domain with the user when required. Deploy staging, run a two-device smoke test and rollback rehearsal, then publish only to an explicitly agreed destination.
+- **Gate:** clean-checkout and CI checks pass; staging and production tests, monitoring and rollback are recorded. Hosting access, potential costs and physical-device availability are explicit dependencies.
 
-### 6. Real-player 1v1
+### Cross-phase verification and workflow
 
-**Work**
+For each increment: reproduce the issue or define an acceptance case; make the smallest coherent change; add focused tests; run the relevant tests and build; exercise changed UI/gameplay in the browser at relevant sizes; inspect console and results; commit; and update the phase checklist. Keep simulation independent of frame rendering and prefer injectable clocks/randomness. Stop test servers started by the task when they are no longer needed. Record device, browser, viewport, build/commit, case, observed result and unresolved limitations. Never mark a phase complete merely because code exists or a unit test passes.
 
-- Choose the network and hosting architecture after the offline match rules and deterministic simulation interface are stable. Define match states, authoritative event ordering, inputs, delivery snapshots, timing, replay and versioning before implementation.
-- Build a server-authoritative match loop with validation, idempotent commands, disconnect/reconnect behavior and a clear latency policy. Do not trust client-reported score, distance, time or randomness. Keep a deterministic event log for investigating disputes and reproducing bugs.
-- Add private match creation/joining first, then matchmaking and social features only when the base flow is reliable. Define what each player can see so a bowler's hidden input is not leaked before release.
-- Test two clients, latency/jitter, dropped/repeated messages, reconnects, simultaneous inputs, version mismatches and full match completion. Keep offline bot play functional.
+### Known decisions and dependencies
 
-**Exit criteria:** two actual clients finish repeatable matches against an authoritative result; disconnects and invalid messages are handled; latency behavior is documented and tested. This milestone requires a selected backend/hosting environment and its access.
+- **Contest interpretation:** preserve the agreed one-over 1v1 longest-six hierarchy in `CRICKET_RULES.md`. IPL awards have used different criteria; HardHit is an original game inspired by the six-hitting spectacle, not an assertion that its rules reproduce a particular IPL award.
+- **Distance:** decide and label whether the primary metric is modeled unobstructed carry, actual first physical contact with stands, or a competition-defined measure before calibration is finalized. Current behavior is an approximation with a cap.
+- **Fielding/running:** exact player control vs automated handling and catches are design decisions for Phase 5, not a reason to delay the earlier foundations.
+- **Network/deployment:** backend, regions, domain, accounts, costs, moderation needs and release target are not yet chosen. No purchase or production destination is assumed.
+- **Devices and external data:** physical Android/iPhone/iPad access, representative measurements and asset rights may require user input or access; continue independent local work while these are pending, but do not claim their validation.
 
-### 7. Release and deployment
+### References for future calibration and validation
 
-**Work**
-
-- Establish a reproducible clean install, typecheck/build, automated test run and production smoke test. Add CI appropriate to the selected repository host and deployment target.
-- Reduce or justify the current large 3D bundle, check caching and asset delivery, and verify load/error recovery on mobile networks. Do not switch rendering engines without measured evidence that the benefit justifies the migration.
-- Prepare environment configuration, secrets handling, monitoring, backup/recovery where relevant, and a rollback path. Verify the production build locally before publishing.
-- Deploy to the agreed staging target first, run end-to-end checks there, then publish to the agreed production target when access and the intended destination are available. Record the deployed version and rollback method.
-
-**Exit criteria:** clean-checkout checks pass; staging and production smoke tests are recorded; deployment configuration and rollback instructions are documented. No deployment target or production credentials are assumed.
+- [MCC Laws of Cricket, 2026 edition](https://www.lords.org/getmedia/a4ef9f77-2a25-4f5b-a286-4601f08e6334/Laws-of-Cricket-2017-Code-4th-Edition-%282026%29_5.pdf), especially Laws 19, 21, 22 and 36, and [ICC men's T20I playing conditions](https://images.icc-cricket.com/image/upload/prd/rz8dfczzfiwa0pwzmcs3.pdf). Tournament conditions can differ.
+- [A review and reassessment of the aerodynamics of cricket ball swing](https://www.repository.cam.ac.uk/items/08ac7dca-0898-4fd6-851b-43b7f632f658): research starting point for understanding swing, not a ready-made validated game model.
+- [Official IPL 2017 awards](https://www.iplt20.com/news/article/ipl-awards-2017): one historical award used six count with longest-six tie-break; the user's specified duel hierarchy governs this project.
+- [Playwright device emulation](https://playwright.dev/docs/emulation): useful for browser/viewport checks, not evidence of actual device performance or touch behavior.
 
 ## Decisions and escalation
 
-Work continues autonomously through routine implementation, testing, refactoring and the requested commit loop. Use judgment for ordinary technical choices and preserve the established game rules. Ask the user only when:
+After the user approves the phase plan, continue autonomously through routine implementation, testing, refactoring and the requested commit loop. Use judgment for ordinary technical choices and preserve the established game rules. Ask the user only when:
 
 - A product decision would materially change the agreed six-ball contest, scoring hierarchy, control scheme or player experience and cannot be inferred from existing direction.
 - A required physical-device test, account, credential, hosting destination, domain, paid service or external integration is unavailable locally.

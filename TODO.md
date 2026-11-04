@@ -1,6 +1,32 @@
 # Gameplay to-do
 
-Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. Unchecked items are not verified or complete.
+Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. **The user must approve that plan before implementation resumes.** Unchecked items are not verified or complete.
+
+## Phase index
+
+- [ ] **Phase 0 — Baseline:** reproducible clean install, automated browser workflow, test fixtures, production preview and recorded environment.
+- [ ] **Phase 1 — Offline match and controls:** repeated complete matches, lifecycle protection, accessible landscape input and device matrix.
+- [ ] **Phase 2 — Rules:** tested no-ball, wide, free-hit, LBW/bowled and agreed contest/tie-break decisions; document limitations.
+- [ ] **Phase 3 — Bowling physics:** unified coordinates and delivery trajectory, side/hand symmetry, marker consistency and traceable calibration.
+- [ ] **Phase 4 — Batting and six flight:** spatial contact, shot timing, trajectory, boundary/landing distance and scoring fixtures.
+- [ ] **Phase 5 — Offline opponents and fielding:** varied fair bots, reproducible difficulty, and the minimum fielding/running design needed for plausible outcomes.
+- [ ] **Phase 6 — Presentation and performance:** broadcast UI/cameras, animation, licensed audio, accessibility and actual-device profiling.
+- [ ] **Phase 7 — Real-player 1v1:** authoritative private matches, event protocol, latency, reconnect, integrity and two-client testing.
+- [ ] **Phase 8 — Release:** CI, staging, monitoring, deployment target, rollback and release verification.
+
+The detailed tasks below map to these phases. Completed sub-tasks do not imply a whole phase is complete. Physical-device checks, measurement sources, service access and costs must remain explicit; do not invent results or block unrelated local work while waiting for them.
+
+## Additional phase acceptance work
+
+- [ ] **Phase 0:** Establish repeatable seeded match and browser fixtures, capture console/runtime failures, record clean-install and production-preview results, and stop test processes afterward.
+- [ ] **Phase 1:** Verify a complete interactive batting and bowling match through both possible innings orders, extras, summary, rematch and lobby; ensure score and control state survive orientation and focus changes.
+- [ ] **Phase 2:** Test no-ball precedence, free-hit chains, LBW/bowled for both hands, offered/no shot and actual impact ordering; keep contest tiebreak and sudden-death rules explicit.
+- [ ] **Phase 3:** Reconcile modeled release/crease/contact/stump coordinates with the rendered pitch, then use one trajectory for pitch marker, flight, bounce, contact and wicket projection.
+- [ ] **Phase 4:** Replace separate timing-only contact estimates with a spatial bat/ball model and verify the same shot produces the displayed, scored and replayed trajectory; define how distance is measured around stadium obstructions.
+- [ ] **Phase 5:** Establish seeded bot distributions and fair delivery variety; decide and implement how fielding, catches and runs work without undermining the six-hitting focus.
+- [ ] **Phase 6:** Profile actual frame time, input latency, memory, loading and sound on physical devices; verify broadcast cameras remain out of the way during decisions and test reduced motion.
+- [ ] **Phase 7:** Specify server-authoritative inputs and event ordering before implementing private rooms, reconnection, validation and adverse-network tests.
+- [ ] **Phase 8:** Record CI, staging/production destination, deployment credentials, costs, monitoring, versioning and rollback; no production target is assumed.
 
 ## Match reliability and presentation — current priority
 
@@ -60,4 +86,4 @@ Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. Unchecked items a
 - [x] Record a sampled front-foot landing separately from release timing and use it for front-foot no-balls.
 - [ ] Calibrate front-foot variability, add a visible delivery-stride/foot replay and cover back-foot faults, wides, LBW and free-hit edge cases.
 - [ ] Profile frame pacing and input latency on real phones and tablets; build repeatable multi-device gameplay tests.
-- [ ] Add basic character animations after the control and physics foundations are stable, followed by authoritative real-player multiplayer.
+- [ ] Refine the existing basic character animations after the control and physics foundations are stable; implement authoritative real-player multiplayer in Phase 7.
