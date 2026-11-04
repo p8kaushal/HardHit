@@ -32,7 +32,7 @@ export function stepBall(state: BallState, dt: number): void {
   const crossing = state.reachedBoundary ? Infinity : c >= 0 ? 0 : a > 0 && discriminant >= 0 ? (-b + Math.sqrt(discriminant)) / (2 * a) : Infinity;
   const impact = previous.y > BALL_RADIUS_METERS && p.y <= BALL_RADIUS_METERS
     ? (previous.y - BALL_RADIUS_METERS) / (previous.y - p.y)
-    : previous.y <= BALL_RADIUS_METERS ? 0 : Infinity;
+    : previous.y <= BALL_RADIUS_METERS && p.y <= BALL_RADIUS_METERS ? 0 : Infinity;
   if (crossing >= 0 && crossing <= 1 && crossing < impact) {
     p.x = previous.x + dx * crossing;
     p.y = previous.y + (p.y - previous.y) * crossing;

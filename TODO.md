@@ -57,6 +57,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 
 ## Rules, shot and delivery fidelity
 
+- [x] Preserve a boundary-on-the-full when a shot starts at ground level and rises across the rope without bouncing.
 - [x] Align rendered stump width and height with the dimensions used by the simplified wicket decision model; check the actual meshes against those dimensions.
 - [x] Document current contest scoring, modeled cricket decisions and known simplifications against MCC laws and ICC T20I free-hit conditions.
 - [ ] Expand decision-table tests and implementation for both hands, offered/no shot, bat/pad order and unmodeled faults; compare each against the chosen playing conditions.

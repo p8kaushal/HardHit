@@ -1008,6 +1008,18 @@ test('physical ground contact uses a regulation-sized ball radius', () => {
   assert.equal(ball.position.y, BALL_RADIUS_METERS);
 });
 
+test('an upward shot from ground level that clears the rope is on the full', () => {
+  const ball: BallState = {
+    position: { x: 64.99, y: BALL_RADIUS_METERS, z: 0 },
+    velocity: { x: 10, y: 5, z: 0 },
+    hasBounced: false, reachedBoundary: false, stopped: false
+  };
+  stepBall(ball, 1 / 120);
+  assert.equal(ball.reachedBoundary, true);
+  assert.equal(ball.hasBounced, false);
+  assert.equal(ball.boundaryOnFull, true);
+});
+
 test('a six remains in flight beyond the rope until its landing distance is known', () => {
   const ball: BallState = {
     position: { x: 0, y: 1, z: BATTER_CREASE_Z },
