@@ -898,6 +898,29 @@ test('the over display keeps upcoming legal balls after extras and shows the sud
   }
 });
 
+test('summary tracker labels extras and free hits with their legal ball number', () => {
+  const game = match();
+  const originalDocument = globalThis.document;
+  const dots: any[] = [];
+  const container = { innerHTML: '', appendChild: (dot: any) => dots.push(dot) };
+  Object.assign(globalThis, { document: {
+    getElementById: () => container,
+    createElement: () => ({ className: '', textContent: '', title: '' })
+  } });
+  try {
+    game.recordBall(delivery(0.5, 1), null);
+    game.recordBall({ ...delivery(0.5), frontFootHeel: 0.01 }, null);
+    game.recordBall(delivery(0.5), null);
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.renderMiniTracker('tracker', game.getCurrentInnings().balls);
+    assert.match(dots[0].title, /^Ball 1: Wide/);
+    assert.match(dots[1].title, /^Ball 1: No-ball/);
+    assert.match(dots[2].title, /^Ball 1: 0 runs \(free hit\)/);
+  } finally {
+    Object.assign(globalThis, { document: originalDocument });
+  }
+});
+
 test('bat contact cancels a wide and counts the delivery as legal', () => {
   const game = match();
   const shot = { direction: 0, type: 'lofted' as const, timing: 0.5, contactZone: 0.5 };

@@ -1296,24 +1296,24 @@ export class UIManager {
       return;
     }
 
-    balls.forEach((ball, idx) => {
+    balls.forEach(ball => {
       const dot = document.createElement('span');
       if (ball.isWicket) {
         dot.className = 'mini-dot wicket';
         dot.textContent = 'W';
-        dot.title = `Ball ${idx + 1}: Wicket - ${ball.wicketReason || 'Out'}`;
+        dot.title = `Ball ${ball.ballNumber}: Wicket - ${ball.wicketReason || 'Out'}`;
       } else if (ball.isExtra || ball.extraType) {
         dot.className = 'mini-dot extra';
         dot.textContent = ball.extraType === 'wide' ? 'WD' : `NB${ball.runs || ''}`;
-        dot.title = `Ball ${idx + 1}: Extra (+1 penalty${ball.runs ? `, ${ball.runs} off the bat` : ''})`;
+        dot.title = `Ball ${ball.ballNumber}: ${ball.extraType === 'wide' ? 'Wide' : 'No-ball'} (+1 penalty${ball.runs ? `, ${ball.runs} off the bat` : ''})`;
       } else if (ball.runs === 6) {
         dot.className = 'mini-dot six';
         dot.textContent = `${Math.round(ball.distance)}m`;
-        dot.title = `Ball ${idx + 1}: SIX! (${ball.distance.toFixed(1)}m)`;
+        dot.title = `Ball ${ball.ballNumber}: SIX! (${ball.distance.toFixed(1)}m)`;
       } else {
         dot.className = 'mini-dot dot';
         dot.textContent = ball.runs ? String(ball.runs) : '•';
-        dot.title = `Ball ${idx + 1}: ${ball.runs || 0} runs`;
+        dot.title = `Ball ${ball.ballNumber}: ${ball.runs || 0} runs${ball.isFreeHit ? ' (free hit)' : ''}`;
       }
       container.appendChild(dot);
     });

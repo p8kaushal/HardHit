@@ -63,6 +63,15 @@ try {
   for (const selector of ['#summary-player-tracker .mini-dot', '#summary-bot-tracker .mini-dot']) {
     if (await page.$$eval(selector, els => els.length) < 6) throw new Error(`Incomplete scorecard: ${selector}`);
     if (await page.$$eval(`${selector}:not(.extra)`, els => els.length) !== 6) throw new Error(`Incorrect legal-ball count: ${selector}`);
+    const labelsMatch = await page.$$eval(selector, els => {
+      let legal = 0;
+      return els.every(el => {
+        const correct = el.title.startsWith(`Ball ${legal + 1}:`);
+        if (!el.classList.contains('extra')) legal++;
+        return correct;
+      });
+    });
+    if (!labelsMatch) throw new Error(`Incorrect ball labels on scorecard: ${selector}`);
   }
   if (process.argv.includes('--rematch')) {
     await page.click('#btn-rematch');
