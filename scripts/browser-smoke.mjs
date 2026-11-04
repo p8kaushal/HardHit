@@ -64,7 +64,13 @@ try {
         await page.mouse.up();
         await page.waitForSelector('#over-tracker .over-dot:not(.upcoming)', { timeout: 30000 });
       } else {
-        // Let a bot delivery resolve without a swing; this exercises batting's missed-ball path.
+        // The beginner's prompt is a visible cue for exercising a real batting input.
+        await page.waitForFunction(() => {
+          const cue = document.querySelector('#hit-space-banner');
+          return cue && getComputedStyle(cue).display !== 'none';
+        }, { timeout: 30000 });
+        await page.click('.touch-shot[data-shot="lofted"]');
+        await page.waitForSelector('#timing-widget:not(.hidden)', { timeout: 3000 });
         await page.waitForSelector('#over-tracker .over-dot:not(.upcoming)', { timeout: 30000 });
       }
       if (errors.length) throw new Error(`${viewport.width}×${viewport.height} ${role} browser errors:\n${errors.join('\n')}`);
