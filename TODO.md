@@ -51,6 +51,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [ ] Test persistence and summary behavior through repeated rematches and lobby returns in the browser; a single rematch and lobby return have each been checked.
 - [ ] Exercise repeated full matches, interactive batting, no-balls/free hits, wides, wickets and sudden-death presentation in a real browser; verify sound and errors.
 - [x] Cancel held bowling and clear held inputs on pause or focus loss; track the bowling pointer so another finger cannot release it. Cover interruption logic in automated tests and normal pointer/keyboard bowling in an emulated browser.
+- [x] In a touch-emulated browser, rotate during a held bowling action, confirm the run-up is cancelled without recording a ball, then rotate back and bowl successfully.
 - [ ] Verify rotation, backgrounding, focus loss, pointer cancellation and simultaneous touch inputs end to end on physical devices, including batting while a delivery is in flight.
 - [x] Show both sudden-death innings, including extras, alongside regular-innings scorecards; explain wicket-based decisions accurately and cover the summary with tests.
 - [ ] Visually verify sudden-death summary, rematch and lobby return in a browser after a naturally completed tied match.

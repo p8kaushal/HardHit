@@ -56,6 +56,20 @@ try {
         if (!spinControls.turn || spinControls.swing || !spinControls.pace) throw new Error(`Incorrect spin controls: ${JSON.stringify(spinControls)}`);
         await page.click('#bowl-type-group [data-val="fast"]');
         if (await page.$eval('#bowl-swing-control', el => el.classList.contains('hidden'))) throw new Error('Swing control did not return for pace');
+        if (viewport.width === 667) {
+          const beforeRotation = await (await page.$('#btn-bowl-pitch')).boundingBox();
+          await page.mouse.move(beforeRotation.x + beforeRotation.width / 2, beforeRotation.y + beforeRotation.height / 2);
+          await page.mouse.down();
+          await page.waitForSelector('#bowler-runup-indicator');
+          await page.setViewport({ width: 300, height: 667, isMobile: true, hasTouch: true });
+          await page.waitForFunction(() => getComputedStyle(document.querySelector('.rotate-hint')).display !== 'none');
+          await page.waitForFunction(() => !document.querySelector('#bowler-runup-indicator'));
+          await page.mouse.up();
+          await page.setViewport({ ...viewport, isMobile: true, hasTouch: true });
+          await page.waitForFunction(() => getComputedStyle(document.querySelector('.rotate-hint')).display === 'none');
+          await new Promise(resolve => setTimeout(resolve, 800));
+          if (await page.$('#over-tracker .over-dot:not(.upcoming)')) throw new Error('Rotation released an unintended delivery');
+        }
         const release = await page.$('#btn-bowl-pitch');
         const box = await release.boundingBox();
         await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
