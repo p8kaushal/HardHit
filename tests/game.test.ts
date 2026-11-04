@@ -638,6 +638,38 @@ test('bowled decisions project past the popping crease to the rendered stumps', 
   assert.equal(resolveMissedDelivery({ ...mirrored, frontFootHeel: 0.01 }, 'LHB', true), null);
 });
 
+test('a bowled ball continues along the projected path to the stumps', () => {
+  const originalWindow = globalThis.window;
+  const originalPerformance = globalThis.performance;
+  let now = 1000;
+  Object.assign(globalThis, {
+    window: { setTimeout: () => 1 },
+    performance: { now: () => now }
+  });
+  try {
+    const choice: DeliveryChoice = { ...delivery(0.5, 0.268), overTheWicket: true, bowlingArm: 'Right' };
+    const start = sampleDeliveryPath(choice, 1);
+    let enabled = false;
+    const ball = { position: new Vector3(start.x, start.y, start.z), setEnabled: (value: boolean) => { enabled = value; } };
+    const scene = Object.create(GameScene.prototype) as any;
+    scene.ballMesh = ball;
+    scene.ballTrail = null;
+    scene.batterRoot = null;
+    scene.onBallResolvedCallback = null;
+    scene.animateMissWicket(true, choice);
+    assert.equal(enabled, true);
+    now += 1000;
+    scene.updateBowledAnimation();
+    const end = sampleDeliveryPath(choice, (10 - BATTER_STUMPS_Z) / (10 - BATTER_CREASE_Z));
+    assert.ok(Math.abs(ball.position.x - end.x) < 1e-9);
+    assert.ok(Math.abs(ball.position.z - BATTER_STUMPS_Z) < 1e-9);
+    assert.equal(enabled, false);
+    assert.equal(scene.updateBowledAnimation, null);
+  } finally {
+    Object.assign(globalThis, { window: originalWindow, performance: originalPerformance });
+  }
+});
+
 test('a mistimed stroke that misses the stumps is a dot, not an invented catch', () => {
   const game = match();
   const result = game.recordBall(delivery(0.5, 0.7), { direction: 0, type: 'power', timing: 0, contactZone: 0.5 });

@@ -841,7 +841,7 @@ export class UIManager {
       gameSound.play(outcome.wicketReason === 'LBW' ? 'bounce' : 'wicket');
       title = 'WICKET!';
       desc = outcome.wicketReason;
-      this.gameScene.animateMissWicket(true);
+      this.gameScene.animateMissWicket(true, outcome.wicketReason === 'Bowled' ? outcome.delivery : undefined);
       this.showResultToast(title, desc);
     } else if (outcome.shot && !outcome.missed) {
       gameSound.play('bat');
