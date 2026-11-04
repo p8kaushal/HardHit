@@ -8,7 +8,7 @@ The phased plan is approved for implementation. The current physics and umpiring
 
 Run `npm run test:browser` for headless Chromium lobby-to-gameplay, touch-control and first-delivery checks at 667×300 and 1024×768, for both batting and bowling. It starts and stops its own local server and browser; it does not yet test a complete match or physical devices.
 
-Run `npm run test:match` for a longer, seeded browser match: the player bowls first, then lets the bot bowl while batting, and the test checks both scorecards and return to the lobby. `npm run test:match:batting` also swings at batting prompts; `npm run test:rematch` checks a fresh rematch and toss. These scenarios do not cover all match outcomes or physical devices.
+Run `npm run test:match` for a longer, seeded browser match: the player bowls first, then lets the bot bowl while batting, and the test checks both scorecards and return to the lobby. `npm run test:match:batting` also swings at batting prompts, `npm run test:match:bat-first` tests the other innings order, and `npm run test:rematch` checks a fresh rematch and toss. These scenarios do not cover all match outcomes or physical devices.
 
 ---
 

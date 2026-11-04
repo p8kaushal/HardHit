@@ -24,7 +24,8 @@ try {
   await page.click('#btn-toss-heads');
   await page.waitForSelector('#toss-choice-buttons:not(.hidden)', { timeout: 5000 });
   await page.evaluate(() => { Math.random = window.__testRandom; delete window.__testRandom; });
-  await page.click('#btn-choice-bowl');
+  const batFirst = process.argv.includes('--bat-first');
+  await page.click(batFirst ? '#btn-choice-bat' : '#btn-choice-bowl');
   const deadline = Date.now() + 240000;
   const swingDuringBatting = process.argv.includes('--swing');
   let lastAttempt = 0, lastState = '', swings = 0;
