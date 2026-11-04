@@ -637,8 +637,7 @@ export class GameScene {
     swing = 0
   ): void {
     this.clearBallTrail();
-    this.onBallArrivedCallback = onArrived;
-    this.onBallResolvedCallback = onResolved;
+    this.setDeliveryCallbacks(onArrived, onResolved);
     this.onBallCreaseCrossedCallback = onCreaseCrossed || null;
     this.creaseCrossedFired = false;
     this.hasBotSwung = false;
@@ -809,6 +808,11 @@ export class GameScene {
 
     };
     this.updateDeliveryAnimation = animateFrame;
+  }
+
+  public setDeliveryCallbacks(onArrived: () => void, onResolved: () => void): void {
+    this.onBallArrivedCallback = onArrived;
+    this.onBallResolvedCallback = onResolved;
   }
 
   private drawBallTrail(): void {

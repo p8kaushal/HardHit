@@ -671,7 +671,7 @@ export class UIManager {
 
       // Start polling for flight progression
       const checkFlight = () => {
-        if (!this.isBallActive || !this.activeDelivery) return;
+        if (generation !== this.deliveryGeneration || !this.isBallActive || !this.activeDelivery) return;
         if (isGamePaused()) { requestAnimationFrame(checkFlight); return; }
         if (!globalAutoAssistConfig.isDeliveryActive) {
           requestAnimationFrame(checkFlight);
@@ -788,8 +788,7 @@ export class UIManager {
 
     if (isPlayerBatting) {
       // Bot is bowler
-      (this.gameScene as any).onBallArrivedCallback = onArrivedCb;
-      (this.gameScene as any).onBallResolvedCallback = onResolvedCb;
+      this.gameScene.setDeliveryCallbacks(onArrivedCb, onResolvedCb);
       this.cancelBattingRunUp = initBattingDelivery(true, this.gameScene.scene.getMeshByName('cricketBall'), () => {
         this.batterPositionLocked = true;
         if (this.activeDelivery) this.activeDelivery.batterPosition = { ...this.batterPosition };

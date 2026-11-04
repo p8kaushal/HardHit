@@ -240,6 +240,68 @@ test('returning to the lobby cancels a pending bot delivery and run-up', () => {
   }
 });
 
+test('cancelled batting callbacks cannot observe or resolve a later delivery', () => {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalRaf = globalThis.requestAnimationFrame;
+  const originalClearTimeout = globalThis.clearTimeout;
+  const oldRunUp = globalAutoAssistConfig.isRunUpActive;
+  const oldStart = globalAutoAssistConfig.runUpStartTime;
+  const oldActive = globalAutoAssistConfig.isDeliveryActive;
+  const frames: Array<() => void> = [];
+  let arrived: () => void = () => {};
+  let resolved: () => void = () => {};
+  let arrivals = 0;
+  Object.assign(globalThis, {
+    document: {
+      getElementById: () => null,
+      createElement: () => ({ style: {}, remove() {} }),
+      body: { appendChild() {} }
+    },
+    window: { setTimeout: () => 1 },
+    clearTimeout: () => {},
+    requestAnimationFrame: (fn: () => void) => { frames.push(fn); return frames.length; }
+  });
+  try {
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.activeDelivery = delivery(0.5);
+    ui.deliveryGeneration = 1;
+    ui.deliveryStarted = false;
+    ui.botDeliveryTimer = null;
+    ui.cancelBattingRunUp = null;
+    ui.hideResultToast = () => {};
+    ui.showBattingHelper = () => {};
+    ui.handleBallArrivalAtStumps = () => { arrivals++; };
+    ui.controller = {
+      state: { player: { id: 'player' }, bot: { rank: 'Gold' } },
+      getCurrentInnings: () => ({ batter: { id: 'player' } }),
+      setCameraMode() {}
+    };
+    ui.gameScene = {
+      prepareDeliverySound() {}, setCameraMode() {},
+      scene: { getMeshByName: () => null },
+      setDeliveryCallbacks: (a: () => void, r: () => void) => { arrived = a; resolved = r; }
+    };
+    ui.deliverBall3D();
+    assert.equal(frames.length, 1);
+    const previousFrame = frames.shift()!;
+    ui.cancelPendingDelivery();
+    ui.isBallActive = true;
+    ui.activeDelivery = delivery(0.5);
+    globalAutoAssistConfig.isDeliveryActive = false;
+    previousFrame();
+    arrived();
+    resolved();
+    assert.equal(frames.length, 0);
+    assert.equal(arrivals, 0);
+  } finally {
+    globalAutoAssistConfig.isRunUpActive = oldRunUp;
+    globalAutoAssistConfig.runUpStartTime = oldStart;
+    globalAutoAssistConfig.isDeliveryActive = oldActive;
+    Object.assign(globalThis, { document: originalDocument, window: originalWindow, requestAnimationFrame: originalRaf, clearTimeout: originalClearTimeout });
+  }
+});
+
 test('showing the same match summary twice records one leaderboard entry', () => {
   const key = 'six_hitting_contest_leaderboard';
   const previous = storage.get(key);
