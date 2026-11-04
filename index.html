@@ -399,13 +399,13 @@
       <div class="canvas-container">
         <canvas id="game-canvas" width="800" height="450"></canvas>
 
-        <!-- Dynamic timing widgets (can overlay canvas) -->
-        <div id="timing-widget" class="timing-overlay hidden">
+        <!-- Feedback is shown after the batter swings, never during aiming. -->
+        <div id="timing-widget" class="timing-overlay hidden" role="status" aria-live="polite">
+          <p class="timing-heading">SHOT TIMING <strong id="timing-instruction"></strong></p>
           <div class="timing-bar-container">
-            <div class="timing-bar-perfect"></div>
             <div id="timing-bar-cursor" class="timing-cursor"></div>
           </div>
-          <p id="timing-instruction">Release SPACE or Touch to swing!</p>
+          <div class="timing-ends" aria-hidden="true"><span>EARLY</span><span>LATE</span></div>
         </div>
       </div>
 

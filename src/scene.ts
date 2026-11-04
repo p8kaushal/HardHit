@@ -33,6 +33,7 @@ export class GameScene {
   private bowlerRoot: BABYLON.TransformNode | null = null;
   private bowlerLegs: BABYLON.Mesh[] = [];
   private bowlerArms: BABYLON.Mesh[] = [];
+  private bowlerRunUpSide: { overTheWicket: boolean; bowlingArm: 'Right' | 'Left' } = { overTheWicket: true, bowlingArm: 'Right' };
   public batterRoot: BABYLON.TransformNode | null = null;
   private batterHead: BABYLON.TransformNode | null = null;
   public batMesh: BABYLON.Mesh | null = null;
@@ -506,7 +507,8 @@ export class GameScene {
   }
 
   public setBowlerSide(overTheWicket: boolean, bowlingArm: 'Right' | 'Left'): void {
-    if (this.bowlerRoot) this.bowlerRoot.position.x = deliveryReleaseX({ overTheWicket, bowlingArm });
+    this.bowlerRunUpSide = { overTheWicket, bowlingArm };
+    if (this.bowlerRoot) this.bowlerRoot.position.x = deliveryReleaseX(this.bowlerRunUpSide);
   }
 
   private buildBall(): void {
@@ -933,7 +935,7 @@ export class GameScene {
     this.bowlerRoot.position.z = z;
     this.bowlerRoot.position.y = bounce;
     this.bowlerRoot.rotation.x = Math.sin(progress * Math.PI * 16) * 0.2;
-    this.bowlerRoot.position.x = deliveryReleaseX(globalAutoAssistConfig.currentDelivery || { bowlingArm: globalAutoAssistConfig.bowlerArm });
+    this.bowlerRoot.position.x = deliveryReleaseX(this.bowlerRunUpSide);
     this.bowlerLegs.forEach((leg, i) => { leg.rotation.x = Math.sin(progress * Math.PI * 8 + i * Math.PI) * 0.3; });
     this.bowlerArms.forEach((arm, i) => { arm.rotation.x = Math.sin(progress * Math.PI * 8 + i * Math.PI) * -0.25; });
   }

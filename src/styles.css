@@ -1556,41 +1556,41 @@ body {
 /* Timing Overlay inside Canvas */
 .timing-overlay {
   position: absolute;
-  bottom: 20px;
+  bottom: max(12px, env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   background-color: rgba(26, 26, 36, 0.9);
-  padding: 0.8rem 1.2rem;
-  border-radius: var(--border-radius);
+  padding: 0.45rem 0.7rem;
+  border-radius: 5px;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  width: 80%;
-  max-width: 400px;
+  width: min(38vw, 240px);
   text-align: center;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
   z-index: 1000;
+  pointer-events: none;
 }
+.timing-heading { font-size: .62rem; font-weight: 800; letter-spacing: .08em; color: #d9d8c9; }
+.timing-heading strong { margin-left: .3rem; color: #f2d58c; }
 .timing-bar-container {
-  height: 20px;
-  background-color: #3e3e56;
-  border-radius: 10px;
+  height: 8px;
+  background: linear-gradient(90deg, #d65c4d 0%, #e8b74b 32%, #43aa75 45%, #43aa75 55%, #e8b74b 68%, #d65c4d 100%);
+  border-radius: 4px;
   position: relative;
-  margin-bottom: 0.5rem;
+  margin: .35rem 0 .15rem;
   overflow: hidden;
 }
-.timing-bar-perfect {
-  width: 25%;
-  height: 100%;
-  background-color: var(--color-success);
-  position: absolute;
-  left: 37.5%; /* Centered perfect zone */
-}
 .timing-cursor {
-  width: 6px;
+  width: 3px;
   height: 100%;
   background-color: #ffffff;
   position: absolute;
   left: 0;
+  transform: translateX(-50%);
   box-shadow: 0 0 8px #ffffff;
+}
+.timing-ends { display: flex; justify-content: space-between; font-size: .55rem; font-weight: 700; color: #e5e4d9; }
+@media (orientation: landscape) and (max-height: 320px) {
+  .timing-overlay { width: min(32vw, 180px); padding: .3rem .45rem; bottom: max(4px, env(safe-area-inset-bottom)); }
 }
 
 /* Controls styling - Dual Side Docks Layout */

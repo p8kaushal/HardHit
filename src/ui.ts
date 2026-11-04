@@ -4,6 +4,7 @@ import { BallOutcome, DeliveryChoice, MatchState, Player, ShotChoice, ShotType }
 import { botChooseDelivery, botChooseShot } from './bot';
 import { BATTER_CONTACT_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget, sampleFrontFootLanding } from './formula';
 import { moveBatter, type BatterPosition } from './batter-position';
+import { battingTimingFeedback } from './batting-timing';
 import { KeyboardInputManager } from './input';
 import { suggestedShotDirection, TouchBattingControls } from './touch-controls';
 import { initBowlingAdjustmentReadouts, isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
@@ -515,6 +516,7 @@ export class UIManager {
     const control = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
     control?.classList.remove('hidden', 'panel-hidden');
     this.gameScene.resetBowlerMesh();
+    this.gameScene.setBowlerSide(this.overTheWicket, this.controller.getCurrentInnings().bowler.bowlingArm || 'Right');
   }
 
   // --- Batting Swings ---
@@ -550,7 +552,10 @@ export class UIManager {
       contactZone: battingContactZone(this.activeDelivery, timing, contactZone),
       footwork: isPlayerBatting ? this.keyboardInputManager.intent.footwork : undefined
     };
-    if (isPlayerBatting) this.touchBattingControls.setLocked(true);
+    if (isPlayerBatting) {
+      this.touchBattingControls.setLocked(true);
+      this.showBattingTiming(this.activeShot.timing);
+    }
 
     this.gameScene.animateBatterSwing(direction, () => {
       // Swing visual completes
@@ -560,6 +565,19 @@ export class UIManager {
   // --- Ball Trajectory Animation Trigger ---
 
   private pendingBotShot: ShotChoice | null = null;
+
+  private showBattingTiming(timing: number): void {
+    const feedback = battingTimingFeedback(timing);
+    const widget = document.getElementById('timing-widget');
+    const marker = document.getElementById('timing-bar-cursor');
+    const label = document.getElementById('timing-instruction');
+    if (marker) marker.style.left = `${feedback.position * 100}%`;
+    if (label) label.textContent = feedback.offsetMs === 0 ? feedback.label : `${feedback.label} · ${Math.abs(feedback.offsetMs)} ms`;
+    if (widget) {
+      widget.dataset.timing = feedback.label.toLowerCase();
+      widget.classList.remove('hidden');
+    }
+  }
 
   // --- Ball Trajectory Animation Trigger ---
 
@@ -1001,6 +1019,7 @@ export class UIManager {
 
   public setupActiveTurn(): void {
     this.cancelPendingDelivery();
+    document.getElementById('timing-widget')?.classList.add('hidden');
     this.deliveryStarted = false;
     this.isBallActive = false;
     const state = this.controller.state;
@@ -1011,6 +1030,7 @@ export class UIManager {
     }
 
     const innings = this.controller.getCurrentInnings();
+    this.gameScene.setBatterHandedness(innings.batter.batterHand || 'RHB');
     globalAutoAssistConfig.bowlerArm = innings.bowler.bowlingArm || 'Right';
     const isPlayerBatting = innings.batter.id === state.player.id;
     

@@ -11,6 +11,8 @@ import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowlin
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout, shouldPauseGameplay } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
 import { UIManager } from '../src/ui';
+import { GameScene } from '../src/scene';
+import { battingTimingFeedback } from '../src/batting-timing';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
@@ -45,6 +47,58 @@ test('shot cameras follow every direction and keep a stable elevated result view
   const chase = followShotPose({ x: 90, y: 4, z: 90 }, shotCameraDirection({ x: 1, y: 0, z: 1 }));
   assert.ok(Math.hypot(chase.position.x, chase.position.z) <= 60.000001);
   assert.ok(chase.position.y >= 14);
+});
+
+test('batting timing feedback matches the shot timing scale and clamps its marker', () => {
+  assert.deepEqual(battingTimingFeedback(0.5), { position: 0.5, offsetMs: 0, label: 'PERFECT' });
+  assert.deepEqual(battingTimingFeedback(0.4), { position: 0.4, offsetMs: -50, label: 'EARLY' });
+  assert.deepEqual(battingTimingFeedback(0.6), { position: 0.6, offsetMs: 50, label: 'LATE' });
+  assert.equal(battingTimingFeedback(-2).position, 0);
+  assert.equal(battingTimingFeedback(2).position, 1);
+});
+
+test('batting timing meter displays the actual shot offset', () => {
+  const oldDocument = globalThis.document;
+  const marker = { style: { left: '' } };
+  const label = { textContent: '' };
+  let shown = false;
+  const widget = { dataset: { timing: '' }, classList: { remove: () => { shown = true; } } };
+  Object.assign(globalThis, { document: { getElementById: (id: string) => ({
+    'timing-widget': widget, 'timing-bar-cursor': marker, 'timing-instruction': label
+  } as Record<string, unknown>)[id] ?? null } });
+  try {
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.showBattingTiming(0.4);
+    assert.equal(marker.style.left, '40%');
+    assert.equal(label.textContent, 'EARLY · 50 ms');
+    assert.equal(widget.dataset.timing, 'early');
+    assert.equal(shown, true);
+  } finally {
+    Object.assign(globalThis, { document: oldDocument });
+  }
+});
+
+test('the first run-up follows the newly selected bowling side, not the previous delivery', () => {
+  const oldDelivery = globalAutoAssistConfig.currentDelivery;
+  const oldStart = globalAutoAssistConfig.runUpStartTime;
+  const scene = Object.create(GameScene.prototype) as any;
+  scene.bowlerRoot = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0 }, setEnabled() {} };
+  scene.batterRoot = null;
+  scene.bowlerLegs = [];
+  scene.bowlerArms = [];
+  try {
+    globalAutoAssistConfig.currentDelivery = { ...delivery(0.5), overTheWicket: true, bowlingArm: 'Right' };
+    globalAutoAssistConfig.runUpStartTime = gameNow() - 1;
+    scene.setBowlerSide(false, 'Right');
+    scene.updateBowlerRunUp();
+    assert.equal(scene.bowlerRoot.position.x, deliveryReleaseX({ overTheWicket: false, bowlingArm: 'Right' }));
+    scene.setBowlerSide(true, 'Left');
+    scene.updateBowlerRunUp();
+    assert.equal(scene.bowlerRoot.position.x, deliveryReleaseX({ overTheWicket: true, bowlingArm: 'Left' }));
+  } finally {
+    globalAutoAssistConfig.currentDelivery = oldDelivery;
+    globalAutoAssistConfig.runUpStartTime = oldStart;
+  }
 });
 
 test('sound effects unlock on input and respect mute without interrupting play', () => {
@@ -470,6 +524,7 @@ test('interrupting a bowling run-up restores controls without delivering', () =>
   let keysCleared = 0;
   let touchCleared = 0;
   let bowlerReset = 0;
+  let restoredSide: unknown[] = [];
   Object.assign(globalThis, { document: { getElementById: (id: string) => {
     if (id === 'bowler-runup-indicator') return { remove: () => { removed++; } };
     if (id === 'control-bowling') return { classList: { remove: () => { controlsRestored++; } } };
@@ -479,7 +534,9 @@ test('interrupting a bowling run-up restores controls without delivering', () =>
     const ui = Object.create(UIManager.prototype) as any;
     ui.keyboardInputManager = { cancelHeldInputs: () => { keysCleared++; } };
     ui.touchBattingControls = { cancelPointer: () => { touchCleared++; } };
-    ui.gameScene = { resetBowlerMesh: () => { bowlerReset++; } };
+    ui.gameScene = { resetBowlerMesh: () => { bowlerReset++; }, setBowlerSide: (...args: unknown[]) => { restoredSide = args; } };
+    ui.controller = { getCurrentInnings: () => ({ bowler: { bowlingArm: 'Left' } }) };
+    ui.overTheWicket = false;
     ui.userBowlingInProgress = true;
     ui.isBallActive = true;
     ui.bowlingPointerId = 12;
@@ -492,11 +549,39 @@ test('interrupting a bowling run-up restores controls without delivering', () =>
     assert.equal(globalAutoAssistConfig.isRunUpActive, false);
     assert.equal(globalAutoAssistConfig.runUpStartTime, undefined);
     assert.deepEqual([removed, controlsRestored, keysCleared, touchCleared, bowlerReset], [1, 1, 1, 1, 1]);
+    assert.deepEqual(restoredSide, [false, 'Left']);
     ui.endUserBowlingDelivery();
     assert.equal(ui.isBallActive, false);
   } finally {
     globalAutoAssistConfig.isRunUpActive = previousRunUp;
     globalAutoAssistConfig.runUpStartTime = previousStart;
+    Object.assign(globalThis, { document: originalDocument });
+  }
+});
+
+test('each turn applies the active batter handedness to the scene', () => {
+  const game = match();
+  game.setTossResult(game.state.player.id, 'bowl');
+  game.startMatch();
+  game.getCurrentInnings().batter.batterHand = 'LHB';
+  const originalDocument = globalThis.document;
+  Object.assign(globalThis, { document: { getElementById: () => null } });
+  try {
+    const seen: string[] = [];
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.controller = game;
+    ui.deliveryGeneration = 0;
+    ui.cancelBattingRunUp = null;
+    ui.botDeliveryTimer = null;
+    ui.gameScene = {
+      setBatterHandedness: (hand: string) => seen.push(hand),
+      setPlayerCreaseOffset() {}, setBowlerSide() {}, setCameraMode() {}
+    };
+    ui.keyboardInputManager = { updateFeedbackOverlay() {} };
+    ui.updateHUD = () => {};
+    ui.setupActiveTurn();
+    assert.deepEqual(seen, ['LHB']);
+  } finally {
     Object.assign(globalThis, { document: originalDocument });
   }
 });

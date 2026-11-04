@@ -4,6 +4,9 @@ Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. Unchecked items a
 
 ## Match reliability and presentation — current priority
 
+- [x] Keep the first run-up after changing bowling side on the newly selected side, including after a previously bowled delivery.
+- [x] Show player batting timing as early, perfect or late with a colored meter and the offset in milliseconds; hide it for bot shots and new deliveries.
+- [ ] Verify run-up switching and batting timing feedback on physical phones and tablets, including repeated side changes and different shot timings.
 - [x] Prevent repeated rendering of the same match summary from duplicating its leaderboard entry; cover successive matches.
 - [ ] Test persistence and summary behavior through repeated rematches and lobby returns in the browser.
 - [ ] Exercise repeated full matches, interactive batting, no-balls/free hits, wides, wickets and sudden-death presentation in a real browser; verify sound and errors.

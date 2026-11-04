@@ -19,6 +19,7 @@ Play a biggest-six duel against a bot. Each batter faces six legal deliveries; t
   - `Ground Drive` (High control, safe boundary chasing through the gaps)
   - `Lofted / Power Shot` (Risk-reward high-exit-angle stroke for maximums)
 - **Precision Timing & Placement**: Swing timing paired with directional shot placement controls.
+- **Shot Timing Feedback**: After a player swings, a compact meter shows early, perfect or late timing and the offset on the game's timing scale.
 - **Ball Flight and Boundary Scoring**: Watch the ball travel across the field; a shot that clears the boundary before bouncing scores six.
 - **Ball Size**: Physics uses a 3.6 cm ball radius. The on-screen ball is enlarged for visibility on small screens.
 - **Batter Position**: Before release, use the movement buttons or I/J/K/L to step forward, left, back or right. The stance locks during the delivery and affects contact timing and reach.
@@ -52,7 +53,7 @@ Play a biggest-six duel against a bot. Each batter faces six legal deliveries; t
 | **Action Execution** | `Spacebar` (Stop bowling release point meter / Trigger bat swing timing) |
 | **Shortcuts Modal** | Press `H` or click the HUD shortcuts button |
 
-On a phone, drag the left batting stick to aim, choose front or back foot, and tap a shot button with your other thumb as the ball arrives. Front foot suits fuller balls; back foot suits short balls. Aim bowling deliveries on the pitch or the compact pitch map, choose a delivery type, adjust speed and swing for pace or turn for spin, then hold and release the delivery button in the green timing zone. Swing directions are shown from the bowler's view; releasing early or late also moves the bounce point away from the target.
+On a phone, drag the left batting stick to aim, choose front or back foot, and tap a shot button with your other thumb as the ball arrives. The timing meter appears after the swing: early means swing later next time, and late means swing earlier. Front foot suits fuller balls; back foot suits short balls. Aim bowling deliveries on the pitch or the compact pitch map, choose a delivery type, adjust speed and swing for pace or turn for spin, then hold and release the delivery button in the green timing zone. Swing directions are shown from the bowler's view; releasing early or late also moves the bounce point away from the target.
 
 ---
 
