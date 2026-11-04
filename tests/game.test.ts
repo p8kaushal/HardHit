@@ -91,11 +91,15 @@ test('batting timing meter displays the actual shot offset', () => {
   } as Record<string, unknown>)[id] ?? null } });
   try {
     const ui = Object.create(UIManager.prototype) as any;
+    ui.controller = { botDifficulty: 'Hard' };
     ui.showBattingTiming(0.4);
     assert.equal(marker.style.left, '40%');
     assert.equal(label.textContent, 'EARLY · 50 ms');
     assert.equal(widget.dataset.timing, 'early');
     assert.equal(shown, true);
+    ui.controller.botDifficulty = 'Rookie';
+    ui.showBattingTiming(0.6);
+    assert.equal(label.textContent, 'LATE · 50 ms · ASSISTED');
   } finally {
     Object.assign(globalThis, { document: oldDocument });
   }

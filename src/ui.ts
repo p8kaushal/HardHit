@@ -572,7 +572,9 @@ export class UIManager {
     const marker = document.getElementById('timing-bar-cursor');
     const label = document.getElementById('timing-instruction');
     if (marker) marker.style.left = `${feedback.position * 100}%`;
-    if (label) label.textContent = feedback.offsetMs === 0 ? feedback.label : `${feedback.label} · ${Math.abs(feedback.offsetMs)} ms`;
+    const timingText = feedback.offsetMs === 0 ? feedback.label : `${feedback.label} · ${Math.abs(feedback.offsetMs)} ms`;
+    const assisted = this.controller.botDifficulty === 'Rookie' || this.controller.botDifficulty === 'Medium';
+    if (label) label.textContent = assisted ? `${timingText} · ASSISTED` : timingText;
     if (widget) {
       widget.dataset.timing = feedback.label.toLowerCase();
       widget.classList.remove('hidden');
