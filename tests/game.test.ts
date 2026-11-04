@@ -1137,6 +1137,56 @@ test('finalizing a six records its runs and biggest hit consistently', () => {
   assert.equal(innings.balls[0].distance, 58);
 });
 
+test('the result banner uses the same finalized distance as the score', () => {
+  const game = match();
+  game.setTossResult(game.state.player.id, 'bowl');
+  game.startMatch();
+  const ball = delivery(0.5);
+  const outcome = game.recordBall(ball, { direction: 0, type: 'lofted', timing: 0.5, contactZone: 0.5 });
+  const oldDocument = globalThis.document;
+  const oldWindow = globalThis.window;
+  const oldPerformance = globalThis.performance;
+  let now = oldPerformance.now();
+  const timers: Array<() => void> = [];
+  let resolveBall: () => void = () => {};
+  let title = '';
+  Object.assign(globalThis, {
+    document: { getElementById: () => null },
+    performance: { now: () => now },
+    window: { setTimeout: (fn: () => void) => { timers.push(fn); return timers.length; } }
+  });
+  try {
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.controller = game;
+    ui.activeDelivery = ball;
+    ui.deliveryGeneration = 1;
+    ui.deliveryStarted = false;
+    ui.hideResultToast = () => {};
+    ui.hideBattingHelper = () => {};
+    ui.hideAssistedPrompt = () => {};
+    ui.showResultToast = (value: string) => { title = value; };
+    ui.updateHUD = () => {};
+    ui.setupActiveTurn = () => {};
+    ui.gameScene = {
+      prepareDeliverySound() {}, setCameraMode() {},
+      animateDelivery: (_aim: unknown, _length: unknown, _type: unknown, _arrived: unknown, resolved: () => void) => { resolveBall = resolved; },
+      getShotDistance: () => 150,
+      shotBoundaryOnFull: true,
+      shotReachedBoundary: true
+    };
+    ui.deliverBall3D();
+    resolveBall();
+    assert.equal(outcome.distance, 130);
+    assert.equal(outcome.runs, 6);
+    assert.equal(game.getCurrentInnings().biggestSix, 130);
+    assert.equal(title, 'SIX! 130.0m');
+    now += 2100;
+    timers.shift()!();
+  } finally {
+    Object.assign(globalThis, { document: oldDocument, window: oldWindow, performance: oldPerformance });
+  }
+});
+
 test('bot skill increases across the three difficulty tiers', () => {
   const bots = (['Rookie', 'Medium', 'Hard'] as const).map(createBotPlayer);
   assert.deepEqual(bots.map(bot => bot.stats.bowling.accuracy), [35, 50, 65]);

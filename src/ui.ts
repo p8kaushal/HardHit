@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery, inningsBa
 import { GameScene } from './scene';
 import { BallOutcome, DeliveryChoice, MatchState, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { BATTER_CONTACT_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, evaluateFinalOutcome, calculateBounceTarget, sampleFrontFootLanding } from './formula';
+import { BATTER_CONTACT_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, calculateBounceTarget, sampleFrontFootLanding } from './formula';
 import { moveBatter, type BatterPosition } from './batter-position';
 import { battingTimingFeedback } from './batting-timing';
 import { KeyboardInputManager } from './input';
@@ -732,14 +732,11 @@ export class UIManager {
       const innings = this.controller.getCurrentInnings();
       const lastBall = innings.balls[innings.balls.length - 1];
       
-      let shotDistanceMeters = 0;
-      let hasBounced = false;
-
       if (lastBall && lastBall.shot && !lastBall.missed && !lastBall.isWicket && lastBall.extraType !== 'wide') {
-        shotDistanceMeters = this.gameScene.getShotDistance();
-        hasBounced = this.gameScene.shotBoundaryOnFull ? false : (globalAutoAssistConfig.hasBounced || false);
-        
-        const runs = evaluateFinalOutcome(shotDistanceMeters, hasBounced, this.gameScene.shotReachedBoundary);
+        const rawDistance = this.gameScene.getShotDistance();
+        const hasBounced = this.gameScene.shotBoundaryOnFull ? false : (globalAutoAssistConfig.hasBounced || false);
+        const runs = this.controller.finalizeBallOutcome(rawDistance, hasBounced, this.gameScene.shotReachedBoundary);
+        const shotDistanceMeters = lastBall.distance;
         
         let title = `${runs} RUNS`;
         let desc = `Shot yielded ${runs} runs.`;
@@ -758,10 +755,6 @@ export class UIManager {
         if (lastBall.extraType === 'noball') desc += ` No-ball: front foot ${((lastBall.delivery.frontFootHeel ?? 0) * 100).toFixed(1)} cm over; one penalty and a free hit.`;
         // Step 2: Freeze the tracking camera target on ball's final location and display scoring result banner for exactly 2.0 seconds
         this.showResultToast(title, desc);
-      }
-
-      if (lastBall && lastBall.shot && !lastBall.missed && !lastBall.isWicket && lastBall.extraType !== 'wide') {
-        this.controller.finalizeBallOutcome(shotDistanceMeters, hasBounced, this.gameScene.shotReachedBoundary);
         this.updateHUD();
       } else if (lastBall) {
         this.controller.handleInningsCompletion();

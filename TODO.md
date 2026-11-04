@@ -4,6 +4,8 @@ Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. Unchecked items a
 
 ## Match reliability and presentation — current priority
 
+- [x] Invalidate cancelled batting flight callbacks so they cannot observe or resolve a later delivery.
+- [x] Use the finalized scorecard distance in the shot result banner, including when a distance is capped.
 - [x] Keep the first run-up after changing bowling side on the newly selected side, including after a previously bowled delivery.
 - [x] Show player batting timing as early, perfect or late with a colored meter and the offset in milliseconds; hide it for bot shots and new deliveries.
 - [ ] Verify run-up switching and batting timing feedback on physical phones and tablets, including repeated side changes and different shot timings.
