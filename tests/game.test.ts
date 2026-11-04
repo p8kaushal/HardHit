@@ -1302,20 +1302,15 @@ test('recorded deliveries and shots retain their original inputs after controls 
   assert.equal(game.getCurrentInnings().balls[0], result);
 });
 
-test('rookie timing assistance does not modify the caller’s shot object', () => {
+test('rookie timing assistance preserves the recorded and displayed shot timing', () => {
   const game = new MatchController('Rookie');
   game.setTossResult(game.state.player.id, 'bat');
   game.startMatch();
   const shot = { direction: 0, type: 'grounded' as const, timing: 0.3, contactZone: 0.5 };
-  const previous = globalAutoAssistConfig.bufferedTiming;
-  try {
-    globalAutoAssistConfig.bufferedTiming = 0.5;
-    const outcome = game.recordBall(delivery(0.5), shot);
-    assert.equal(shot.timing, 0.3);
-    assert.equal(outcome.shot?.timing, 0.5);
-  } finally {
-    globalAutoAssistConfig.bufferedTiming = previous;
-  }
+  const outcome = game.recordBall(delivery(0.5), shot);
+  assert.equal(shot.timing, 0.3);
+  assert.equal(outcome.shot?.timing, 0.3);
+  assert.equal(battingTimingFeedback(outcome.shot!.timing).offsetMs, -100);
 });
 
 test('with equal biggest six and wickets, more sixes beat greater total distance', () => {

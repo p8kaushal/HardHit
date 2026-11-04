@@ -69,7 +69,8 @@ try {
           const cue = document.querySelector('#hit-space-banner');
           return cue && getComputedStyle(cue).display !== 'none';
         }, { timeout: 30000 });
-        await page.click('.touch-shot[data-shot="lofted"]');
+        if (viewport.width === 667) await page.click('.touch-shot[data-shot="lofted"]');
+        else await page.keyboard.press('Space');
         await page.waitForSelector('#timing-widget:not(.hidden)', { timeout: 3000 });
         await page.waitForSelector('#over-tracker .over-dot:not(.upcoming)', { timeout: 30000 });
       }

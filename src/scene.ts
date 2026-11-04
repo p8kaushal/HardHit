@@ -147,19 +147,6 @@ export class GameScene {
       }
     };
 
-    window.addEventListener('keydown', (e) => {
-      // Crease-Zone Input Buffering (Easy Mode)
-      if (e.code === 'Space' && !this.isBotBatting && globalAutoAssistConfig.isRookie) {
-        if (this.isAnimatingBall && this.ballMesh) {
-          const z = this.ballMesh.position.z;
-          // Physical arrival zone definition
-          if (z <= -6.5 && z >= BATTER_CREASE_Z) {
-            globalAutoAssistConfig.bufferedTiming = 0.5; // Guaranteed valid timing offset (0 deviation)
-          }
-        }
-      }
-    });
-
     // Start render loop
     this.engine.runRenderLoop(() => {
       if (!isGamePaused()) this.scene.render();

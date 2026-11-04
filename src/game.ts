@@ -12,7 +12,6 @@ export const globalAutoAssistConfig: {
   isRookie: boolean, 
   currentDelivery: DeliveryChoice | null, 
   batterHand: 'RHB' | 'LHB', 
-  bufferedTiming?: number | null,
   deliveryStartTime?: number,
   delta_t?: number,
   ballZ?: number,
@@ -28,7 +27,6 @@ export const globalAutoAssistConfig: {
   isRookie: false,
   currentDelivery: null,
   batterHand: 'RHB',
-  bufferedTiming: null,
   isDeliveryActive: false,
   isBallInPlay: false,
   hasBounced: false,
@@ -314,14 +312,6 @@ export class MatchController {
       else if (this.botDifficulty === 'Medium') assistMultiplier = 0.40;
       else if (this.botDifficulty === 'Hard') assistMultiplier = 0.00;
 
-      // Preserve the player's chosen shot direction at every difficulty.
-      if (this.botDifficulty === 'Rookie' && shot) {
-        // Apply buffered timing from scene Spacebar press
-        if (globalAutoAssistConfig.bufferedTiming !== null && globalAutoAssistConfig.bufferedTiming !== undefined) {
-          shot.timing = globalAutoAssistConfig.bufferedTiming;
-          globalAutoAssistConfig.bufferedTiming = null;
-        }
-      }
     }
 
     const wicketResult = shot ? evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier) : null;
