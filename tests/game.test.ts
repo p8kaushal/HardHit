@@ -69,6 +69,26 @@ test('rendered stumps match the wicket dimensions used for decisions', () => {
   }
 });
 
+test('rendered popping creases match the delivery model at both ends', () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const renderer = Object.create(GameScene.prototype) as any;
+    renderer.scene = scene;
+    renderer.buildStadium();
+    for (const [name, expectedZ] of [['poppingCreaseBowl', BATTER_CREASE_Z], ['poppingCreaseBat', -BATTER_CREASE_Z]] as const) {
+      const marking = scene.getMeshByName(name)!;
+      marking.computeWorldMatrix(true);
+      const bounds = marking.getBoundingInfo().boundingBox;
+      assert.ok(Math.abs(bounds.minimumWorld.z - expectedZ) < 0.00001);
+      assert.ok(Math.abs(bounds.maximumWorld.z - expectedZ) < 0.00001);
+    }
+  } finally {
+    scene.dispose();
+    engine.dispose();
+  }
+});
+
 test('shot cameras follow every direction and keep a stable elevated result view', () => {
   const ball = { x: 12, y: 3, z: -4 };
   for (const [x, z] of [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]) {

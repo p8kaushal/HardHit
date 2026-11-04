@@ -251,24 +251,24 @@ export class GameScene {
     };
 
     // Popping Creases
-    createLine('poppingCreaseBat', [new BABYLON.Vector3(-1.32, 0, 8.2), new BABYLON.Vector3(1.32, 0, 8.2)]);
-    createLine('poppingCreaseBowl', [new BABYLON.Vector3(-1.32, 0, -8.2), new BABYLON.Vector3(1.32, 0, -8.2)]);
+    createLine('poppingCreaseBat', [new BABYLON.Vector3(-1.32, 0, -BATTER_CREASE_Z), new BABYLON.Vector3(1.32, 0, -BATTER_CREASE_Z)]);
+    createLine('poppingCreaseBowl', [new BABYLON.Vector3(-1.32, 0, BATTER_CREASE_Z), new BABYLON.Vector3(1.32, 0, BATTER_CREASE_Z)]);
 
     // Bowling Creases
     createLine('bowlingCreaseBat', [new BABYLON.Vector3(-1.32, 0, 10), new BABYLON.Vector3(1.32, 0, 10)]);
     createLine('bowlingCreaseBowl', [new BABYLON.Vector3(-1.32, 0, -10), new BABYLON.Vector3(1.32, 0, -10)]);
 
     // Return Creases
-    createLine('returnCreaseLeftBat', [new BABYLON.Vector3(-1.32, 0, 8.2), new BABYLON.Vector3(-1.32, 0, 10)]);
-    createLine('returnCreaseRightBat', [new BABYLON.Vector3(1.32, 0, 8.2), new BABYLON.Vector3(1.32, 0, 10)]);
-    createLine('returnCreaseLeftBowl', [new BABYLON.Vector3(-1.32, 0, -8.2), new BABYLON.Vector3(-1.32, 0, -10)]);
-    createLine('returnCreaseRightBowl', [new BABYLON.Vector3(1.32, 0, -8.2), new BABYLON.Vector3(1.32, 0, -10)]);
+    createLine('returnCreaseLeftBat', [new BABYLON.Vector3(-1.32, 0, -BATTER_CREASE_Z), new BABYLON.Vector3(-1.32, 0, 10)]);
+    createLine('returnCreaseRightBat', [new BABYLON.Vector3(1.32, 0, -BATTER_CREASE_Z), new BABYLON.Vector3(1.32, 0, 10)]);
+    createLine('returnCreaseLeftBowl', [new BABYLON.Vector3(-1.32, 0, BATTER_CREASE_Z), new BABYLON.Vector3(-1.32, 0, -10)]);
+    createLine('returnCreaseRightBowl', [new BABYLON.Vector3(1.32, 0, BATTER_CREASE_Z), new BABYLON.Vector3(1.32, 0, -10)]);
 
     // Wide Lines
-    createLine('wideLineLeftBat', [new BABYLON.Vector3(-0.89, 0, 8.2), new BABYLON.Vector3(-0.89, 0, 10)]);
-    createLine('wideLineRightBat', [new BABYLON.Vector3(0.89, 0, 8.2), new BABYLON.Vector3(0.89, 0, 10)]);
-    createLine('wideLineLeftBowl', [new BABYLON.Vector3(-0.89, 0, -8.2), new BABYLON.Vector3(-0.89, 0, -10)]);
-    createLine('wideLineRightBowl', [new BABYLON.Vector3(0.89, 0, -8.2), new BABYLON.Vector3(0.89, 0, -10)]);
+    createLine('wideLineLeftBat', [new BABYLON.Vector3(-0.89, 0, -BATTER_CREASE_Z), new BABYLON.Vector3(-0.89, 0, 10)]);
+    createLine('wideLineRightBat', [new BABYLON.Vector3(0.89, 0, -BATTER_CREASE_Z), new BABYLON.Vector3(0.89, 0, 10)]);
+    createLine('wideLineLeftBowl', [new BABYLON.Vector3(-0.89, 0, BATTER_CREASE_Z), new BABYLON.Vector3(-0.89, 0, -10)]);
+    createLine('wideLineRightBowl', [new BABYLON.Vector3(0.89, 0, BATTER_CREASE_Z), new BABYLON.Vector3(0.89, 0, -10)]);
 
     // Stumps are on the bowling creases at each end of the pitch.
     this.buildStumps(new BABYLON.Vector3(0, 0, -10));
