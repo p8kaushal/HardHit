@@ -110,22 +110,23 @@ export function batterContactProgress(delivery: DeliveryChoice): number {
   return Math.max(0, Math.min(1, (BATTER_CONTACT_Z + z - 10) / (BATTER_CREASE_Z - 10)));
 }
 
-export function deliveryContactPoint(delivery: DeliveryChoice): { x: number; y: number; z: number } {
+/** Sample the shared incoming path from release to the modeled crease. */
+export function sampleDeliveryPath(delivery: DeliveryChoice, progress: number): { x: number; y: number; z: number } {
   const start = { x: deliveryReleaseX(delivery), y: 1.9, z: 10 };
   const bounce = { x: delivery.aimTarget.x, y: BALL_RADIUS_METERS, z: delivery.aimTarget.z };
   const end = { x: deliveryBaseCreaseX(delivery), y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
-  return getDeliveryFlightPosition(batterContactProgress(delivery), start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
+  return getDeliveryFlightPosition(progress, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
+}
+
+export function deliveryContactPoint(delivery: DeliveryChoice): { x: number; y: number; z: number } {
+  return sampleDeliveryPath(delivery, batterContactProgress(delivery));
 }
 
 /** Approximate incoming velocity at contact from the same path used on screen. */
 export function deliveryVelocityAtCrease(delivery: DeliveryChoice): { x: number; y: number; z: number } {
-  const start = { x: deliveryReleaseX(delivery), y: 1.9, z: 10 };
-  const bounce = { x: delivery.aimTarget.x, y: BALL_RADIUS_METERS, z: delivery.aimTarget.z };
-  const end = { x: deliveryBaseCreaseX(delivery), y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
-  const sample = (progress: number) => getDeliveryFlightPosition(progress, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
   const contact = batterContactProgress(delivery);
-  const before = sample(Math.max(0, contact - 0.01));
-  const atCrease = sample(contact);
+  const before = sampleDeliveryPath(delivery, Math.max(0, contact - 0.01));
+  const atCrease = sampleDeliveryPath(delivery, contact);
   const seconds = deliveryDurationMs(delivery.type, delivery.pace) / 1000 * 0.01;
   return { x: (atCrease.x - before.x) / seconds, y: (atCrease.y - before.y) / seconds, z: (atCrease.z - before.z) / seconds };
 }
@@ -138,11 +139,8 @@ export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'L
   const stumpHeight = STUMP_HEIGHT_METERS;
   const impactZ = BATTER_CONTACT_Z + (delivery.batterPosition?.z ?? 0);
   const progress = (impactZ - 10) / (BATTER_CREASE_Z - 10);
-  const start = { x: deliveryReleaseX(delivery), y: 1.9, z: 10 };
-  const bounce = { x: delivery.aimTarget.x, y: BALL_RADIUS_METERS, z: delivery.aimTarget.z };
-  const end = { x: deliveryBaseCreaseX(delivery), y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
-  const impact = getDeliveryFlightPosition(progress, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
-  const wicket = getDeliveryFlightPosition(1, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
+  const impact = sampleDeliveryPath(delivery, progress);
+  const wicket = sampleDeliveryPath(delivery, 1);
   const hitsWicket = Math.abs(wicket.x) <= stumpHalfWidth + ballRadius && wicket.y <= stumpHeight + ballRadius;
   if (!hitsWicket) return null;
 

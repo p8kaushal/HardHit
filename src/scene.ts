@@ -1,8 +1,8 @@
 import * as BABYLON from 'babylonjs';
 import { gameNow, isGamePaused, setGameTimeout } from './game-clock';
-import { CameraMode, DeliveryType } from './types';
+import { CameraMode, DeliveryChoice, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryDurationMs, deliveryReleaseX, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
+import { BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryDurationMs, deliveryReleaseX, deliverySwingAtBounce, sampleDeliveryPath } from './formula';
 import { stepBall, type BallState } from './ball-physics';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
@@ -538,18 +538,11 @@ export class GameScene {
     const points: BABYLON.Vector3[] = [];
     const steps = 60;
     
-    const targetX = aimTarget.x;
-    const bounceZ = aimTarget.z;
-    
-    const delivery = { aimTarget, type, line: 'middle' as const, length: 'good' as const, releaseTiming: 0.5, overTheWicket, bowlingArm: globalAutoAssistConfig.bowlerArm || 'Right' };
-    const startX = deliveryReleaseX(delivery);
-    const release = { x: startX, y: 1.9, z: 10.0 };
-    const bounce = { x: targetX, y: BALL_RADIUS_METERS, z: bounceZ };
-    const end = { x: deliveryBaseCreaseX(delivery), y: deliveryArrivalHeight(bounceZ, type, pace), z: BATTER_CREASE_Z };
+    const delivery: DeliveryChoice = { aimTarget, type, line: 'middle', length: 'good', releaseTiming: 0.5, overTheWicket, bowlingArm: globalAutoAssistConfig.bowlerArm || 'Right', turn, swing, pace };
     
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
-      const pos = getDeliveryFlightPosition(progress, release, bounce, end, type, turn, swing, pace);
+      const pos = sampleDeliveryPath(delivery, progress);
       points.push(new BABYLON.Vector3(pos.x, pos.y + BALL_VISUAL_OFFSET, pos.z));
     }
 
@@ -947,12 +940,8 @@ export class GameScene {
       const targetZ = delivery?.aimTarget.z ?? -3.5;
       this.notifyDeliveryBounce(progress, targetZ);
         
-      const startX = deliveryReleaseX(delivery || { bowlingArm: globalAutoAssistConfig.bowlerArm });
-      const release = { x: startX, y: 1.9, z: 10.0 };
-      const bounce = { x: targetX, y: BALL_RADIUS_METERS, z: targetZ };
-      const end = { x: delivery ? deliveryBaseCreaseX(delivery) : targetX, y: deliveryArrivalHeight(targetZ, delivery?.type, delivery?.pace), z: BATTER_CREASE_Z };
-      
-      const pos = getDeliveryFlightPosition(progress, release, bounce, end, delivery?.type ?? 'medium', delivery?.turn, delivery?.swing, delivery?.pace);
+      const activeDelivery: DeliveryChoice = delivery ?? { aimTarget: { x: targetX, z: targetZ }, type: 'medium', line: 'middle', length: 'good', releaseTiming: 0.5, bowlingArm: globalAutoAssistConfig.bowlerArm };
+      const pos = sampleDeliveryPath(activeDelivery, progress);
       ball.position.set(pos.x, pos.y + BALL_VISUAL_OFFSET, pos.z);
       if (progress >= contactProgress && this.onBallArrivedCallback) this.onBallArrivedCallback();
     }

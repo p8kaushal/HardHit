@@ -14,7 +14,7 @@ import { SoundManager } from '../src/sound';
 import { UIManager, opponentBadgeText } from '../src/ui';
 import { GameScene } from '../src/scene';
 import { battingTimingFeedback } from '../src/batting-timing';
-import { battingAssistanceMultiplier, shotFlightQuality } from '../src/formula';
+import { battingAssistanceMultiplier, deliveryContactPoint, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
@@ -98,6 +98,32 @@ test('rendered popping creases match the delivery model at both ends', () => {
   } finally {
     scene.dispose();
     engine.dispose();
+  }
+});
+
+test('rendered bowling paths use the same sampled trajectory as contact decisions', () => {
+  const oldArm = globalAutoAssistConfig.bowlerArm;
+  const scene = Object.create(GameScene.prototype) as GameScene;
+  try {
+    for (const arm of ['Right', 'Left'] as const) {
+      globalAutoAssistConfig.bowlerArm = arm;
+      for (const type of ['fast', 'offspin', 'legspin'] as const) {
+        const ball: DeliveryChoice = {
+          ...delivery(0.5, 0.3), type, overTheWicket: false, bowlingArm: arm,
+          turn: 0.7, swing: -0.5, pace: 0.8
+        };
+        const points = scene.generateTrajectoryPoints(ball.aimTarget, type, false, ball.turn, ball.swing, ball.pace);
+        for (const index of [0, 20, 40, 60]) {
+          const expected = sampleDeliveryPath(ball, index / 60);
+          assert.ok(Math.abs(points[index].x - expected.x) < 1e-9);
+          assert.ok(Math.abs(points[index].z - expected.z) < 1e-9);
+          assert.ok(Math.abs(points[index].y - expected.y - (0.075 - BALL_RADIUS_METERS)) < 1e-9);
+        }
+        assert.deepEqual(deliveryContactPoint(ball), sampleDeliveryPath(ball, batterContactProgress(ball)));
+      }
+    }
+  } finally {
+    globalAutoAssistConfig.bowlerArm = oldArm;
   }
 });
 
