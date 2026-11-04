@@ -1,5 +1,7 @@
 # Six Hitting Contest - 3D MVP Overview
 
+> Historical prototype notes: some details below describe earlier implementations. For current behavior, validation and open work, see [README.md](README.md), [DELIVERY_PLAN.md](DELIVERY_PLAN.md) and [TODO.md](TODO.md).
+
 A mobile-first, cross-device single-over cricket duel built from scratch using **TypeScript**, **Babylon.js**, and modern web standard components. 
 
 ---
@@ -76,7 +78,7 @@ Default parameters ensure balanced risk-reward gameplay (Default Stats = 50):
     *   *Timing & Contact Zone Variance*: Calculated dynamically from stats (`timingStdDev = 0.15 - (Timing / 100) * 0.13`), ensuring bots with higher stats execute cleaner timing.
 *   **Rank Progression**: Experience points (XP) accumulated from wins/losses, unlocking Bronze, Silver, Gold, Elite, and Legend rank badges.
 *   **Leaderboard**: Local Storage scores recording player personal bests.
-*   **Formula Verification Helper (`src/formula.ts`)**: Exposes `verifyFormulas()` which runs isolated test executions of hit carrying distances and wicket risks, logging diagnostics in the console on start.
+*   **Formula Regression Tests (`tests/game.test.ts`)**: Automated checks cover delivery paths, shot calculations and wicket decisions; run them with `npm test`.
 *   **Rules & Over Loop Enforcement (`src/game.ts`)**:
     *   *Single Wicket Forfeiture*: Strictly capped at 1 wicket. On dismissal, the innings ends instantly and remaining balls are forfeited.
     *   *Extra Balls*: Timing `<0.08` or `>0.92` issues a Wide/No-ball. Adds +1 penalty run to opponent, does not increment legal balls, and sets `isFreeHit = true` for the next delivery.

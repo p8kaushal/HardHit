@@ -194,14 +194,6 @@ export class MatchController {
     this.state = this.createInitialMatchState(player, bot);
   }
 
-  public nextBall(): void {
-    if (globalAutoAssistConfig.isBallInPlay) return;
-  }
-
-  public resetPositions(): void {
-    if (globalAutoAssistConfig.isBallInPlay) return;
-  }
-
   private createInitialMatchState(player: Player, bot: Player): MatchState {
     return {
       player,
