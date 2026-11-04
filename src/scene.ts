@@ -906,15 +906,7 @@ export class GameScene {
   }
 
   public updateBowlerRunUp(): void {
-    if (!this.bowlerRoot || !globalAutoAssistConfig.runUpStartTime) return;
-    
-    this.bowlerRoot.setEnabled(true);
-
-    // ENFORCE BATTER VISIBILITY
-    if (this.batterRoot) {
-      this.batterRoot.setEnabled(true);
-      this.batterRoot.getChildMeshes().forEach(m => { m.isVisible = true; });
-    }
+    if (!this.bowlerRoot || globalAutoAssistConfig.runUpStartTime === undefined) return;
     
     const elapsed = gameNow() - globalAutoAssistConfig.runUpStartTime;
     const duration = 1200;
@@ -936,16 +928,10 @@ export class GameScene {
     const ball = this.ballMesh as any;
     if (!ball) return;
     
-    // ENFORCE BATTER VISIBILITY
-    if (this.batterRoot) {
-      this.batterRoot.setEnabled(true);
-      this.batterRoot.getChildMeshes().forEach(m => { m.isVisible = true; });
-    }
-
     // Do not dispose predictionPath if we want to show it. But we should render it if we need to.
     // If we only render predictionPath for player, then for bot we just move the ball.
 
-    if (globalAutoAssistConfig.deliveryStartTime) {
+    if (globalAutoAssistConfig.deliveryStartTime !== undefined) {
       const elapsed = gameNow() - globalAutoAssistConfig.deliveryStartTime;
       const delivery = globalAutoAssistConfig.currentDelivery;
       const duration = deliveryDurationMs(delivery?.type ?? 'medium', delivery?.pace);

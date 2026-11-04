@@ -141,6 +141,10 @@ test('the first run-up follows the newly selected bowling side, not the previous
     scene.setBowlerSide(true, 'Left');
     scene.updateBowlerRunUp();
     assert.equal(scene.bowlerRoot.position.x, deliveryReleaseX({ overTheWicket: true, bowlingArm: 'Left' }));
+    globalAutoAssistConfig.runUpStartTime = 0;
+    scene.bowlerRoot.position.x = 99;
+    scene.updateBowlerRunUp();
+    assert.equal(scene.bowlerRoot.position.x, deliveryReleaseX({ overTheWicket: true, bowlingArm: 'Left' }));
   } finally {
     globalAutoAssistConfig.currentDelivery = oldDelivery;
     globalAutoAssistConfig.runUpStartTime = oldStart;
