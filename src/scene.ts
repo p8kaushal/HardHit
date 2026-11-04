@@ -2,7 +2,7 @@ import * as BABYLON from 'babylonjs';
 import { gameNow, isGamePaused, setGameTimeout } from './game-clock';
 import { CameraMode, DeliveryChoice, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, sampleDeliveryPath } from './formula';
+import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { stepBall, type BallState } from './ball-physics';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
@@ -271,8 +271,8 @@ export class GameScene {
     createLine('wideLineRightBowl', [new BABYLON.Vector3(0.89, 0, BATTER_CREASE_Z), new BABYLON.Vector3(0.89, 0, -10)]);
 
     // Stumps are on the bowling creases at each end of the pitch.
-    this.buildStumps(new BABYLON.Vector3(0, 0, -10));
-    this.buildStumps(new BABYLON.Vector3(0, 0, 10));
+    this.buildStumps(new BABYLON.Vector3(0, 0, BATTER_STUMPS_Z));
+    this.buildStumps(new BABYLON.Vector3(0, 0, -BATTER_STUMPS_Z));
     
     // Bounce Marker shadow on pitch
     const markerMat = new BABYLON.StandardMaterial('markerMat', this.scene);

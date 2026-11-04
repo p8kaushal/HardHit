@@ -83,7 +83,7 @@ The goal is a credible six-hitting contest with responsive controls and explaina
 
 ### Phase 3 — bowling trajectory and pitch consistency
 
-- Define shared world coordinates, metres, seconds and constants, including release, popping crease, impact and actual rendered stumps. The current modeled contact/crease and rendered stump positions differ; measure and reconcile them before claiming accurate wicket projection.
+- Define shared world coordinates, metres, seconds and constants, including release, popping crease, impact and actual rendered stumps. Wicket decisions now extrapolate the approximate path to the rendered stump plane; animate missed balls there and calibrate the projection before claiming accuracy.
 - Make a single sampled delivery path drive pitch marker, rendering, bounce, batter contact, sound and wicket projection. Include selected over/around side, bowling arm, stance, line/length, pace, swing and off/leg spin with mirrored sign tests.
 - Gather traceable, appropriately licensed measurements or research ranges for representative pace, spin, swing and bounce. Record source, units, uncertainty, fixture inputs and chosen tolerances before tuning; use reproducible tests rather than promising professional-grade accuracy from guessed coefficients.
 - Test stable simulation under frame-rate variation, interruption and device load; preserve player reaction time without hidden slowdowns.

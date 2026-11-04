@@ -28,6 +28,7 @@ export function bowlingTargetFromScreen(x: number, y: number): { x: number; z: n
 
 export const BAT_ANIMATION_LEAD_TIME = 0.15; // 150ms swing apex delay
 export const BATTER_CREASE_Z = -8.8;
+export const BATTER_STUMPS_Z = -10;
 export const BATTER_CONTACT_Z = -8.4;
 export const BALL_AIR_DAMPING = 0.9985;
 // A 22.6 cm circumference ball has an approximately 3.6 cm radius.
@@ -109,7 +110,7 @@ export function batterContactProgress(delivery: DeliveryChoice): number {
   return Math.max(0, Math.min(1, (BATTER_CONTACT_Z + z - 10) / (BATTER_CREASE_Z - 10)));
 }
 
-/** Sample the shared incoming path from release to the modeled crease. */
+/** Sample the shared incoming path; progress 1 is the modeled popping crease. */
 export function sampleDeliveryPath(delivery: DeliveryChoice, progress: number): { x: number; y: number; z: number } {
   const start = { x: deliveryReleaseX(delivery), y: 1.9, z: 10 };
   const bounce = { x: delivery.aimTarget.x, y: BALL_RADIUS_METERS, z: delivery.aimTarget.z };
@@ -139,7 +140,8 @@ export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'L
   const impactZ = BATTER_CONTACT_Z + (delivery.batterPosition?.z ?? 0);
   const progress = (impactZ - 10) / (BATTER_CREASE_Z - 10);
   const impact = sampleDeliveryPath(delivery, progress);
-  const wicket = sampleDeliveryPath(delivery, 1);
+  const wicketProgress = (10 - BATTER_STUMPS_Z) / (10 - BATTER_CREASE_Z);
+  const wicket = sampleDeliveryPath(delivery, wicketProgress);
   const hitsWicket = Math.abs(wicket.x) <= stumpHalfWidth + ballRadius && wicket.y <= stumpHeight + ballRadius;
   if (!hitsWicket) return null;
 
@@ -163,7 +165,7 @@ export function battingContactZone(delivery: DeliveryChoice, timing: number, bas
 /** Ballistic vertical motion, with a simplified rebound from the pitch. */
 export function deliveryVerticalPosition(progress: number, releaseY: number, bounceY: number, bounceProgress: number, durationSeconds: number): number {
   const bounceTime = Math.max(0.001, bounceProgress * durationSeconds);
-  const t = Math.max(0, Math.min(1, progress)) * durationSeconds;
+  const t = Math.max(0, progress) * durationSeconds;
   const initialVelocity = (bounceY - releaseY) / bounceTime + 0.5 * 9.81 * bounceTime;
   if (t <= bounceTime) return releaseY + initialVelocity * t - 0.5 * 9.81 * t * t;
   const impactVelocity = initialVelocity - 9.81 * bounceTime;
@@ -600,7 +602,7 @@ export function getDeliveryFlightPosition(
   position.x += deliverySwingAtBounce(type, swing, bounce.z) * swingFactor;
   position.y = deliveryVerticalPosition(progress, release.y, bounce.y, bounceProgress, deliveryDurationMs(type, pace) / 1000);
   if (progress > bounceProgress && bounceProgress < 1) {
-    position.x += deliveryTurn(type, turn) * Math.min(1, (progress - bounceProgress) / (1 - bounceProgress));
+    position.x += deliveryTurn(type, turn) * (progress - bounceProgress) / (1 - bounceProgress);
   }
   return position;
 }

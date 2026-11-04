@@ -25,9 +25,9 @@ This is a simplified line test, not a complete implementation of MCC Law 22 or T
 
 ## Bowled and LBW
 
-A missed delivery can be bowled or LBW using a simplified projected path and pad/stump geometry. A no-ball cannot result in either. The model takes batter handedness and stance into account; it rejects LBW when the ball pitches outside leg, or impacts outside off when a shot is offered. If there was no shot, impact outside off can qualify. A ball that misses the modeled wicket is not a wicket.
+A missed delivery can be bowled or LBW using a simplified projected path and pad/stump geometry. The incoming path is extended from the modeled popping crease to the rendered stump plane for the wicket test. A no-ball cannot result in either. The model takes batter handedness and stance into account; it rejects LBW when the ball pitches outside leg, or impacts outside off when a shot is offered. If there was no shot, impact outside off can qualify. A ball that misses the modeled wicket is not a wicket.
 
-The model does not currently simulate bat-versus-pad contact ordering, full body geometry, a replay, umpire's-call margins, or a complete trajectory beyond the modeled crease. It must not be presented as a fully accurate LBW decision system. Catches, stumpings, run outs, hit wicket, leg byes and byes are not simulated.
+The projection beyond the crease extrapolates the current approximate path; it is not calibrated, and a missed ball is not yet visibly animated all the way to the stumps. The model does not currently simulate bat-versus-pad contact ordering, full body geometry, a replay, or umpire's-call margins. It must not be presented as a fully accurate LBW decision system. Catches, stumpings, run outs, hit wicket, leg byes and byes are not simulated.
 
 ## Reference material
 

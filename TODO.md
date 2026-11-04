@@ -66,8 +66,9 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 
 - [x] Preserve a boundary-on-the-full when a shot starts at ground level and rises across the rope without bouncing.
 - [x] Align rendered stump width and height with the dimensions used by the simplified wicket decision model; check the actual meshes against those dimensions.
-- [x] Align the painted popping creases and adjoining markings with the existing modeled crease at both ends. Actual stump projection remains open.
-- [x] Sample the same authored incoming path for rendered deliveries, pitch marker, pitching-line test, contact, incoming velocity and the current crease-based decision; extend and calibrate that path to the actual stumps in a later step.
+- [x] Align the painted popping creases and adjoining markings with the existing modeled crease at both ends.
+- [x] Sample the same authored incoming path for rendered deliveries, pitch marker, pitching-line test, contact and incoming velocity; extrapolate it to the rendered stump plane for simplified wicket decisions.
+- [ ] Animate missed deliveries to the stumps and calibrate the extrapolated trajectory and wicket decisions against traceable data; the current approximation does not establish realistic LBW accuracy.
 - [x] Document current contest scoring, modeled cricket decisions and known simplifications against MCC laws and ICC T20I free-hit conditions.
 - [ ] Expand decision-table tests and implementation for both hands, offered/no shot, bat/pad order and unmodeled faults; compare each against the chosen playing conditions.
 - [x] Identify non-boundary runs as distance estimates in the shot result.

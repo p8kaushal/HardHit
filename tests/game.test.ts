@@ -14,7 +14,7 @@ import { SoundManager } from '../src/sound';
 import { UIManager, opponentBadgeText } from '../src/ui';
 import { GameScene } from '../src/scene';
 import { battingTimingFeedback } from '../src/batting-timing';
-import { battingAssistanceMultiplier, deliveryContactPoint, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
+import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryContactPoint, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
@@ -600,7 +600,7 @@ test('front-foot landing is independent of release timing and captured for repla
 });
 
 test('LBW considers pitch, impact, offered shot, stumps, handedness and no-balls', () => {
-  const turning = { ...delivery(0.5, 0.25), type: 'offspin' as const, turn: 1 };
+  const turning = { ...delivery(0.5, 0.35), type: 'offspin' as const, turn: 1 };
   assert.equal(resolveMissedDelivery(turning, 'RHB', true), 'lbw');
   assert.equal(resolveMissedDelivery({ ...turning, batterPosition: { x: 0.6, z: 0 } }, 'RHB', true), 'bowled');
   assert.equal(resolveMissedDelivery({ ...turning, frontFootHeel: 0.01 }, 'RHB', true), null);
@@ -613,6 +613,29 @@ test('LBW considers pitch, impact, offered shot, stumps, handedness and no-balls
   assert.equal(resolveMissedDelivery(leftOutsideOff, 'LHB', true), null);
   assert.equal(resolveMissedDelivery(leftOutsideOff, 'LHB', false), 'lbw');
   assert.equal(resolveMissedDelivery(delivery(0.5, 0.7), 'RHB', false), null);
+});
+
+test('bowled decisions project past the popping crease to the rendered stumps', () => {
+  const progress = (10 - BATTER_STUMPS_Z) / (10 - BATTER_CREASE_Z);
+  const intoWicket: DeliveryChoice = { ...delivery(0.5, 0.268), overTheWicket: true, bowlingArm: 'Right', batterPosition: { x: 0.6, z: 0 } };
+  const awayFromWicket: DeliveryChoice = { ...delivery(0.5, -0.047), overTheWicket: false, bowlingArm: 'Right', batterPosition: { x: -0.6, z: 0 } };
+  const edge = WICKET_WIDTH_METERS / 2 + BALL_RADIUS_METERS;
+  const creaseIn = sampleDeliveryPath(intoWicket, 1);
+  const stumpsIn = sampleDeliveryPath(intoWicket, progress);
+  assert.ok(Math.abs(creaseIn.x) > edge);
+  assert.ok(Math.abs(stumpsIn.x) < edge);
+  assert.ok(Math.abs(stumpsIn.z - BATTER_STUMPS_Z) < 1e-9);
+  assert.equal(resolveMissedDelivery(intoWicket, 'RHB', true), 'bowled');
+  const creaseAway = sampleDeliveryPath(awayFromWicket, 1);
+  const stumpsAway = sampleDeliveryPath(awayFromWicket, progress);
+  assert.ok(Math.abs(creaseAway.x) < edge);
+  assert.ok(Math.abs(stumpsAway.x) > edge);
+  assert.equal(resolveMissedDelivery(awayFromWicket, 'RHB', true), null);
+  const mirrored: DeliveryChoice = { ...intoWicket, aimTarget: { x: -0.268, z: -3.5 }, bowlingArm: 'Left', batterPosition: { x: -0.6, z: 0 } };
+  const mirroredStumps = sampleDeliveryPath(mirrored, progress);
+  assert.ok(Math.abs(mirroredStumps.x + stumpsIn.x) < 1e-9);
+  assert.equal(resolveMissedDelivery(mirrored, 'LHB', true), 'bowled');
+  assert.equal(resolveMissedDelivery({ ...mirrored, frontFootHeel: 0.01 }, 'LHB', true), null);
 });
 
 test('a mistimed stroke that misses the stumps is a dot, not an invented catch', () => {
