@@ -2,7 +2,7 @@ import * as BABYLON from 'babylonjs';
 import { gameNow, isGamePaused, setGameTimeout } from './game-clock';
 import { CameraMode, DeliveryChoice, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryDurationMs, deliveryReleaseX, deliverySwingAtBounce, sampleDeliveryPath } from './formula';
+import { BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { stepBall, type BallState } from './ball-physics';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
@@ -632,7 +632,9 @@ export class GameScene {
       this.bounceMarker.parent = null;
       this.bounceMarker.isVisible = true;
       this.bounceMarker.setEnabled(true);
-      this.bounceMarker.position.set(aimTarget.x + deliverySwingAtBounce(deliveryType, swing, aimTarget.z), 0.08, aimTarget.z);
+      const delivery: DeliveryChoice = { aimTarget, type: deliveryType, line: 'middle', length: 'good', releaseTiming: 0.5, overTheWicket, bowlingArm: globalAutoAssistConfig.bowlerArm || 'Right', turn, swing, pace };
+      const pitch = deliveryPitchPoint(delivery);
+      this.bounceMarker.position.set(pitch.x, 0.08, pitch.z);
     }
 
     const lengthColors: Record<string, BABYLON.Color3> = {

@@ -1248,7 +1248,10 @@ test('bowling side and arm change the same path used for visuals and adjudicatio
   const over = { ...delivery(0.5, 0.7), bowlingArm: 'Right' as const, overTheWicket: true };
   const around = { ...over, overTheWicket: false };
   assert.notEqual(deliveryCreaseX(over), deliveryCreaseX(around));
-  assert.deepEqual(deliveryPitchPoint(over), deliveryPitchPoint(around));
+  const overPitch = deliveryPitchPoint(over);
+  const aroundPitch = deliveryPitchPoint(around);
+  assert.ok(Math.abs(overPitch.x - aroundPitch.x) < 1e-9);
+  assert.ok(Math.abs(overPitch.z - aroundPitch.z) < 1e-9);
   assert.notEqual(deliveryVelocityAtCrease(over).x, deliveryVelocityAtCrease(around).x);
   assert.notEqual(battingContactZone(over, 0.5), battingContactZone(around, 0.5));
   assert.equal(checkExtraBall(over).isExtra, false);

@@ -98,10 +98,9 @@ export function isFrontFootNoBall(delivery: Pick<DeliveryChoice, 'frontFootHeel'
 
 /** Actual pitch point, including any movement before the bounce. */
 export function deliveryPitchPoint(delivery: DeliveryChoice): { x: number; z: number } {
-  return {
-    x: delivery.aimTarget.x + deliverySwingAtBounce(delivery.type, delivery.swing, delivery.aimTarget.z),
-    z: delivery.aimTarget.z
-  };
+  const progress = (10 - delivery.aimTarget.z) / (10 - BATTER_CREASE_Z);
+  const point = sampleDeliveryPath(delivery, progress);
+  return { x: point.x, z: point.z };
 }
 
 /** Fraction of the standard flight when the ball reaches the batter's stance. */
@@ -148,7 +147,7 @@ export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'L
   const hitsPad = Math.abs(impact.x - (delivery.batterPosition?.x ?? 0)) <= 0.30 + ballRadius && impact.y >= 0.18 && impact.y <= 1.05;
   if (!hitsPad) return 'bowled';
   const legSign = hand === 'RHB' ? -1 : 1;
-  const pitchX = delivery.aimTarget.x + deliverySwingAtBounce(delivery.type, delivery.swing, delivery.aimTarget.z);
+  const pitchX = deliveryPitchPoint(delivery).x;
   if (delivery.aimTarget.z > impactZ && pitchX * legSign > stumpHalfWidth + ballRadius) return null;
   const impactInLine = Math.abs(impact.x) <= stumpHalfWidth + ballRadius;
   const impactOutsideOff = impact.x * legSign < -(stumpHalfWidth + ballRadius);
