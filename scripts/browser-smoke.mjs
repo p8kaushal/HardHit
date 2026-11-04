@@ -1,11 +1,17 @@
-import { createServer } from 'vite';
+import { createServer, preview } from 'vite';
 import puppeteer from 'puppeteer';
 
 // This smoke test owns its temporary server and browser; it never uses an existing game session.
-const server = await createServer({ configFile: false, server: { host: '127.0.0.1', port: 0, open: false } });
+const production = process.argv.includes('--preview');
+let server;
 let browser;
 try {
-  await server.listen();
+  if (production) {
+    server = await preview({ configFile: false, preview: { host: '127.0.0.1', port: 0, open: false } });
+  } else {
+    server = await createServer({ configFile: false, server: { host: '127.0.0.1', port: 0, open: false } });
+    await server.listen();
+  }
   const address = server.httpServer.address();
   browser = await puppeteer.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   for (const viewport of [{ width: 667, height: 300 }, { width: 1024, height: 768 }]) {
@@ -90,10 +96,11 @@ try {
       }
       if (errors.length) throw new Error(`${viewport.width}×${viewport.height} ${role} browser errors:\n${errors.join('\n')}`);
       await page.close();
-      console.log(`Browser smoke passed: ${viewport.width}×${viewport.height} ${role} controls and first delivery`);
+      console.log(`${production ? 'Production preview' : 'Browser'} smoke passed: ${viewport.width}×${viewport.height} ${role} controls and first delivery`);
     }
   }
 } finally {
   await browser?.close();
-  await server.close();
+  if (production && server) await new Promise((resolve, reject) => server.httpServer.close(error => error ? reject(error) : resolve()));
+  else await server?.close();
 }
