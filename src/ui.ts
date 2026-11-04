@@ -12,6 +12,11 @@ import { addLeaderboardEntry, readLeaderboard } from './leaderboard';
 import { clearGameTimeout, gameNow, isGamePaused, setGameTimeout } from './game-clock';
 import { gameSound } from './sound';
 
+export function opponentBadgeText(opponent: Player, isPlayerBatting: boolean): string {
+  const role = isPlayerBatting ? `${opponent.bowlingArm || 'Right'}-arm bowler` : (opponent.batterHand || 'RHB');
+  return `Opponent: ${opponent.name} | ${role}`;
+}
+
 export class UIManager {
   private controller: MatchController;
   private gameScene: GameScene;
@@ -1005,11 +1010,7 @@ export class UIManager {
     const opponentBadge = document.getElementById('opponent-badge');
     if (opponentBadge) {
       const isPlayerBatting = currentInn.batter.id === state.player.id;
-      if (isPlayerBatting) {
-        opponentBadge.innerText = `Opponent: ${currentInn.bowler.name} | Right-Arm Fast`;
-      } else {
-        opponentBadge.innerText = `Opponent: ${currentInn.batter.name} | RHB`;
-      }
+      opponentBadge.innerText = opponentBadgeText(isPlayerBatting ? currentInn.bowler : currentInn.batter, isPlayerBatting);
     }
   }
 
@@ -1033,15 +1034,6 @@ export class UIManager {
     this.gameScene.isBotBatting = !isPlayerBatting;
 
     this.updateHUD();
-
-    const opponentBadge = document.getElementById('opponent-badge');
-    if (opponentBadge) {
-      if (isPlayerBatting) {
-        opponentBadge.innerText = `Opponent: ${innings.bowler.name} | Right-Arm Fast`;
-      } else {
-        opponentBadge.innerText = `Opponent: ${innings.batter.name} | RHB`;
-      }
-    }
 
     const controlBowling = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
     const controlBatting = document.getElementById('control-batting') || document.getElementById('setup-batting-panel');

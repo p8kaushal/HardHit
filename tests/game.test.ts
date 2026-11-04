@@ -11,7 +11,7 @@ import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_MET
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout, shouldPauseGameplay } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
-import { UIManager } from '../src/ui';
+import { UIManager, opponentBadgeText } from '../src/ui';
 import { GameScene } from '../src/scene';
 import { battingTimingFeedback } from '../src/batting-timing';
 import { battingAssistanceMultiplier, shotFlightQuality } from '../src/formula';
@@ -67,6 +67,18 @@ test('rendered stumps match the wicket dimensions used for decisions', () => {
     scene.dispose();
     engine.dispose();
   }
+});
+
+test('opponent badge reflects handedness without revealing the next delivery', () => {
+  const bot = createBotPlayer('Rookie');
+  bot.bowlingArm = 'Left';
+  bot.batterHand = 'LHB';
+  assert.equal(opponentBadgeText(bot, true), `Opponent: ${bot.name} | Left-arm bowler`);
+  assert.equal(opponentBadgeText(bot, false), `Opponent: ${bot.name} | LHB`);
+  delete bot.bowlingArm;
+  delete bot.batterHand;
+  assert.equal(opponentBadgeText(bot, true), `Opponent: ${bot.name} | Right-arm bowler`);
+  assert.equal(opponentBadgeText(bot, false), `Opponent: ${bot.name} | RHB`);
 });
 
 test('rendered popping creases match the delivery model at both ends', () => {
