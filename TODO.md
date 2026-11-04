@@ -1,6 +1,6 @@
 # Gameplay to-do
 
-Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. **The user must approve that plan before implementation resumes.** Unchecked items are not verified or complete.
+Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. The user approved proceeding phase by phase. Unchecked items are not verified or complete.
 
 ## Phase index
 
@@ -9,7 +9,7 @@ Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. **The user must a
 - [ ] **Phase 2 — Rules:** tested no-ball, wide, free-hit, LBW/bowled and agreed contest/tie-break decisions; document limitations.
 - [ ] **Phase 3 — Bowling physics:** unified coordinates and delivery trajectory, side/hand symmetry, marker consistency and traceable calibration.
 - [ ] **Phase 4 — Batting and six flight:** spatial contact, shot timing, trajectory, boundary/landing distance and scoring fixtures.
-- [ ] **Phase 5 — Offline opponents and fielding:** varied fair bots, reproducible difficulty, and the minimum fielding/running design needed for plausible outcomes.
+- [ ] **Phase 5 — Offline opponents and fielding:** varied fair bots, AI-controlled supporting players, field settings, rating-based fielding and catches, automated running, and transparent teammate progression tied to player performance.
 - [ ] **Phase 6 — Presentation and performance:** broadcast UI/cameras, animation, licensed audio, accessibility and actual-device profiling.
 - [ ] **Phase 7 — Real-player 1v1:** authoritative private matches, event protocol, latency, reconnect, integrity and two-client testing.
 - [ ] **Phase 8 — Release:** CI, staging, monitoring, deployment target, rollback and release verification.
@@ -23,7 +23,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [ ] **Phase 2:** Test no-ball precedence, free-hit chains, LBW/bowled for both hands, offered/no shot and actual impact ordering; keep contest tiebreak and sudden-death rules explicit.
 - [ ] **Phase 3:** Reconcile modeled release/crease/contact/stump coordinates with the rendered pitch, then use one trajectory for pitch marker, flight, bounce, contact and wicket projection.
 - [ ] **Phase 4:** Replace separate timing-only contact estimates with a spatial bat/ball model and verify the same shot produces the displayed, scored and replayed trajectory; define how distance is measured around stadium obstructions.
-- [ ] **Phase 5:** Establish seeded bot distributions and fair delivery variety; decide and implement how fielding, catches and runs work without undermining the six-hitting focus.
+- [ ] **Phase 5:** Establish seeded bot distributions and fair delivery variety. Implement AI fielders with placement, reaction, interception, catches and throws influenced by individual ratings and ball physics; automate supporting roles and running while the human controls only their own all-rounder. Define and test transparent, bounded teammate-rating progression related to player performance.
 - [ ] **Phase 6:** Profile actual frame time, input latency, memory, loading and sound on physical devices; verify broadcast cameras remain out of the way during decisions and test reduced motion.
 - [ ] **Phase 7:** Specify server-authoritative inputs and event ordering before implementing private rooms, reconnection, validation and adverse-network tests.
 - [ ] **Phase 8:** Record CI, staging/production destination, deployment credentials, costs, monitoring, versioning and rollback; no production target is assumed.

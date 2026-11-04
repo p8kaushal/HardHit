@@ -2,7 +2,7 @@
 
 This is the proposed plan for taking the existing offline prototype to a reliable mobile-first six-hitting duel and, after that foundation is ready, a deployable real-player 1v1 game. `TODO.md` tracks the implementation checklist; this document defines priorities, phase gates and decision boundaries.
 
-**Approval gate:** This plan is ready for user review. Do not start implementation phases until the user approves it. After approval, complete and verify phases in order, commit focused increments, and continue autonomously unless a decision or access listed below is needed. An approval of the plan is not approval for an unspecified paid service, public deployment or destructive action.
+**Approval:** The user approved proceeding phase by phase and specified the AI teammate model. Complete and verify phases in order, commit focused increments, and continue autonomously unless a decision or access listed below is needed. Approval of the plan is not approval for an unspecified paid service, public deployment or destructive action.
 
 ## Product constraints
 
@@ -10,6 +10,7 @@ This is the proposed plan for taking the existing offline prototype to a reliabl
 - Each player receives six legal balls. The biggest single six is the primary result. When biggest six and wickets are tied, compare the number of sixes, then total hit distance. If neither player hits a six and wickets are level, compare runs; if runs are also level, use sudden death.
 - Preserve manual batting and bowling controls, batter movement before release, over/around-the-wicket selection, speed and swing or spin, a clear pitch target, and the selected shot direction.
 - Real-player 1v1 is a later milestone. Until then, bot play must remain a complete, testable experience. Use original presentation and assets inspired by cricket games, without copying their interface or assets.
+- Each human controls only their own all-rounder when batting or bowling. Supporting players, including fielders, are AI-controlled. Field settings and individual fielding ratings influence positioning and realistic chances of stopping runs or taking catches. Teammate ratings are related to the human player's performance; define transparent, measured progression without obscuring player skill or granting unexplained advantages. Offline bot opponents use the same principles.
 - Keep sound optional with an accessible mute control. Defer elaborate character animations until controls, decisions and physics are stable.
 
 ## Current baseline
@@ -98,9 +99,10 @@ The goal is a credible six-hitting contest with responsive controls and explaina
 ### Phase 5 — credible offline play
 
 - Give the bot varied pace, swing and spin deliveries, selectable sides and skill-based batting; use seeded randomness and measured distributions. Keep the same inputs, rules and adjudication path as a human player.
-- Design and implement the minimum fielding/running behavior needed for plausible non-boundary outcomes, catches and relevant dismissals, without turning the product into a full match simulator. Until then, retain the explicit distance-estimate label. Decide exact control/automation details before implementation if they would materially change play.
+- Implement AI-controlled teammates and fielders: field placement, reaction, movement, interception, catching and throws affect runs and dismissals, taking each fielder's rating and the actual ball trajectory into account. The human controls only their own all-rounder; fielders and other supporting roles are automated. Keep running decisions consistent with that constraint and retain the distance-estimate label until the replacement works.
+- Relate supporting-player ratings to the human player's performance through a transparent progression model. Define measurable inputs, fair bounds and offline/online behavior before implementation; prevent ratings from overriding physically impossible catches or obscuring the player's own influence. Avoid assuming that a single rating controls every fielding skill.
 - Test difficulty distributions, no-ball and wide frequency, shot diversity and six opportunities; avoid impossible lines or a bot that wins through hidden advantages.
-- **Gate:** offline matches provide varied, fair and reproducible scenarios; outcomes are explainable and bot behavior is measured, not just anecdotal.
+- **Gate:** offline matches provide varied, fair and reproducible scenarios; field settings, ratings and player performance have tested, explainable effects, and catches and saved runs follow reachable trajectories. Test extremes, ratings distribution and both teams without hidden advantages.
 
 ### Phase 6 — broadcast feel, sound and performance
 
@@ -132,7 +134,7 @@ For each increment: reproduce the issue or define an acceptance case; make the s
 
 - **Contest interpretation:** preserve the agreed one-over 1v1 longest-six hierarchy in `CRICKET_RULES.md`. IPL awards have used different criteria; HardHit is an original game inspired by the six-hitting spectacle, not an assertion that its rules reproduce a particular IPL award.
 - **Distance:** decide and label whether the primary metric is modeled unobstructed carry, actual first physical contact with stands, or a competition-defined measure before calibration is finalized. Current behavior is an approximation with a cap.
-- **Fielding/running:** exact player control vs automated handling and catches are design decisions for Phase 5, not a reason to delay the earlier foundations.
+- **Fielding and progression:** the human controls only their all-rounder; fielders and other supporting players are AI-controlled. Phase 5 must specify how field settings are chosen, running is automated, and player performance maps to teammate ratings. Make any consequential progression choices transparent and testable.
 - **Network/deployment:** backend, regions, domain, accounts, costs, moderation needs and release target are not yet chosen. No purchase or production destination is assumed.
 - **Devices and external data:** physical Android/iPhone/iPad access, representative measurements and asset rights may require user input or access; continue independent local work while these are pending, but do not claim their validation.
 
