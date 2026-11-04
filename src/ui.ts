@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery, inningsBa
 import { GameScene } from './scene';
 import { BallOutcome, DeliveryChoice, MatchState, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { BATTER_CONTACT_Z, batterContactProgress, battingAssistanceMultiplier, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, shotFlightQuality, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, calculateBounceTarget, sampleFrontFootLanding } from './formula';
+import { BATTER_CONTACT_Z, batterContactProgress, battingAssistanceMultiplier, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryHitsPad, deliveryPitchPoint, deliveryVelocityAtCrease, shotFlightQuality, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, calculateBounceTarget, sampleFrontFootLanding } from './formula';
 import { moveBatter, type BatterPosition } from './batter-position';
 import { battingTimingFeedback } from './batting-timing';
 import { KeyboardInputManager } from './input';
@@ -835,7 +835,7 @@ export class UIManager {
       desc = outcome.extraType === 'noball'
         ? `Front foot ${((outcome.delivery.frontFootHeel ?? 0) * 100).toFixed(1)} cm over the line. Extra ball and free hit.`
         : 'Wide delivery. One penalty run and an extra ball.';
-      this.gameScene.animateMissWicket(false);
+      this.gameScene.animateMissWicket(false, deliveryHitsPad(outcome.delivery) ? undefined : outcome.delivery);
       this.showResultToast(title, desc);
     } else if (outcome.isWicket) {
       gameSound.play(outcome.wicketReason === 'LBW' ? 'bounce' : 'wicket');
@@ -858,7 +858,7 @@ export class UIManager {
     } else {
       title = 'Dot Ball';
       desc = outcome.wicketReason || 'A swing and a miss!';
-      this.gameScene.animateMissWicket(false);
+      this.gameScene.animateMissWicket(false, deliveryHitsPad(outcome.delivery) ? undefined : outcome.delivery);
       this.showResultToast(title, desc);
     }
   }

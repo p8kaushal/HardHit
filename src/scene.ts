@@ -45,7 +45,7 @@ export class GameScene {
   private ballAnimationTime = 0;
   private ballTrajectoryPoints: BABYLON.Vector3[] = [];
   private updateDeliveryAnimation: (() => void) | null = null;
-  private updateBowledAnimation: (() => void) | null = null;
+  private updateMissedAnimation: (() => void) | null = null;
   private onBallArrivedCallback: (() => void) | null = null;
   private onBallResolvedCallback: (() => void) | null = null;
   private onBallCreaseCrossedCallback: (() => void) | null = null;
@@ -86,7 +86,7 @@ export class GameScene {
     const observer = this.scene.onBeforeRenderObservable.add(() => {
       try {
         this.updateDeliveryAnimation?.();
-        this.updateBowledAnimation?.();
+        this.updateMissedAnimation?.();
         if (globalAutoAssistConfig.isBallInPlay) {
           this.updateBallPhysics();
         }
@@ -619,7 +619,7 @@ export class GameScene {
     turn = 0.5,
     swing = 0
   ): void {
-    this.updateBowledAnimation = null;
+    this.updateMissedAnimation = null;
     this.clearBallTrail();
     this.setDeliveryCallbacks(onArrived, onResolved);
     this.onBallCreaseCrossedCallback = onCreaseCrossed || null;
@@ -1001,7 +1001,7 @@ export class GameScene {
 
   public animateHitPath(distance: number, direction: number, V_out?: { x: number, y: number, z: number }): void {
     this.isAnimatingBall = false;
-    this.updateBowledAnimation = null;
+    this.updateMissedAnimation = null;
     this.clearBallTrail();
     this.ballMesh?.setEnabled(true);
     
@@ -1042,25 +1042,25 @@ export class GameScene {
     return Math.hypot(this.currentBallPos.x - this.shotOrigin.x, this.currentBallPos.z - this.shotOrigin.z);
   }
 
-  public animateMissWicket(isWicket: boolean, bowledDelivery?: DeliveryChoice): void {
+  public animateMissWicket(isWicket: boolean, continuingDelivery?: DeliveryChoice): void {
     this.isAnimatingBall = false;
-    this.updateBowledAnimation = null;
+    this.updateMissedAnimation = null;
     this.clearBallTrail();
     this.bounceMarker?.setEnabled(false);
     const ball = this.ballMesh;
-    if (ball && bowledDelivery) {
+    if (ball && continuingDelivery) {
       const wicketProgress = (10 - BATTER_STUMPS_Z) / (10 - BATTER_CREASE_Z);
       const startProgress = Math.max(0, Math.min(wicketProgress, (10 - ball.position.z) / (10 - BATTER_CREASE_Z)));
       const startTime = gameNow();
-      const duration = Math.max(1, (wicketProgress - startProgress) * deliveryDurationMs(bowledDelivery.type, bowledDelivery.pace));
+      const duration = Math.max(1, (wicketProgress - startProgress) * deliveryDurationMs(continuingDelivery.type, continuingDelivery.pace));
       ball.setEnabled(true);
-      this.updateBowledAnimation = () => {
+      this.updateMissedAnimation = () => {
         const fraction = Math.min(1, Math.max(0, (gameNow() - startTime) / duration));
-        const point = sampleDeliveryPath(bowledDelivery, startProgress + (wicketProgress - startProgress) * fraction);
+        const point = sampleDeliveryPath(continuingDelivery, startProgress + (wicketProgress - startProgress) * fraction);
         ball.position.set(point.x, point.y + BALL_VISUAL_OFFSET, point.z);
         if (fraction >= 1) {
           ball.setEnabled(false);
-          this.updateBowledAnimation = null;
+          this.updateMissedAnimation = null;
         }
       };
     } else {

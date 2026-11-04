@@ -14,7 +14,7 @@ import { SoundManager } from '../src/sound';
 import { UIManager, opponentBadgeText } from '../src/ui';
 import { GameScene } from '../src/scene';
 import { battingTimingFeedback } from '../src/batting-timing';
-import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryContactPoint, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
+import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryContactPoint, deliveryHitsPad, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
@@ -659,14 +659,40 @@ test('a bowled ball continues along the projected path to the stumps', () => {
     scene.animateMissWicket(true, choice);
     assert.equal(enabled, true);
     now += 1000;
-    scene.updateBowledAnimation();
+    scene.updateMissedAnimation();
     const end = sampleDeliveryPath(choice, (10 - BATTER_STUMPS_Z) / (10 - BATTER_CREASE_Z));
     assert.ok(Math.abs(ball.position.x - end.x) < 1e-9);
     assert.ok(Math.abs(ball.position.z - BATTER_STUMPS_Z) < 1e-9);
     assert.equal(enabled, false);
-    assert.equal(scene.updateBowledAnimation, null);
+    assert.equal(scene.updateMissedAnimation, null);
   } finally {
     Object.assign(globalThis, { window: originalWindow, performance: originalPerformance });
+  }
+});
+
+test('pad interception uses the same stance and delivered line as wicket decisions', () => {
+  const turning = { ...delivery(0.5, 0.35), type: 'offspin' as const, turn: 1 };
+  assert.equal(deliveryHitsPad(turning), true);
+  assert.equal(resolveMissedDelivery(turning, 'RHB', true), 'lbw');
+  const moved = { ...turning, batterPosition: { x: 0.6, z: 0 } };
+  assert.equal(deliveryHitsPad(moved), false);
+  assert.equal(resolveMissedDelivery(moved, 'RHB', true), 'bowled');
+});
+
+test('missed deliveries continue only when the modeled pad does not intercept them', () => {
+  const padBall = { ...delivery(0.5, 0.35), type: 'offspin' as const, turn: 1 };
+  const clearBall = { ...padBall, batterPosition: { x: 0.6, z: 0 } };
+  const ui = Object.create(UIManager.prototype) as any;
+  let continuation: DeliveryChoice | undefined;
+  ui.updateHUD = () => {};
+  ui.showResultToast = () => {};
+  ui.gameScene = { animateMissWicket: (_wicket: boolean, choice?: DeliveryChoice) => { continuation = choice; } };
+  for (const choice of [padBall, clearBall]) {
+    ui.activeDelivery = choice;
+    ui.activeShot = null;
+    ui.controller = { recordBall: () => ({ delivery: choice, shot: null, missed: true, isWicket: false, isExtra: false, wicketReason: '', extraType: null }) };
+    ui.handleBallArrivalAtStumps();
+    assert.equal(continuation, choice === clearBall ? choice : undefined);
   }
 });
 

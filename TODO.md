@@ -69,7 +69,8 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [x] Align the painted popping creases and adjoining markings with the existing modeled crease at both ends.
 - [x] Sample the same authored incoming path for rendered deliveries, pitch marker, pitching-line test, contact and incoming velocity; extrapolate it to the rendered stump plane for simplified wicket decisions.
 - [x] Animate a bowled ball from its visible position to the modeled stump plane using the same projected path.
-- [ ] Continue other missed deliveries visibly and calibrate the extrapolated trajectory and wicket decisions against traceable data; the current approximation does not establish realistic LBW accuracy.
+- [x] Continue missed deliveries that avoid the simplified pad model to the stump plane, including extras; stop the visual on modeled pad impacts.
+- [ ] Model pad deflection and calibrate the extrapolated trajectory and wicket decisions against traceable data; the current approximation does not establish realistic LBW accuracy.
 - [x] Document current contest scoring, modeled cricket decisions and known simplifications against MCC laws and ICC T20I free-hit conditions.
 - [ ] Expand decision-table tests and implementation for both hands, offered/no shot, bat/pad order and unmodeled faults; compare each against the chosen playing conditions.
 - [x] Identify non-boundary runs as distance estimates in the shot result.

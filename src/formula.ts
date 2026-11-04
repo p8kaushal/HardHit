@@ -131,6 +131,14 @@ export function deliveryVelocityAtCrease(delivery: DeliveryChoice): { x: number;
   return { x: (atCrease.x - before.x) / seconds, y: (atCrease.y - before.y) / seconds, z: (atCrease.z - before.z) / seconds };
 }
 
+/** Whether the existing simplified pad model intercepts the delivery. */
+export function deliveryHitsPad(delivery: DeliveryChoice): boolean {
+  const impactZ = BATTER_CONTACT_Z + (delivery.batterPosition?.z ?? 0);
+  const progress = (impactZ - 10) / (BATTER_CREASE_Z - 10);
+  const impact = sampleDeliveryPath(delivery, progress);
+  return Math.abs(impact.x - (delivery.batterPosition?.x ?? 0)) <= 0.30 + BALL_RADIUS_METERS && impact.y >= 0.18 && impact.y <= 1.05;
+}
+
 /** Simplified pad and stump geometry, in metres, for a missed delivery. */
 export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'LHB', offeredShot: boolean): 'lbw' | 'bowled' | null {
   if (isFrontFootNoBall(delivery)) return null;
@@ -146,8 +154,7 @@ export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'L
   if (!hitsWicket) return null;
 
   // This is a simplified fixed stance; it represents a pad, not a full body mesh.
-  const hitsPad = Math.abs(impact.x - (delivery.batterPosition?.x ?? 0)) <= 0.30 + ballRadius && impact.y >= 0.18 && impact.y <= 1.05;
-  if (!hitsPad) return 'bowled';
+  if (!deliveryHitsPad(delivery)) return 'bowled';
   const legSign = hand === 'RHB' ? -1 : 1;
   const pitchX = deliveryPitchPoint(delivery).x;
   if (delivery.aimTarget.z > impactZ && pitchX * legSign > stumpHalfWidth + ballRadius) return null;
