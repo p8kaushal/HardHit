@@ -176,7 +176,9 @@ export class MatchController {
   constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard') {
     this.botDifficulty = botDifficulty;
     globalAutoAssistConfig.isRookie = botDifficulty === 'Rookie';
-    this.reset();
+    // A controller must start with valid state even if another scene still has
+    // a ball in play. The active-match reset guard applies only to reset().
+    this.state = this.createInitialMatchState(getOrCreatePlayer(), createBotPlayer(botDifficulty));
   }
 
   public reset(): void {

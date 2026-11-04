@@ -35,6 +35,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 
 ## Match reliability and presentation — current priority
 
+- [x] Initialize new match controllers even if a previous scene still marks a ball in play, while retaining the active-match reset guard.
 - [x] Invalidate cancelled batting flight callbacks so they cannot observe or resolve a later delivery.
 - [x] Store detached delivery and shot inputs for each recorded ball so later control changes cannot rewrite its history.
 - [x] Use the finalized scorecard distance in the shot result banner, including when a distance is capped.

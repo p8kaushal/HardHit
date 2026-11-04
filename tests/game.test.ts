@@ -28,6 +28,24 @@ const delivery = (timing: number, x = 0): DeliveryChoice => ({
   aimTarget: { x, z: -3.5 }, line: 'middle', length: 'good', type: 'fast', releaseTiming: timing
 });
 
+test('a new match initializes even when a previous scene has a ball in play', () => {
+  const previous = globalAutoAssistConfig.isBallInPlay;
+  const previousRookie = globalAutoAssistConfig.isRookie;
+  try {
+    globalAutoAssistConfig.isBallInPlay = true;
+    const game = new MatchController('Medium');
+    assert.equal(game.state.status, 'toss');
+    assert.equal(game.state.player.id, 'player_1');
+    assert.deepEqual(game.state.innings, []);
+    const state = game.state;
+    game.reset();
+    assert.equal(game.state, state);
+  } finally {
+    globalAutoAssistConfig.isBallInPlay = previous;
+    globalAutoAssistConfig.isRookie = previousRookie;
+  }
+});
+
 test('rendered stumps match the wicket dimensions used for decisions', () => {
   const engine = new NullEngine();
   const scene = new Scene(engine);
