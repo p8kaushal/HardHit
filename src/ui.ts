@@ -739,7 +739,7 @@ export class UIManager {
         const shotDistanceMeters = lastBall.distance;
         
         let title = `${runs} RUNS`;
-        let desc = `Shot yielded ${runs} runs.`;
+        let desc = `Estimated from shot distance: ${runs} run${runs === 1 ? '' : 's'}.`;
         if (runs === 6) {
            gameSound.play('boundary');
            title = `SIX! ${(shotDistanceMeters || 0).toFixed(1)}m`;
@@ -750,7 +750,7 @@ export class UIManager {
            desc = `Bounced over the boundary towards ${getDirectionName(lastBall.shot.direction)}!`;
         } else if (runs === 0) {
            title = `Dot Ball`;
-           desc = `Fielded safely. 0 runs.`;
+           desc = `Estimated from shot distance: no runs.`;
         }
         if (lastBall.extraType === 'noball') desc += ` No-ball: front foot ${((lastBall.delivery.frontFootHeel ?? 0) * 100).toFixed(1)} cm over; one penalty and a free hit.`;
         // Step 2: Freeze the tracking camera target on ball's final location and display scoring result banner for exactly 2.0 seconds

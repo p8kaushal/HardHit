@@ -1175,6 +1175,7 @@ test('the result banner uses the same finalized distance as the score', () => {
   const timers: Array<() => void> = [];
   let resolveBall: () => void = () => {};
   let title = '';
+  let description = '';
   Object.assign(globalThis, {
     document: { getElementById: () => null },
     performance: { now: () => now },
@@ -1189,7 +1190,7 @@ test('the result banner uses the same finalized distance as the score', () => {
     ui.hideResultToast = () => {};
     ui.hideBattingHelper = () => {};
     ui.hideAssistedPrompt = () => {};
-    ui.showResultToast = (value: string) => { title = value; };
+    ui.showResultToast = (value: string, detail: string) => { title = value; description = detail; };
     ui.updateHUD = () => {};
     ui.setupActiveTurn = () => {};
     ui.gameScene = {
@@ -1205,8 +1206,19 @@ test('the result banner uses the same finalized distance as the score', () => {
     assert.equal(outcome.runs, 6);
     assert.equal(game.getCurrentInnings().biggestSix, 130);
     assert.equal(title, 'SIX! 130.0m');
+    const next = game.recordBall(ball, { direction: 0, type: 'grounded', timing: 0.5, contactZone: 0.5 });
+    ui.deliveryStarted = false;
+    ui.deliveryGeneration++;
+    ui.activeDelivery = ball;
+    ui.gameScene.getShotDistance = () => 45;
+    ui.gameScene.shotReachedBoundary = false;
+    ui.deliverBall3D();
+    resolveBall();
+    assert.equal(next.runs, 2);
+    assert.equal(title, '2 RUNS');
+    assert.match(description, /Estimated from shot distance/);
     now += 2100;
-    timers.shift()!();
+    timers.forEach(timer => timer());
   } finally {
     Object.assign(globalThis, { document: oldDocument, window: oldWindow, performance: oldPerformance });
   }
