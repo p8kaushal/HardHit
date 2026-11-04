@@ -1,5 +1,5 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, deliveryContactPoint, deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
+import { battingAssistanceMultiplier, evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, deliveryContactPoint, deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
@@ -308,13 +308,7 @@ export class MatchController {
     let distance = 0;
     let missed = shot === null;
 
-    let assistMultiplier = 0;
-    if (!innings.batter.isBot && innings.bowler.isBot) {
-      if (this.botDifficulty === 'Rookie') assistMultiplier = 0.80;
-      else if (this.botDifficulty === 'Medium') assistMultiplier = 0.40;
-      else if (this.botDifficulty === 'Hard') assistMultiplier = 0.00;
-
-    }
+    const assistMultiplier = battingAssistanceMultiplier(innings.batter, innings.bowler, this.botDifficulty);
 
     const wicketResult = shot ? evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier) : null;
     if (wicketResult) missed = wicketResult.missed ?? false;

@@ -14,6 +14,7 @@ import { SoundManager } from '../src/sound';
 import { UIManager } from '../src/ui';
 import { GameScene } from '../src/scene';
 import { battingTimingFeedback } from '../src/batting-timing';
+import { battingAssistanceMultiplier, shotFlightQuality } from '../src/formula';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
@@ -1345,6 +1346,22 @@ test('rookie timing assistance preserves the recorded and displayed shot timing'
   assert.equal(shot.timing, 0.3);
   assert.equal(outcome.shot?.timing, 0.3);
   assert.equal(battingTimingFeedback(outcome.shot!.timing).offsetMs, -100);
+});
+
+test('flight quality uses the same human batting assistance as contact decisions', () => {
+  const game = new MatchController('Medium');
+  const human = game.state.player;
+  const bot = game.state.bot;
+  const shot = { direction: 0, type: 'lofted' as const, timing: 0.3, contactZone: 0.5 };
+  const ball = delivery(0.5);
+  const medium = battingAssistanceMultiplier(human, bot, 'Medium');
+  const hard = battingAssistanceMultiplier(human, bot, 'Hard');
+  assert.equal(medium, 0.4);
+  assert.equal(hard, 0);
+  assert.equal(battingAssistanceMultiplier(bot, human, 'Rookie'), 0);
+  assert.ok(shotFlightQuality(shot, ball, medium) > shotFlightQuality(shot, ball, hard));
+  assert.equal(shotFlightQuality({ ...shot, timing: 0.5 }, ball, medium), shotFlightQuality({ ...shot, timing: 0.5 }, ball, hard));
+  assert.equal(shot.timing, 0.3);
 });
 
 test('with equal biggest six and wickets, more sixes beat greater total distance', () => {

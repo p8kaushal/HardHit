@@ -45,6 +45,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [x] Show player batting timing as early, perfect or late with a colored meter and the offset in milliseconds; hide it for bot shots and new deliveries.
 - [x] Remove the keyboard-only Rookie override that replaced a recorded shot's timing with a perfect value; preserve the displayed timing for both input methods while retaining documented difficulty assistance.
 - [x] Identify timing assistance in the post-shot feedback on Rookie and Medium difficulty.
+- [x] Apply the same human-versus-bot timing assistance to contact decisions and shot-flight quality; keep the timing meter and recorded input unmodified.
 - [ ] Verify run-up switching and batting timing feedback on physical phones and tablets, including repeated side changes and different shot timings.
 - [x] Prevent repeated rendering of the same match summary from duplicating its leaderboard entry; cover successive matches.
 - [ ] Test persistence and summary behavior through repeated rematches and lobby returns in the browser; a single rematch and lobby return have each been checked.

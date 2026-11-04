@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery, inningsBa
 import { GameScene } from './scene';
 import { BallOutcome, DeliveryChoice, MatchState, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { BATTER_CONTACT_Z, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, footworkFactor, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, calculateBounceTarget, sampleFrontFootLanding } from './formula';
+import { BATTER_CONTACT_Z, batterContactProgress, battingAssistanceMultiplier, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryPitchPoint, deliveryVelocityAtCrease, shotFlightQuality, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, calculateBounceTarget, sampleFrontFootLanding } from './formula';
 import { moveBatter, type BatterPosition } from './batter-position';
 import { battingTimingFeedback } from './batting-timing';
 import { KeyboardInputManager } from './input';
@@ -841,8 +841,10 @@ export class UIManager {
     } else if (outcome.shot && !outcome.missed) {
       gameSound.play('bat');
       const theta_shot = (outcome.shot.direction * Math.PI) / 4 - Math.PI / 2;
-      const quality = Math.max(0, 1 - Math.abs(outcome.shot.timing - 0.5) * 2 - Math.abs(outcome.shot.contactZone - 0.5)) * footworkFactor(outcome.shot.footwork, outcome.delivery.length);
-      const batterPower = this.controller.getCurrentInnings().batter.stats.batting.power;
+      const innings = this.controller.getCurrentInnings();
+      const assist = battingAssistanceMultiplier(innings.batter, innings.bowler, this.controller.botDifficulty);
+      const quality = shotFlightQuality(outcome.shot, outcome.delivery, assist);
+      const batterPower = innings.batter.stats.batting.power;
       const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, deliveryVelocityAtCrease(outcome.delivery), {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower);
       
       this.gameScene.animateHitPath(outcome.distance, outcome.shot.direction, vOut);

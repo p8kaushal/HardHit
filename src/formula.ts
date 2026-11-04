@@ -187,6 +187,19 @@ export function footworkFactor(footwork: ShotChoice['footwork'], length: Deliver
   return (footwork === 'back_foot') === shortBall ? 1.08 : 0.8;
 }
 
+/** Assistance applies only to a human batting against the offline bot. */
+export function battingAssistanceMultiplier(batter: Player, bowler: Player, difficulty: 'Rookie' | 'Medium' | 'Hard'): number {
+  if (batter.isBot || !bowler.isBot) return 0;
+  return difficulty === 'Rookie' ? 0.8 : difficulty === 'Medium' ? 0.4 : 0;
+}
+
+/** Flight quality uses the same assisted timing offset as contact decisions. */
+export function shotFlightQuality(shot: ShotChoice, delivery: DeliveryChoice, assistMultiplier: number): number {
+  const assist = Math.max(0, Math.min(1, assistMultiplier));
+  const timingError = Math.abs(shot.timing - 0.5) * (1 - assist);
+  return Math.max(0, 1 - timingError * 2 - Math.abs(shot.contactZone - 0.5)) * footworkFactor(shot.footwork, delivery.length);
+}
+
 /** Apply a 60 Hz damping coefficient consistently at any frame rate. */
 export function frameIndependentDamping(perFrame: number, elapsedSeconds: number): number {
   return Math.pow(perFrame, Math.max(0, elapsedSeconds) * 60);
