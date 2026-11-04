@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "node scripts/test.mjs",
     "test:browser": "node scripts/browser-smoke.mjs",
-    "test:match": "node scripts/browser-match.mjs"
+    "test:match": "node scripts/browser-match.mjs",
+    "test:rematch": "node scripts/browser-match.mjs --rematch"
   },
   "dependencies": {
     "babylonjs": "^6.33.0"

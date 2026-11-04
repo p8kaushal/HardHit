@@ -54,11 +54,34 @@ try {
   await page.waitForSelector('#match-summary-modal.active', { timeout: 1000 });
   for (const selector of ['#summary-player-tracker .mini-dot', '#summary-bot-tracker .mini-dot']) {
     if (await page.$$eval(selector, els => els.length) < 6) throw new Error(`Incomplete scorecard: ${selector}`);
+    if (await page.$$eval(`${selector}:not(.extra)`, els => els.length) !== 6) throw new Error(`Incorrect legal-ball count: ${selector}`);
   }
-  await page.click('#btn-return-lobby');
-  await page.waitForSelector('#screen-lobby.active');
+  if (process.argv.includes('--rematch')) {
+    await page.click('#btn-rematch');
+    await page.waitForSelector('#screen-toss.active');
+    if (await page.$eval('#btn-toss-heads', el => el.disabled)) throw new Error('Rematch toss is disabled');
+    await page.evaluate(() => { window.__testRandom = Math.random; Math.random = () => 0; });
+    await page.click('#btn-toss-heads');
+    await page.waitForSelector('#toss-choice-buttons:not(.hidden)', { timeout: 5000 });
+    await page.evaluate(() => { Math.random = window.__testRandom; delete window.__testRandom; });
+    await page.click('#btn-choice-bowl');
+    await page.waitForSelector('#screen-gameplay.active');
+    const fresh = await page.evaluate(() => ({
+      balls: document.querySelector('#hud-balls-count').textContent,
+      score: document.querySelector('#hud-score-count').textContent,
+      wickets: document.querySelector('#hud-wickets-count').textContent,
+      bowling: !document.querySelector('#control-bowling').classList.contains('hidden'),
+    }));
+    if (fresh.balls !== '0/6' || fresh.score !== '0' || fresh.wickets !== '0' || !fresh.bowling) {
+      throw new Error(`Rematch did not start fresh: ${JSON.stringify(fresh)}`);
+    }
+    console.log('Browser match passed: two innings, scorecards and a fresh rematch.');
+  } else {
+    await page.click('#btn-return-lobby');
+    await page.waitForSelector('#screen-lobby.active');
+    console.log('Browser match passed: two innings, scorecards and return to lobby.');
+  }
   if (errors.length) throw new Error(`Browser errors:\n${errors.join('\n')}`);
-  console.log('Browser match passed: two innings, scorecards and return to lobby.');
 } finally {
   await browser?.close();
   await server.close();
