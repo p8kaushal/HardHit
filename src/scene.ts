@@ -2,7 +2,7 @@ import * as BABYLON from 'babylonjs';
 import { gameNow, isGamePaused, setGameTimeout } from './game-clock';
 import { CameraMode, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BALL_RADIUS_METERS, BATTER_CREASE_Z, batterContactProgress, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryDurationMs, deliveryReleaseX, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
+import { BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryDurationMs, deliveryReleaseX, deliverySwingAtBounce, getDeliveryFlightPosition } from './formula';
 import { stepBall, type BallState } from './ball-physics';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
@@ -283,7 +283,7 @@ export class GameScene {
     createLine('wideLineLeftBowl', [new BABYLON.Vector3(-0.89, 0, -8.2), new BABYLON.Vector3(-0.89, 0, -10)]);
     createLine('wideLineRightBowl', [new BABYLON.Vector3(0.89, 0, -8.2), new BABYLON.Vector3(0.89, 0, -10)]);
 
-    // Stumps (Bowling crease: Z = -10, Batting crease: Z = 10)
+    // Stumps are on the bowling creases at each end of the pitch.
     this.buildStumps(new BABYLON.Vector3(0, 0, -10));
     this.buildStumps(new BABYLON.Vector3(0, 0, 10));
     
@@ -314,8 +314,9 @@ export class GameScene {
     const stumpMat = new BABYLON.StandardMaterial('stumpMat', this.scene);
     stumpMat.diffuseColor = new BABYLON.Color3(0.8, 0.6, 0.25);
     
-    const stumpWidth = 0.05;
-    const stumpHeight = 0.9;
+    const stumpWidth = 0.0381;
+    const stumpHeight = STUMP_HEIGHT_METERS;
+    const spacing = (WICKET_WIDTH_METERS - stumpWidth) / 2;
     
     // Create 3 stumps
     for (let i = -1; i <= 1; i++) {
@@ -323,13 +324,13 @@ export class GameScene {
         height: stumpHeight,
         diameter: stumpWidth
       }, this.scene);
-      stump.position.set(position.x + (i * 0.12), stumpHeight / 2, position.z);
+      stump.position.set(position.x + i * spacing, stumpHeight / 2, position.z);
       stump.material = stumpMat;
     }
     for (let i = -1; i <= 0; i++) {
-      const bail = BABYLON.MeshBuilder.CreateCylinder(`bail_${position.z}_${i}`, { height: 0.12, diameter: 0.025, tessellation: 6 }, this.scene);
+      const bail = BABYLON.MeshBuilder.CreateCylinder(`bail_${position.z}_${i}`, { height: spacing, diameter: 0.025, tessellation: 6 }, this.scene);
       bail.rotation.z = Math.PI / 2;
-      bail.position.set(position.x + (i + 0.5) * 0.12, stumpHeight + 0.015, position.z);
+      bail.position.set(position.x + (i + 0.5) * spacing, stumpHeight + 0.0125, position.z);
       bail.material = stumpMat;
     }
   }

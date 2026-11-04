@@ -32,6 +32,9 @@ export const BATTER_CONTACT_Z = -8.4;
 export const BALL_AIR_DAMPING = 0.9985;
 // A 22.6 cm circumference ball has an approximately 3.6 cm radius.
 export const BALL_RADIUS_METERS = 0.036;
+// The modeled wicket is 9 inches wide and 28 inches high, in metres.
+export const WICKET_WIDTH_METERS = 0.2286;
+export const STUMP_HEIGHT_METERS = 0.7112;
 
 export function deliveryDurationMs(type: DeliveryType, pace = 0.5): number {
   // Approximately 18.8 m from release to the crease: faster balls arrive
@@ -131,8 +134,8 @@ export function deliveryVelocityAtCrease(delivery: DeliveryChoice): { x: number;
 export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'LHB', offeredShot: boolean): 'lbw' | 'bowled' | null {
   if (isFrontFootNoBall(delivery)) return null;
   const ballRadius = BALL_RADIUS_METERS;
-  const stumpHalfWidth = 0.1143;
-  const stumpHeight = 0.711;
+  const stumpHalfWidth = WICKET_WIDTH_METERS / 2;
+  const stumpHeight = STUMP_HEIGHT_METERS;
   const impactZ = BATTER_CONTACT_Z + (delivery.batterPosition?.z ?? 0);
   const progress = (impactZ - 10) / (BATTER_CREASE_Z - 10);
   const start = { x: deliveryReleaseX(delivery), y: 1.9, z: 10 };
