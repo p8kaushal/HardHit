@@ -26,11 +26,13 @@ try {
   await page.evaluate(() => { Math.random = window.__testRandom; delete window.__testRandom; });
   await page.click('#btn-choice-bowl');
   const deadline = Date.now() + 240000;
-  let lastAttempt = 0, lastState = '';
+  const swingDuringBatting = process.argv.includes('--swing');
+  let lastAttempt = 0, lastState = '', swings = 0;
   while (Date.now() < deadline) {
     const state = await page.evaluate(() => ({
       summary: document.querySelector('#match-summary-modal').classList.contains('active'),
       bowling: !document.querySelector('#control-bowling').classList.contains('hidden'),
+      cue: !!document.querySelector('#hit-space-banner') && getComputedStyle(document.querySelector('#hit-space-banner')).display !== 'none',
       innings: document.querySelector('#hud-innings-title').textContent,
       balls: document.querySelector('#hud-balls-count').textContent,
       score: document.querySelector('#hud-score-count').textContent,
@@ -39,6 +41,10 @@ try {
     if (label !== lastState) { console.log(label); lastState = label; }
     if (errors.length) throw new Error(`Browser errors:\n${errors.join('\n')}`);
     if (state.summary) break;
+    if (swingDuringBatting && state.cue) {
+      await page.keyboard.press('Space');
+      if (await page.$eval('#timing-widget', el => !el.classList.contains('hidden'))) swings++;
+    }
     if (state.bowling && Date.now() - lastAttempt > 3000) {
       lastAttempt = Date.now();
       const box = await (await page.$('#btn-bowl-pitch')).boundingBox();
@@ -49,9 +55,10 @@ try {
         await page.mouse.up();
       }
     }
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, 60));
   }
   await page.waitForSelector('#match-summary-modal.active', { timeout: 1000 });
+  if (swingDuringBatting && !swings) throw new Error('No batting swing was triggered');
   for (const selector of ['#summary-player-tracker .mini-dot', '#summary-bot-tracker .mini-dot']) {
     if (await page.$$eval(selector, els => els.length) < 6) throw new Error(`Incomplete scorecard: ${selector}`);
     if (await page.$$eval(`${selector}:not(.extra)`, els => els.length) !== 6) throw new Error(`Incorrect legal-ball count: ${selector}`);
