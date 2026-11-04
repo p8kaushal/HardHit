@@ -1226,6 +1226,38 @@ test('recording a bot delivery preserves the line the batter actually saw', () =
   assert.equal(game.getCurrentInnings().balls[0].delivery.aimTarget.x, 0.7);
 });
 
+test('recorded deliveries and shots retain their original inputs after controls change', () => {
+  const game = match();
+  const ball = { ...delivery(0.5, 0.2), batterPosition: { x: 0.1, z: 0.2 } };
+  const shot = { direction: 2, type: 'lofted' as const, timing: 0.5, contactZone: 0.5 };
+  const result = game.recordBall(ball, shot);
+  ball.aimTarget.x = -1;
+  ball.batterPosition.x = -0.5;
+  shot.direction = 6;
+  shot.timing = 0.1;
+  assert.equal(result.delivery.aimTarget.x, 0.2);
+  assert.equal(result.delivery.batterPosition?.x, 0.1);
+  assert.equal(result.shot?.direction, 2);
+  assert.equal(result.shot?.timing, 0.5);
+  assert.equal(game.getCurrentInnings().balls[0], result);
+});
+
+test('rookie timing assistance does not modify the caller’s shot object', () => {
+  const game = new MatchController('Rookie');
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.3, contactZone: 0.5 };
+  const previous = globalAutoAssistConfig.bufferedTiming;
+  try {
+    globalAutoAssistConfig.bufferedTiming = 0.5;
+    const outcome = game.recordBall(delivery(0.5), shot);
+    assert.equal(shot.timing, 0.3);
+    assert.equal(outcome.shot?.timing, 0.5);
+  } finally {
+    globalAutoAssistConfig.bufferedTiming = previous;
+  }
+});
+
 test('with equal biggest six and wickets, more sixes beat greater total distance', () => {
   const game = match();
   const [first, second] = game.state.innings;

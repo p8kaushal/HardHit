@@ -5,6 +5,7 @@ Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. Unchecked items a
 ## Match reliability and presentation — current priority
 
 - [x] Invalidate cancelled batting flight callbacks so they cannot observe or resolve a later delivery.
+- [x] Store detached delivery and shot inputs for each recorded ball so later control changes cannot rewrite its history.
 - [x] Use the finalized scorecard distance in the shot result banner, including when a distance is capped.
 - [x] Keep the first run-up after changing bowling side on the newly selected side, including after a previously bowled delivery.
 - [x] Show player batting timing as early, perfect or late with a colored meter and the offset in milliseconds; hide it for bot shots and new deliveries.
@@ -16,7 +17,7 @@ Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. Unchecked items a
 - [ ] Verify rotation, backgrounding, focus loss, pointer cancellation and simultaneous touch inputs end to end on physical devices, including batting while a delivery is in flight.
 - [x] Show both sudden-death innings, including extras, alongside regular-innings scorecards; explain wicket-based decisions accurately and cover the summary with tests.
 - [ ] Visually verify sudden-death summary, rematch and lobby return in a browser after a naturally completed tied match.
-- [ ] Replace global delivery flags and loosely typed renderer callbacks incrementally with typed, cancellable match events and immutable delivery snapshots.
+- [ ] Replace global delivery flags and loosely typed renderer callbacks incrementally with typed, cancellable match events and replayable snapshots.
 - [ ] Remove obsolete diagnostic paths and duplicate UI/screen handling after verifying callers; do not discard useful tests.
 
 ## Rules, shot and delivery fidelity

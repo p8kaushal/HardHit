@@ -281,8 +281,15 @@ export class MatchController {
     globalAutoAssistConfig.bowlerArm = innings.bowler.bowlingArm || 'Right';
   }
 
-  public recordBall(delivery: DeliveryChoice, shot: ShotChoice | null): BallOutcome {
+  public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null): BallOutcome {
     const innings = this.getCurrentInnings();
+    // A completed ball must not change when controls prepare the next delivery.
+    const delivery: DeliveryChoice = {
+      ...inputDelivery,
+      aimTarget: { ...inputDelivery.aimTarget },
+      ...(inputDelivery.batterPosition ? { batterPosition: { ...inputDelivery.batterPosition } } : {})
+    };
+    const shot: ShotChoice | null = inputShot ? { ...inputShot } : null;
     
     // Save whether this ball is a Free Hit
     const isFreeHit = innings.isNextFreeHit;
