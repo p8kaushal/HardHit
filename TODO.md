@@ -22,7 +22,8 @@ Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. Unchecked items a
 
 ## Rules, shot and delivery fidelity
 
-- [ ] Document contest-specific scoring and compare wide, no-ball, free-hit, bowled and LBW decisions with applicable laws; add decision-table tests for both hands, offered/no shot and bat/pad order.
+- [x] Document current contest scoring, modeled cricket decisions and known simplifications against MCC laws and ICC T20I free-hit conditions.
+- [ ] Expand decision-table tests and implementation for both hands, offered/no shot, bat/pad order and unmodeled faults; compare each against the chosen playing conditions.
 - [ ] Clearly identify estimated runs in the no-fielder prototype and design fielding/running before claiming realistic non-boundary scoring.
 - [ ] Consolidate authored delivery, contact, shot flight and wicket projection around shared coordinates, time, units and sampled inputs; eliminate competing legacy distance paths where safe.
 - [ ] Build traceable calibration fixtures for pace, bounce, swing, spin, contact speed, launch angle and six carry, including symmetry and frame-rate checks; document assumptions and confidence.

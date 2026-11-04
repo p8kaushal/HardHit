@@ -713,6 +713,31 @@ test('extras do not consume a legal ball and only no-balls start a free hit', ()
   assert.equal(innings.score, 3);
 });
 
+test('no-ball overrides wide and free-hit protection survives further extras', () => {
+  const game = new MatchController('Hard');
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  const noBallWideLine = { ...delivery(0.5, 1.4), frontFootHeel: 0.01 };
+  const first = game.recordBall(noBallWideLine, null);
+  assert.equal(first.extraType, 'noball');
+  assert.equal(first.isWicket, false);
+  const wide = game.recordBall(delivery(0.5, 1.4), null);
+  assert.equal(wide.extraType, 'wide');
+  assert.equal(wide.isFreeHit, true);
+  const anotherNoBall = game.recordBall({ ...delivery(0.5), frontFootHeel: 0.01 }, null);
+  assert.equal(anotherNoBall.extraType, 'noball');
+  assert.equal(anotherNoBall.isFreeHit, true);
+  const missedShot = { direction: 0, type: 'power' as const, timing: 0, contactZone: 0.5 };
+  const protectedBall = game.recordBall(delivery(0.5), missedShot);
+  assert.equal(protectedBall.isFreeHit, true);
+  assert.equal(protectedBall.isWicket, false);
+  const next = game.recordBall(delivery(0.5), missedShot);
+  assert.equal(next.isFreeHit, false);
+  assert.equal(next.isWicket, true);
+  assert.equal(game.getCurrentInnings().ballsBowled, 2);
+  assert.equal(game.getCurrentInnings().score, 3);
+});
+
 test('the over display keeps upcoming legal balls after extras and shows the sudden-death limit', () => {
   const game = match();
   const innings = game.getCurrentInnings();
