@@ -4,7 +4,7 @@ import { NullEngine, Scene, Vector3 } from 'babylonjs';
 import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
-import { stepBall, type BallState } from '../src/ball-physics';
+import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
 import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
@@ -1179,6 +1179,23 @@ test('fixed-step shot physics resolves a lofted six and a grounded shot', () => 
   const ground = simulate('grounded');
   assert.equal(ground.hasBounced, true);
   assert.ok(ground.reachedBoundary || ground.stopped);
+});
+
+test('shot physics keeps pace at low frame rates while bounding long stalls', () => {
+  const ball = (): BallState => ({ position: { x: 0, y: 100, z: 0 }, velocity: { x: 1, y: 0, z: 3 }, hasBounced: false, reachedBoundary: false, stopped: false });
+  const simulate = (frames: number, elapsed: number) => {
+    const state = ball();
+    let accumulator = 0;
+    for (let i = 0; i < frames; i++) accumulator = advanceBallFrame(state, accumulator, elapsed);
+    return state;
+  };
+  const sixtyFps = simulate(60, 1 / 60);
+  const tenFps = simulate(10, 0.1);
+  assert.ok(Math.abs(sixtyFps.position.x - tenFps.position.x) < 1e-9);
+  assert.ok(Math.abs(sixtyFps.position.y - tenFps.position.y) < 1e-9);
+  assert.ok(Math.abs(sixtyFps.position.z - tenFps.position.z) < 1e-9);
+  const stalled = simulate(1, 10);
+  assert.ok(stalled.position.x > 0.2 && stalled.position.x < 0.3);
 });
 
 test('rope crossing and bounce are resolved in their actual order within a physics step', () => {

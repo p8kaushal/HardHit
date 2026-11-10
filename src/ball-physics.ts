@@ -9,6 +9,21 @@ export interface BallState {
   stopped: boolean;
 }
 
+/** Advance fixed simulation steps while bounding catch-up after a long stall. */
+export function advanceBallFrame(state: BallState, accumulator: number, elapsedSeconds: number): number {
+  const step = 1 / 120;
+  const elapsed = Number.isFinite(elapsedSeconds) ? Math.max(0, Math.min(elapsedSeconds, 0.25)) : 0;
+  let remaining = Math.max(0, accumulator) + elapsed;
+  let steps = 0;
+  while (remaining + 1e-10 >= step && steps < 30) {
+    stepBall(state, step);
+    remaining = Math.max(0, remaining - step);
+    steps++;
+    if (state.stopped || (state.reachedBoundary && (!state.boundaryOnFull || state.hasBounced))) break;
+  }
+  return remaining;
+}
+
 /** Advance one small, fixed interval in metres and seconds. */
 export function stepBall(state: BallState, dt: number): void {
   const { position: p, velocity: v } = state;

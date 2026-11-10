@@ -3,7 +3,7 @@ import { gameNow, isGamePaused, setGameTimeout } from './game-clock';
 import { CameraMode, DeliveryChoice, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, sampleDeliveryPath } from './formula';
-import { stepBall, type BallState } from './ball-physics';
+import { advanceBallFrame, type BallState } from './ball-physics';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
@@ -956,13 +956,7 @@ export class GameScene {
     try {
       if (!this.currentBallPos || !this.shotPhysics || !this.ballMesh) return;
 
-      const step = 1 / 120;
-      this.physicsAccumulator += Math.min(this.engine.getDeltaTime() / 1000, 0.05);
-      while (this.physicsAccumulator >= step) {
-        stepBall(this.shotPhysics, step);
-        this.physicsAccumulator -= step;
-        if (this.shotPhysics.stopped || (this.shotPhysics.reachedBoundary && (!this.shotPhysics.boundaryOnFull || this.shotPhysics.hasBounced))) break;
-      }
+      this.physicsAccumulator = advanceBallFrame(this.shotPhysics, this.physicsAccumulator, this.engine.getDeltaTime() / 1000);
       globalAutoAssistConfig.hasBounced = this.shotPhysics.hasBounced;
       this.shotReachedBoundary = this.shotPhysics.reachedBoundary;
       this.shotBoundaryOnFull = this.shotPhysics.boundaryOnFull ?? false;
