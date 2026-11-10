@@ -14,7 +14,7 @@ import { SoundManager } from '../src/sound';
 import { UIManager, opponentBadgeText } from '../src/ui';
 import { GameScene } from '../src/scene';
 import { battingTimingFeedback } from '../src/batting-timing';
-import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryContactPoint, deliveryHitsPad, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
+import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryBounceProgress, deliveryContactPoint, deliveryHitsPad, deliveryProgressAtZ, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
 import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
@@ -639,9 +639,9 @@ test('LBW considers pitch, impact, offered shot, stumps, handedness and no-balls
 });
 
 test('bowled decisions project past the popping crease to the rendered stumps', () => {
-  const progress = (10 - BATTER_STUMPS_Z) / (10 - BATTER_CREASE_Z);
   const intoWicket: DeliveryChoice = { ...delivery(0.5, 0.268), overTheWicket: true, bowlingArm: 'Right', batterPosition: { x: 0.6, z: 0 } };
   const awayFromWicket: DeliveryChoice = { ...delivery(0.5, -0.047), overTheWicket: false, bowlingArm: 'Right', batterPosition: { x: -0.6, z: 0 } };
+  const progress = deliveryProgressAtZ(intoWicket, BATTER_STUMPS_Z);
   const edge = WICKET_WIDTH_METERS / 2 + BALL_RADIUS_METERS;
   const creaseIn = sampleDeliveryPath(intoWicket, 1);
   const stumpsIn = sampleDeliveryPath(intoWicket, progress);
@@ -683,7 +683,7 @@ test('a bowled ball continues along the projected path to the stumps', () => {
     assert.equal(enabled, true);
     now += 1000;
     scene.updateMissedAnimation();
-    const end = sampleDeliveryPath(choice, (10 - BATTER_STUMPS_Z) / (10 - BATTER_CREASE_Z));
+    const end = sampleDeliveryPath(choice, deliveryProgressAtZ(choice, BATTER_STUMPS_Z));
     assert.ok(Math.abs(ball.position.x - end.x) < 1e-9);
     assert.ok(Math.abs(ball.position.z - BATTER_STUMPS_Z) < 1e-9);
     assert.equal(enabled, false);
@@ -1410,6 +1410,45 @@ test('delivery timings correspond to plausible average release-to-crease speeds'
   const speedKmh = (type: 'fast' | 'offspin') => 18.8 / (deliveryDurationMs(type) / 1000) * 3.6;
   assert.ok(speedKmh('fast') >= 100 && speedKmh('fast') <= 150);
   assert.ok(speedKmh('offspin') >= 55 && speedKmh('offspin') <= 90);
+});
+
+test('pace delivery loses speed at the pitch while retaining the chosen bounce and arrival', () => {
+  for (const bounceZ of [-7.5, -3.5, -1.5]) {
+    const ball: DeliveryChoice = { ...delivery(0.5), aimTarget: { x: 0, z: bounceZ }, overTheWicket: true, bowlingArm: 'Right', pace: 0.5 };
+    const bounceTime = deliveryBounceProgress(ball.type, bounceZ);
+    const epsilon = 0.0001;
+    const before = sampleDeliveryPath(ball, bounceTime - epsilon);
+    const at = sampleDeliveryPath(ball, bounceTime);
+    const after = sampleDeliveryPath(ball, bounceTime + epsilon);
+    const beforeSpeed = Math.hypot(at.x - before.x, at.y - before.y, at.z - before.z);
+    const afterSpeed = Math.hypot(after.x - at.x, after.y - at.y, after.z - at.z);
+    assert.ok(Math.abs(at.z - bounceZ) < 1e-9);
+    assert.ok(Math.abs(deliveryProgressAtZ(ball, bounceZ) - bounceTime) < 1e-9);
+    assert.ok(afterSpeed / beforeSpeed > 0.86 && afterSpeed / beforeSpeed < 0.92);
+    assert.ok(Math.abs(sampleDeliveryPath(ball, 1).z - BATTER_CREASE_Z) < 1e-9);
+    assert.ok(Math.abs(sampleDeliveryPath(ball, batterContactProgress(ball)).z - (-8.4)) < 1e-9);
+  }
+});
+
+test('delivery time, bounce sound and visible positions agree for pace and spin', () => {
+  const scene = Object.create(GameScene.prototype) as any;
+  let sounds = 0;
+  scene.onDeliveryBounce = () => { sounds++; };
+  for (const type of ['fast', 'offspin'] as const) {
+    const ball: DeliveryChoice = { ...delivery(0.5, 0.2), type, pace: 0.7, turn: 0.6, swing: -0.4 };
+    for (const z of [10, -1, ball.aimTarget.z, -7, BATTER_CREASE_Z, BATTER_STUMPS_Z]) {
+      const time = deliveryProgressAtZ(ball, z);
+      assert.ok(Math.abs(sampleDeliveryPath(ball, time).z - z) < 1e-9);
+    }
+    scene.prepareDeliverySound();
+    const bounce = deliveryBounceProgress(type, ball.aimTarget.z);
+    const previous = sounds;
+    scene.notifyDeliveryBounce(bounce - 1e-6, type, ball.aimTarget.z);
+    assert.equal(sounds, previous);
+    scene.notifyDeliveryBounce(bounce, type, ball.aimTarget.z);
+    scene.notifyDeliveryBounce(bounce + 1e-6, type, ball.aimTarget.z);
+    assert.equal(sounds, previous + 1);
+  }
 });
 
 test('bat contact and wide decisions use the delivered line at the crease', () => {

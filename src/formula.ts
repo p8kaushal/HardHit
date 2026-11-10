@@ -97,9 +97,33 @@ export function isFrontFootNoBall(delivery: Pick<DeliveryChoice, 'frontFootHeel'
   return delivery.frontFootHeel !== undefined && Number.isFinite(delivery.frontFootHeel) && delivery.frontFootHeel >= 0;
 }
 
+// A first approximation for pace deliveries only: measured pitch-pace
+// examples report roughly 88–90% total speed retained. This parameter is
+// not yet calibrated across surfaces or spin deliveries.
+function postBounceLongitudinalRatio(type: DeliveryType): number {
+  return type === 'offspin' || type === 'legspin' ? 1 : 0.9;
+}
+
+/** Fraction of release-to-crease time when the delivery pitches. */
+export function deliveryBounceProgress(type: DeliveryType, bounceZ: number): number {
+  const bounceFraction = (10 - bounceZ) / (10 - BATTER_CREASE_Z);
+  const ratio = postBounceLongitudinalRatio(type);
+  return bounceFraction / (bounceFraction + (1 - bounceFraction) / ratio);
+}
+
+/** Convert a world Z coordinate to the corresponding delivery-time fraction. */
+export function deliveryProgressAtZ(delivery: DeliveryChoice, z: number): number {
+  const spatial = (10 - z) / (10 - BATTER_CREASE_Z);
+  const bounceSpatial = (10 - delivery.aimTarget.z) / (10 - BATTER_CREASE_Z);
+  const bounceTime = deliveryBounceProgress(delivery.type, delivery.aimTarget.z);
+  return spatial <= bounceSpatial
+    ? spatial * bounceTime / bounceSpatial
+    : bounceTime + (spatial - bounceSpatial) * (1 - bounceTime) / (1 - bounceSpatial);
+}
+
 /** Actual pitch point, including any movement before the bounce. */
 export function deliveryPitchPoint(delivery: DeliveryChoice): { x: number; z: number } {
-  const progress = (10 - delivery.aimTarget.z) / (10 - BATTER_CREASE_Z);
+  const progress = deliveryBounceProgress(delivery.type, delivery.aimTarget.z);
   const point = sampleDeliveryPath(delivery, progress);
   return { x: point.x, z: point.z };
 }
@@ -107,7 +131,7 @@ export function deliveryPitchPoint(delivery: DeliveryChoice): { x: number; z: nu
 /** Fraction of the standard flight when the ball reaches the batter's stance. */
 export function batterContactProgress(delivery: DeliveryChoice): number {
   const z = Math.max(-0.3, Math.min(0.8, delivery.batterPosition?.z ?? 0));
-  return Math.max(0, Math.min(1, (BATTER_CONTACT_Z + z - 10) / (BATTER_CREASE_Z - 10)));
+  return Math.max(0, Math.min(1, deliveryProgressAtZ(delivery, BATTER_CONTACT_Z + z)));
 }
 
 /** Sample the shared incoming path; progress 1 is the modeled popping crease. */
@@ -115,7 +139,14 @@ export function sampleDeliveryPath(delivery: DeliveryChoice, progress: number): 
   const start = { x: deliveryReleaseX(delivery), y: 1.9, z: 10 };
   const bounce = { x: delivery.aimTarget.x, y: BALL_RADIUS_METERS, z: delivery.aimTarget.z };
   const end = { x: deliveryBaseCreaseX(delivery), y: deliveryArrivalHeight(delivery.aimTarget.z, delivery.type, delivery.pace), z: BATTER_CREASE_Z };
-  return getDeliveryFlightPosition(progress, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
+  const bounceSpatial = (10 - delivery.aimTarget.z) / (10 - BATTER_CREASE_Z);
+  const bounceTime = deliveryBounceProgress(delivery.type, delivery.aimTarget.z);
+  const spatial = progress <= bounceTime
+    ? progress * bounceSpatial / bounceTime
+    : bounceSpatial + (progress - bounceTime) * (1 - bounceSpatial) / (1 - bounceTime);
+  const position = getDeliveryFlightPosition(spatial, start, bounce, end, delivery.type, delivery.turn, delivery.swing, delivery.pace);
+  position.y = deliveryVerticalPosition(progress, start.y, bounce.y, bounceTime, deliveryDurationMs(delivery.type, delivery.pace) / 1000);
+  return position;
 }
 
 export function deliveryContactPoint(delivery: DeliveryChoice): { x: number; y: number; z: number } {
@@ -134,7 +165,7 @@ export function deliveryVelocityAtCrease(delivery: DeliveryChoice): { x: number;
 /** Whether the existing simplified pad model intercepts the delivery. */
 export function deliveryHitsPad(delivery: DeliveryChoice): boolean {
   const impactZ = BATTER_CONTACT_Z + (delivery.batterPosition?.z ?? 0);
-  const progress = (impactZ - 10) / (BATTER_CREASE_Z - 10);
+  const progress = deliveryProgressAtZ(delivery, impactZ);
   const impact = sampleDeliveryPath(delivery, progress);
   return Math.abs(impact.x - (delivery.batterPosition?.x ?? 0)) <= 0.30 + BALL_RADIUS_METERS && impact.y >= 0.18 && impact.y <= 1.05;
 }
@@ -146,9 +177,9 @@ export function resolveMissedDelivery(delivery: DeliveryChoice, hand: 'RHB' | 'L
   const stumpHalfWidth = WICKET_WIDTH_METERS / 2;
   const stumpHeight = STUMP_HEIGHT_METERS;
   const impactZ = BATTER_CONTACT_Z + (delivery.batterPosition?.z ?? 0);
-  const progress = (impactZ - 10) / (BATTER_CREASE_Z - 10);
+  const progress = deliveryProgressAtZ(delivery, impactZ);
   const impact = sampleDeliveryPath(delivery, progress);
-  const wicketProgress = (10 - BATTER_STUMPS_Z) / (10 - BATTER_CREASE_Z);
+  const wicketProgress = deliveryProgressAtZ(delivery, BATTER_STUMPS_Z);
   const wicket = sampleDeliveryPath(delivery, wicketProgress);
   const hitsWicket = Math.abs(wicket.x) <= stumpHalfWidth + ballRadius && wicket.y <= stumpHeight + ballRadius;
   if (!hitsWicket) return null;
@@ -182,7 +213,7 @@ export function deliveryVerticalPosition(progress: number, releaseY: number, bou
 }
 
 export function deliveryArrivalHeight(bounceZ: number, type: DeliveryType = 'medium', pace = 0.5): number {
-  const bounceProgress = (bounceZ - 10) / (BATTER_CREASE_Z - 10);
+  const bounceProgress = deliveryBounceProgress(type, bounceZ);
   return deliveryVerticalPosition(1, 1.9, BALL_RADIUS_METERS, bounceProgress, deliveryDurationMs(type, pace) / 1000);
 }
 

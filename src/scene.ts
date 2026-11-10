@@ -2,7 +2,7 @@ import * as BABYLON from 'babylonjs';
 import { gameNow, isGamePaused, setGameTimeout } from './game-clock';
 import { CameraMode, DeliveryChoice, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, sampleDeliveryPath } from './formula';
+import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
@@ -521,8 +521,8 @@ export class GameScene {
 
   public prepareDeliverySound(): void { this.deliveryBouncePlayed = false; }
 
-  private notifyDeliveryBounce(progress: number, bounceZ: number): void {
-    const bounceProgress = (bounceZ - 10) / (BATTER_CREASE_Z - 10);
+  private notifyDeliveryBounce(progress: number, type: DeliveryType, bounceZ: number): void {
+    const bounceProgress = deliveryBounceProgress(type, bounceZ);
     if (!this.deliveryBouncePlayed && progress >= bounceProgress) {
       this.deliveryBouncePlayed = true;
       this.onDeliveryBounce?.();
@@ -730,7 +730,7 @@ export class GameScene {
       }
 
       this.ballAnimationTime += deliveryAnimationStep(this.engine.getDeltaTime(), currentSpeedScale);
-      this.notifyDeliveryBounce(this.ballAnimationTime / 60, aimTarget.z);
+      this.notifyDeliveryBounce(this.ballAnimationTime / 60, deliveryType, aimTarget.z);
       const index = Math.floor(this.ballAnimationTime);
 
       if (this.timingRing && this.ballMesh) {
@@ -943,7 +943,7 @@ export class GameScene {
       
       const targetX = globalAutoAssistConfig.currentDelivery ? globalAutoAssistConfig.currentDelivery.aimTarget.x : 0;
       const targetZ = delivery?.aimTarget.z ?? -3.5;
-      this.notifyDeliveryBounce(progress, targetZ);
+      this.notifyDeliveryBounce(progress, delivery?.type ?? 'medium', targetZ);
         
       const activeDelivery: DeliveryChoice = delivery ?? { aimTarget: { x: targetX, z: targetZ }, type: 'medium', line: 'middle', length: 'good', releaseTiming: 0.5, bowlingArm: globalAutoAssistConfig.bowlerArm };
       const pos = sampleDeliveryPath(activeDelivery, progress);
@@ -1043,8 +1043,8 @@ export class GameScene {
     this.bounceMarker?.setEnabled(false);
     const ball = this.ballMesh;
     if (ball && continuingDelivery) {
-      const wicketProgress = (10 - BATTER_STUMPS_Z) / (10 - BATTER_CREASE_Z);
-      const startProgress = Math.max(0, Math.min(wicketProgress, (10 - ball.position.z) / (10 - BATTER_CREASE_Z)));
+      const wicketProgress = deliveryProgressAtZ(continuingDelivery, BATTER_STUMPS_Z);
+      const startProgress = Math.max(0, Math.min(wicketProgress, deliveryProgressAtZ(continuingDelivery, ball.position.z)));
       const startTime = gameNow();
       const duration = Math.max(1, (wicketProgress - startProgress) * deliveryDurationMs(continuingDelivery.type, continuingDelivery.pace));
       ball.setEnabled(true);

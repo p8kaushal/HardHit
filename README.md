@@ -4,6 +4,8 @@
 
 Play a biggest-six duel against a bot. Each batter faces six legal deliveries; the longest six wins, with wickets and further tie-breaks when needed. If neither batter hits a six and wickets are level, runs decide the winner. Real-player 1v1 is planned but is not yet implemented. See [CRICKET_RULES.md](CRICKET_RULES.md) for the modeled rules and limitations, [TODO.md](TODO.md) for open tasks and [DELIVERY_PLAN.md](DELIVERY_PLAN.md) for the delivery and verification plan.
 
+[PHYSICS_CALIBRATION.md](PHYSICS_CALIBRATION.md) records the measurements, assumptions and open validation work behind the current approximations.
+
 The phased plan is approved for implementation. The current physics and umpiring are approximations, and physical-device validation remains open. Planned AI teammates will field automatically, with performance influenced by field settings and ratings related to the human all-rounder's performance.
 
 Run `npm run test:browser` for headless Chromium lobby-to-gameplay, touch-control and first-delivery checks at 568×240, 667×300 and 1024×768, for both batting and bowling. It starts and stops its own local server and browser; it does not yet test a complete match or physical devices.
