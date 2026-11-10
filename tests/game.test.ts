@@ -764,6 +764,10 @@ test('keyboard bowling starts at good length and updates the aim marker', () => 
     assert.equal(input.intent.aimZ, -3.5);
     assert.equal(input.getBowlingLineLabel(0), 'Off Side');
     assert.equal(input.getBowlingLineLabel(2), 'Leg Side');
+    listeners.keydown({ key: 'ArrowLeft', code: 'ArrowLeft', target: { tagName: 'INPUT' } });
+    listeners.keydown({ key: '4', code: 'Digit4', target: { tagName: 'INPUT' } });
+    assert.deepEqual(positions, []);
+    assert.equal(input.intent.deliveryType, 'fast');
     listeners.keydown({ key: 'ArrowLeft', code: 'ArrowLeft' });
     listeners.keydown({ key: 'ArrowUp', code: 'ArrowUp' });
     assert.deepEqual(positions, [[0.8, -3.5], [0.8, -5.5]]);
@@ -782,10 +786,11 @@ test('interrupted keyboard holds clear without releasing a delivery', () => {
   const listeners: Record<string, (event: any) => void> = {};
   let starts = 0;
   let releases = 0;
+  let active = true;
   Object.assign(globalThis, {
     window: { addEventListener: (name: string, fn: (event: any) => void) => { listeners[name] = fn; }, removeEventListener() {} },
     document: {
-      getElementById: (id: string) => id === 'screen-gameplay' ? { classList: { contains: () => true } } : null,
+      getElementById: (id: string) => id === 'screen-gameplay' ? { classList: { contains: () => active } } : null,
       querySelectorAll: () => []
     }
   });
@@ -803,6 +808,10 @@ test('interrupted keyboard holds clear without releasing a delivery', () => {
     listeners.keydown(space);
     listeners.keyup(space);
     assert.equal(starts, 2);
+    assert.equal(releases, 1);
+    listeners.keydown(space);
+    active = false;
+    listeners.keyup(space);
     assert.equal(releases, 1);
     input.destroy();
   } finally {

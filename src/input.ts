@@ -137,6 +137,11 @@ export class KeyboardInputManager {
     const gameplayScreen = document.getElementById('screen-gameplay');
     if (!gameplayScreen || !gameplayScreen.classList.contains('active')) return;
 
+    // Let native form controls handle their own keyboard input. In particular,
+    // range-slider arrows must not also change the bowling target.
+    const target = e.target as HTMLElement | null;
+    if (target && (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable)) return;
+
     // Toggle Help Modal on 'H' / 'h'
     if (e.key === 'h' || e.key === 'H') {
       this.toggleHelpModal();
@@ -167,7 +172,8 @@ export class KeyboardInputManager {
     if (e.code === 'Space') {
       const wasPressed = this.spacePressed;
       this.spacePressed = false;
-      if (wasPressed && !isGamePaused() && !this.isPlayerBatting()) {
+      const gameplay = document.getElementById('screen-gameplay');
+      if (wasPressed && gameplay?.classList.contains('active') && !isGamePaused() && !this.isPlayerBatting()) {
         // End release meter on bowling release
         this.onEndBowling();
       }

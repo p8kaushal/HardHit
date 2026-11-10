@@ -51,6 +51,16 @@ try {
       }), selectors);
       if (issues.length) throw new Error(`${viewport.width}×${viewport.height} ${role}:\n${issues.join('\n')}`);
       if (role === 'bowl') {
+        const beforeAim = await page.$eval('#bowling-map-marker', el => el.style.left);
+        await page.focus('#bowl-pace');
+        const beforePace = await page.$eval('#bowl-pace', el => el.valueAsNumber);
+        await page.keyboard.press('ArrowLeft');
+        const afterPace = await page.$eval('#bowl-pace', el => el.valueAsNumber);
+        const afterAim = await page.$eval('#bowling-map-marker', el => el.style.left);
+        if (beforePace === afterPace || beforeAim !== afterAim) throw new Error('Pace slider keyboard input changed bowling aim or failed to adjust pace');
+        await page.keyboard.press('4');
+        if (!await page.$eval('#bowl-type-group [data-val="fast"]', el => el.classList.contains('active'))) throw new Error('Slider keyboard input changed delivery type');
+        await page.$eval('#bowl-pace', el => el.blur());
         await page.click('#bowl-side-group [data-side="around"]');
         if (await page.$eval('#bowl-side-group [data-side="around"]', el => el.getAttribute('aria-pressed')) !== 'true') throw new Error('Bowling side did not change');
         await page.click('#bowl-type-group [data-val="offspin"]');
