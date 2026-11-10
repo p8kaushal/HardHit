@@ -47,6 +47,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [x] Show player batting timing as early, perfect or late with a colored meter and the offset in milliseconds; hide it for bot shots and new deliveries.
 - [x] Remove the keyboard-only Rookie override that replaced a recorded shot's timing with a perfect value; preserve the displayed timing for both input methods while retaining documented difficulty assistance.
 - [x] Identify timing assistance in the post-shot feedback on Rookie and Medium difficulty.
+- [x] Use a compact batting cue with touch-appropriate wording on touchscreen devices and keyboard wording on desktop.
 - [x] Apply the same human-versus-bot timing assistance to contact decisions and shot-flight quality; keep the timing meter and recorded input unmodified.
 - [x] Show the opponent's configured bowling arm or batting hand instead of a hard-coded role; do not reveal the next delivery type.
 - [x] Label over-tracker entries and upcoming balls by legal ball number after extras, and distinguish a legal free-hit dot from an extra.

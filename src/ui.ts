@@ -603,9 +603,11 @@ export class UIManager {
       helper.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
       document.body.appendChild(helper);
     }
+    const touch = window.matchMedia('(pointer: coarse)').matches;
+    const displayRecommendation = touch ? recommendation.replace(/\s*\[[^\]]+\]/g, '') : recommendation;
     helper.innerHTML = `
-      <div id="recommended-shot-banner" style="color: #22d3ee; font-size: 1.5rem; font-weight: bold; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;">RECOMMENDED: ${recommendation}</div>
-      <div id="hit-space-banner" style="color: #4ade80; font-size: 2.5rem; font-weight: 900; margin-top: 10px; display: none; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 8px; border: 2px solid #4ade80; animation: pulse 1s infinite;">HIT SPACE NOW!</div>
+      <div id="recommended-shot-banner" style="color: #22d3ee; font-size: clamp(.7rem, 2.5dvh, 1rem); font-weight: bold; background: rgba(0,0,0,0.5); padding: .3rem .5rem; border-radius: 8px;">RECOMMENDED: ${displayRecommendation}</div>
+      <div id="hit-space-banner" style="color: #4ade80; font-size: clamp(.8rem, 3dvh, 1.1rem); font-weight: 900; margin-top: .25rem; display: none; background: rgba(0,0,0,0.7); padding: .3rem .5rem; border-radius: 8px; border: 1px solid #4ade80; animation: pulse 1s infinite;">${touch ? 'TAP A SHOT' : 'PRESS SPACE'}</div>
     `;
     if (!document.getElementById('pulse-anim')) {
       const style = document.createElement('style');

@@ -182,6 +182,29 @@ test('batting timing meter displays the actual shot offset', () => {
   }
 });
 
+test('batting prompts match touch and keyboard inputs', () => {
+  const oldDocument = globalThis.document;
+  const oldWindow = globalThis.window;
+  const helper = { style: {}, innerHTML: '' };
+  let coarse = true;
+  Object.assign(globalThis, {
+    window: { matchMedia: () => ({ matches: coarse }) },
+    document: { getElementById: (id: string) => id === 'batting-helper' ? helper : {} }
+  });
+  try {
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.showBattingHelper('Straight Drive [W]');
+    assert.match(helper.innerHTML, /TAP A SHOT/);
+    assert.doesNotMatch(helper.innerHTML, /\[W\]/);
+    coarse = false;
+    ui.showBattingHelper('Straight Drive [W]');
+    assert.match(helper.innerHTML, /PRESS SPACE/);
+    assert.match(helper.innerHTML, /\[W\]/);
+  } finally {
+    Object.assign(globalThis, { document: oldDocument, window: oldWindow });
+  }
+});
+
 test('the first run-up follows the newly selected bowling side, not the previous delivery', () => {
   const oldDelivery = globalAutoAssistConfig.currentDelivery;
   const oldStart = globalAutoAssistConfig.runUpStartTime;

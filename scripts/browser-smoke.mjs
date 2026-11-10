@@ -89,6 +89,7 @@ try {
           const cue = document.querySelector('#hit-space-banner');
           return cue && getComputedStyle(cue).display !== 'none';
         }, { timeout: 30000 });
+        if (await page.$eval('#hit-space-banner', el => el.textContent) !== 'TAP A SHOT') throw new Error('Touch batting prompt is incorrect');
         if (viewport.width === 667) await page.click('.touch-shot[data-shot="lofted"]');
         else await page.keyboard.press('Space');
         await page.waitForSelector('#timing-widget:not(.hidden)', { timeout: 3000 });
