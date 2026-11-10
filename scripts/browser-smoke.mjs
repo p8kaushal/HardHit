@@ -95,6 +95,7 @@ try {
         await page.waitForSelector('#over-tracker .over-dot:not(.upcoming)', { timeout: 30000 });
       } else {
         // The beginner's prompt is a visible cue for exercising a real batting input.
+        if (viewport.width === 1024) await page.focus('.touch-shot[data-shot="lofted"]');
         await page.waitForFunction(() => {
           const cue = document.querySelector('#hit-space-banner');
           return cue && getComputedStyle(cue).display !== 'none';

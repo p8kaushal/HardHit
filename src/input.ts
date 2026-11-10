@@ -141,6 +141,8 @@ export class KeyboardInputManager {
     // range-slider arrows must not also change the bowling target.
     const target = e.target as HTMLElement | null;
     if (target && (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable)) return;
+    // Focused shot buttons handle their own keyboard/assistive activation.
+    if (target?.tagName === 'BUTTON' && target.classList.contains('touch-shot')) return;
 
     // Toggle Help Modal on 'H' / 'h'
     if (e.key === 'h' || e.key === 'H') {

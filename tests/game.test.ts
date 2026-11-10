@@ -541,6 +541,10 @@ test('a second finger can strike while the aiming finger remains held', () => {
   stickEvents.pointerdown({ pointerId: 6, clientX: 0, clientY: 50, preventDefault() {} });
   shotEvents.pointerdown({ pointerId: 7, preventDefault() {} });
   assert.deepEqual(shots[3], [6, 'lofted']);
+  shotEvents.click({ detail: 1, preventDefault() {} });
+  assert.equal(shots.length, 4);
+  shotEvents.click({ detail: 0, preventDefault() {} });
+  assert.deepEqual(shots[4], [6, 'lofted']);
 });
 
 test('shot guide follows the delivered line including movement', () => {
@@ -816,6 +820,30 @@ test('interrupted keyboard holds clear without releasing a delivery', () => {
     input.destroy();
   } finally {
     setGamePaused(false);
+    Object.assign(globalThis, { window: originalWindow, document: originalDocument });
+  }
+});
+
+test('focused shot buttons do not also trigger the global batting shortcut', () => {
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+  const oldActive = globalAutoAssistConfig.isDeliveryActive;
+  const listeners: Record<string, (event: any) => void> = {};
+  let swings = 0;
+  Object.assign(globalThis, {
+    window: { addEventListener: (name: string, fn: (event: any) => void) => { listeners[name] = fn; }, removeEventListener() {} },
+    document: { getElementById: (id: string) => id === 'screen-gameplay' ? { classList: { contains: () => true } } : null, querySelectorAll: () => [] }
+  });
+  try {
+    globalAutoAssistConfig.isDeliveryActive = true;
+    const input = new KeyboardInputManager(() => true, () => {}, () => {}, () => { swings++; }, () => 'RHB', () => {});
+    const target = { tagName: 'BUTTON', classList: { contains: (name: string) => name === 'touch-shot' } };
+    listeners.keydown({ key: ' ', code: 'Space', target });
+    listeners.keyup({ key: ' ', code: 'Space', target });
+    assert.equal(swings, 0);
+    input.destroy();
+  } finally {
+    globalAutoAssistConfig.isDeliveryActive = oldActive;
     Object.assign(globalThis, { window: originalWindow, document: originalDocument });
   }
 });

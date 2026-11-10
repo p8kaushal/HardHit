@@ -42,10 +42,19 @@ export class TouchBattingControls {
     };
     stick.addEventListener('pointerup', release);
     stick.addEventListener('pointercancel', release);
-    buttons.forEach(button => button.addEventListener('pointerdown', event => {
-      event.preventDefault();
-      this.onShot(this.direction, button.dataset.shot as ShotType);
-    }));
+    buttons.forEach(button => {
+      button.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        this.onShot(this.direction, button.dataset.shot as ShotType);
+      });
+      // Keyboard and assistive-technology activation produces a click without
+      // a pointer press. Pointer clicks were already handled on pointerdown.
+      button.addEventListener('click', event => {
+        if (event.detail !== 0) return;
+        event.preventDefault();
+        this.onShot(this.direction, button.dataset.shot as ShotType);
+      });
+    });
   }
 
   public setLocked(locked: boolean): void {
