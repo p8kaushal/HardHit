@@ -31,6 +31,15 @@ The current code supports an offline prototype, not a calibrated cricket simulat
 - **Architecture and operations:** `ui.ts`, `scene.ts`, `game.ts`, and `formula.ts` mix state, simulation, rendering, DOM and diagnostics; global callbacks and uncaptured randomness make replay and future authoritative multiplayer difficult. Introduce typed, serializable delivery events and injected randomness incrementally. Add automated browser smoke tests, lifecycle cleanup, accessibility checks, profiling, release/rollback procedures and CI. The current production build includes a roughly 1.09 MB gzip Babylon chunk; measure load and runtime before considering an engine migration.
 - **Future product:** Real-player 1v1, authoritative matchmaking/private rooms, reconnects, latency handling and deployment do not exist yet. Keep them behind stable offline rules, deterministic input/event contracts and representative two-client testing; hosting and credentials are still undecided.
 
+## Project work protocol
+
+- Keep all implementation work on a dedicated `feature/<short-name>` branch; never edit `main` directly.
+- Before each bounded task, record its scope and acceptance checks in `TODO.md` and update the relevant plan status. Update tracking at task start, when findings change scope, and at completion.
+- Keep changes focused and architecture boundaries clear. Add only necessary, behavior-focused tests for fixes.
+- Before considering a task complete, run relevant automated tests, production build, and browser/device checks when applicable. Record what ran, what passed, and any device or environment limitation.
+- Commit each verified increment atomically with a descriptive message. Do not merge feature branches without presenting the verified changes and receiving explicit user approval. After an approved merge, remove the local and remote feature branch.
+- Never claim the whole project is issue-free; report the audited scope and known limitations.
+
 ## Operating loop
 
 For each bounded change:

@@ -37,6 +37,11 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [ ] **Phase 7:** Specify server-authoritative inputs and event ordering before implementing private rooms, reconnection, validation and adverse-network tests.
 - [ ] **Phase 8:** Record CI, staging/production destination, deployment credentials, costs, monitoring, versioning and rollback; no production target is assumed.
 
+## Audit findings and next-feature readiness
+
+- [ ] **BUG: Align bot batting visual contact with adjudicated contact.** When the human bowls, the incoming delivery animation currently travels to the modeled popping crease while contact and shot resolution use `batterContactProgress` (the batter contact plane). Verify the bot swing trigger, animated ball position, timing and recorded outcome share the same contact instant/position; add regression coverage for pace and spin and a browser match check.
+- [ ] Run the full readiness suite before starting the next feature: unit tests, production build and preview smoke across supported emulated landscape sizes, full match in both innings orders, sudden-death fixture, rematch/lobby, extras and a confirmed-six scenario. Record results and remaining physical-device coverage.
+
 ## Match reliability and presentation — current priority
 
 - [x] Initialize new match controllers even if a previous scene still marks a ball in play, while retaining the active-match reset guard.
