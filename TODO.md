@@ -37,6 +37,10 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [ ] **Phase 7:** Specify server-authoritative inputs and event ordering before implementing private rooms, reconnection, validation and adverse-network tests.
 - [ ] **Phase 8:** Record CI, staging/production destination, deployment credentials, costs, monitoring, versioning and rollback; no production target is assumed.
 
+## Bowling touch reliability
+
+- [x] Keep the release control available during a hold and suppress its browser text-selection UI. Production browser checks covered quick tap, held release, subsequent delivery, rotation cancellation and keyboard input; 103 unit tests and the build passed. The user reported that the fix seems to work on iPad Chrome.
+
 ## Audit findings and next-feature readiness
 
 - [ ] **BUG: Align bot batting visual contact with adjudicated contact.** When the human bowls, the incoming delivery animation currently travels to the modeled popping crease while contact and shot resolution use `batterContactProgress` (the batter contact plane). Verify the bot swing trigger, animated ball position, timing and recorded outcome share the same contact instant/position; add regression coverage for pace and spin and a browser match check.

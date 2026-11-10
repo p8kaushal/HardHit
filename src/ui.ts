@@ -419,12 +419,6 @@ export class UIManager {
     globalAutoAssistConfig.isRunUpActive = true;
     globalAutoAssistConfig.runUpStartTime = gameNow();
 
-    // Auto-hide panels
-    const controlBowling = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
-    const controlBatting = document.getElementById('control-batting') || document.getElementById('setup-batting-panel');
-    if (controlBowling) controlBowling.classList.add('hidden', 'panel-hidden');
-    if (controlBatting) controlBatting.classList.add('hidden', 'panel-hidden');
-
     let indicator = document.getElementById('bowler-runup-indicator');
     if (!indicator) {
       indicator = document.createElement('div');
@@ -459,7 +453,13 @@ export class UIManager {
     this.userBowlingInProgress = false;
     
     globalAutoAssistConfig.isRunUpActive = false;
-    
+
+    // Keep the pressed control mounted until release, especially on iPad touch.
+    const controlBowling = document.getElementById('control-bowling') || document.getElementById('setup-delivery-panel');
+    const controlBatting = document.getElementById('control-batting') || document.getElementById('setup-batting-panel');
+    controlBowling?.classList.add('hidden', 'panel-hidden');
+    controlBatting?.classList.add('hidden', 'panel-hidden');
+
     const indicator = document.getElementById('bowler-runup-indicator');
     if (indicator && indicator.parentNode) {
       indicator.parentNode.removeChild(indicator);

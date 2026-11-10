@@ -94,12 +94,32 @@ try {
         } else {
           const release = await page.$('#btn-bowl-pitch');
           const box = await release.boundingBox();
-          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-          await page.mouse.down();
-          await new Promise(resolve => setTimeout(resolve, 300));
-          await page.mouse.up();
+          await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
         }
         await page.waitForSelector('#over-tracker .over-dot:not(.upcoming)', { timeout: 30000 });
+        if (viewport.width === 667) {
+          await page.waitForFunction(() => {
+            const button = document.querySelector('#btn-bowl-pitch');
+            return button && button.getBoundingClientRect().width > 0;
+          }, { timeout: 30000 });
+          const before = await page.$$eval('#over-tracker .over-dot:not(.upcoming)', els => els.length);
+          const box = await (await page.$('#btn-bowl-pitch')).boundingBox();
+          const client = await page.createCDPSession();
+          const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+          await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+          await page.waitForSelector('#bowler-runup-indicator');
+          const visible = await page.$eval('#btn-bowl-pitch', el => ({
+            width: el.getBoundingClientRect().width,
+            select: getComputedStyle(el).webkitUserSelect,
+            touch: getComputedStyle(el).touchAction,
+          }));
+          if (!visible.width || visible.select !== 'none' || visible.touch !== 'none') throw new Error(`Hold control unavailable or selectable: ${JSON.stringify(visible)}`);
+          await new Promise(resolve => setTimeout(resolve, 600));
+          await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+          await page.waitForFunction(count => document.querySelectorAll('#over-tracker .over-dot:not(.upcoming)').length > count, { timeout: 30000 }, before);
+          await page.waitForFunction(() => !document.querySelector('#bowler-runup-indicator'));
+          await client.detach();
+        }
       } else {
         // The beginner's prompt is a visible cue for exercising a real batting input.
         if (viewport.width === 1024) await page.focus('.touch-shot[data-shot="lofted"]');
