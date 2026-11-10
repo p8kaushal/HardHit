@@ -14,6 +14,8 @@ Run `npm run test:production` to build the app and run the same browser checks a
 
 Run `npm run test:match` for a longer, seeded browser match: the player bowls first, then lets the bot bowl while batting, and the test checks both scorecards and return to the lobby. `npm run test:match:batting` also swings at batting prompts, `npm run test:match:bat-first` tests the other innings order, `npm run test:match:sixes` exercises lofted shots and verifies the six scorecard (a six is not guaranteed because browser timing varies), and `npm run test:rematch` checks a fresh rematch and toss. These scenarios do not cover all match outcomes or physical devices.
 
+`npm run test:match:sudden` uses a test-only tied-innings fixture to exercise both sudden-death innings and their one-legal-ball scorecards in the browser.
+
 ---
 
 ## 🎮 Key Features

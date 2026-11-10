@@ -1839,11 +1839,57 @@ test('a finished innings schedules only one transition', () => {
     for (let i = 0; i < 6; i++) game.recordBall(delivery(0.5), null);
     game.handleInningsCompletion();
     game.handleInningsCompletion();
+    const observed: number[] = [];
+    game.afterInningsTransition(() => observed.push(game.state.currentInningsIndex));
+    assert.deepEqual(observed, []);
     assert.equal(timers.length, 1);
     timers[0]();
     assert.equal(game.state.currentInningsIndex, 1);
+    assert.deepEqual(observed, [1]);
   } finally {
     Object.assign(globalThis, { document: originalDocument, window: originalWindow, performance: originalPerformance });
+  }
+});
+
+test('finished regular and sudden-death innings reject all further deliveries', () => {
+  for (const sudden of [false, true]) {
+    const game = match();
+    game.state.tieBreakerActive = sudden;
+    const innings = game.getCurrentInnings();
+    const limit = sudden ? 1 : 6;
+    for (let i = 0; i < limit; i++) game.recordBall(delivery(0.5), null);
+    const before = { balls: innings.balls.length, score: innings.score, wickets: innings.wicketsLost };
+    assert.throws(() => game.recordBall(delivery(0.5), null), /innings has finished/);
+    assert.throws(() => game.recordBall(delivery(0.5, 1.4), null), /innings has finished/);
+    assert.equal(innings.ballsBowled, limit);
+    assert.deepEqual({ balls: innings.balls.length, score: innings.score, wickets: innings.wicketsLost }, before);
+  }
+});
+
+test('a finished innings waits for its transition before preparing another delivery', () => {
+  const oldDocument = globalThis.document;
+  let ready: (() => void) | undefined;
+  let starts = 0;
+  Object.assign(globalThis, { document: { getElementById: () => null } });
+  try {
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.deliveryGeneration = 0;
+    ui.cancelBattingRunUp = null;
+    ui.botDeliveryTimer = null;
+    ui.controller = {
+      state: { status: 'playing' },
+      getCurrentInnings: () => ({ finished: true }),
+      handleInningsCompletion: () => {},
+      afterInningsTransition: (callback: () => void) => { ready = callback; }
+    };
+    ui.setupActiveTurn();
+    assert.ok(ready);
+    assert.equal(starts, 0);
+    ui.setupActiveTurn = () => { starts++; };
+    ready();
+    assert.equal(starts, 1);
+  } finally {
+    Object.assign(globalThis, { document: oldDocument });
   }
 });
 
@@ -1900,11 +1946,14 @@ test('reset invalidates a pending innings transition and removes its overlay', (
   try {
     for (let i = 0; i < 6; i++) game.recordBall(delivery(0.5), null);
     game.handleInningsCompletion();
+    let callbackCount = 0;
+    game.afterInningsTransition(() => { callbackCount++; });
     game.reset();
     assert.equal(removed, 1);
     timers[0]();
     assert.equal(game.state.status, 'toss');
     assert.equal(game.state.currentInningsIndex, 0);
+    assert.equal(callbackCount, 0);
     assert.equal(removed, 1);
   } finally {
     Object.assign(globalThis, { document: originalDocument, window: originalWindow, performance: originalPerformance });

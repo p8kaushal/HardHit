@@ -172,6 +172,7 @@ export class MatchController {
   private transitionGeneration = 0;
   private transitionOverlay: HTMLElement | null = null;
   private transitionTimer: number | null = null;
+  private transitionCallbacks: Array<() => void> = [];
 
   constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard') {
     this.botDifficulty = botDifficulty;
@@ -185,6 +186,7 @@ export class MatchController {
     if (globalAutoAssistConfig.isBallInPlay) return;
     this.transitionGeneration++;
     this.transitionPending = false;
+    this.transitionCallbacks = [];
     if (this.transitionTimer !== null) clearGameTimeout(this.transitionTimer);
     this.transitionTimer = null;
     this.transitionOverlay?.parentNode?.removeChild(this.transitionOverlay);
@@ -283,6 +285,9 @@ export class MatchController {
 
   public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null): BallOutcome {
     const innings = this.getCurrentInnings();
+    if (this.state.status !== 'playing' || !innings || innings.finished) {
+      throw new Error('Cannot record a delivery after the innings has finished');
+    }
     // A completed ball must not change when controls prepare the next delivery.
     const delivery: DeliveryChoice = {
       ...inputDelivery,
@@ -492,8 +497,17 @@ export class MatchController {
           // End of the pair, resolve match or tie-break
           this.resolveMatch();
         }
+        const callbacks = this.transitionCallbacks;
+        this.transitionCallbacks = [];
+        callbacks.forEach(callback => callback());
       }, 2000);
     }
+  }
+
+  /** Run after the current innings transition has actually updated match state. */
+  public afterInningsTransition(callback: () => void): void {
+    if (this.transitionPending) this.transitionCallbacks.push(callback);
+    else callback();
   }
 
   private resolveMatch(): void {

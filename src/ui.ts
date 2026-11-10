@@ -407,6 +407,7 @@ export class UIManager {
   }
 
   public startUserBowlingDelivery(): void {
+    if (this.controller.state.status !== 'playing' || this.controller.getCurrentInnings().finished) return;
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     if (isPlayerBatting || this.isBallActive || globalAutoAssistConfig.isRunUpActive) return;
     this.userBowlingInProgress = true;
@@ -769,7 +770,7 @@ export class UIManager {
         this.controller.handleInningsCompletion();
       }
 
-      setGameTimeout(() => {
+      const startNextTurn = () => {
         if (generation !== this.deliveryGeneration) return;
         // Step 3: Fade out and hide the result banner overlay completely
         this.hideResultToast();
@@ -784,7 +785,13 @@ export class UIManager {
         if ((this as any).setupActiveTurn) {
           (this as any).setupActiveTurn();
         }
-      }, 2000);
+      };
+      if (innings.finished) {
+        this.controller.handleInningsCompletion();
+        this.controller.afterInningsTransition(startNextTurn);
+      } else {
+        setGameTimeout(startNextTurn, 2000);
+      }
 
     };
 
@@ -1030,6 +1037,14 @@ export class UIManager {
     }
 
     const innings = this.controller.getCurrentInnings();
+    if (innings.finished) {
+      const generation = this.deliveryGeneration;
+      this.controller.handleInningsCompletion();
+      this.controller.afterInningsTransition(() => {
+        if (generation === this.deliveryGeneration) this.setupActiveTurn();
+      });
+      return;
+    }
     this.gameScene.setBatterHandedness(innings.batter.batterHand || 'RHB');
     globalAutoAssistConfig.bowlerArm = innings.bowler.bowlingArm || 'Right';
     const isPlayerBatting = innings.batter.id === state.player.id;

@@ -18,6 +18,18 @@ try {
   page.on('console', msg => { if (msg.type() === 'error') errors.push(`${msg.text()} ${msg.location().url ?? ''}`); });
   page.on('response', response => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${response.url()}`); });
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { waitUntil: 'networkidle0' });
+  if (process.argv.includes('--force-tie')) {
+    // Test-only fixture: make regular-innings deliveries legal dots so the
+    // real UI must play both sudden-death innings. Production code is unchanged.
+    await page.evaluate(async () => {
+      const { MatchController } = await import('/src/game.ts');
+      const record = MatchController.prototype.recordBall;
+      MatchController.prototype.recordBall = function (delivery, shot) {
+        if (this.state.tieBreakerActive) return record.call(this, delivery, shot);
+        return record.call(this, { ...delivery, aimTarget: { x: 0.7, z: -3.5 }, type: 'fast', swing: 0, turn: 0, overTheWicket: undefined, frontFootHeel: -0.1 }, null);
+      };
+    });
+  }
   if (process.argv.includes('--loft')) {
     // Read the live delivery clock in this isolated test page so host/browser
     // scheduling does not turn a deliberately well-timed swing into a late one.
@@ -57,6 +69,8 @@ try {
       score: document.querySelector('#hud-score-count').textContent,
     }));
     const label = `${state.innings}: ${state.balls} score ${state.score}`;
+    const counts = state.balls.match(/^(\d+)\/(\d+)$/);
+    if (counts && Number(counts[1]) > Number(counts[2])) throw new Error(`Legal ball limit exceeded: ${label}`);
     if (label !== lastState) { console.log(label); lastState = label; }
     if (errors.length) throw new Error(`Browser errors:\n${errors.join('\n')}`);
     if (state.summary) break;
@@ -80,6 +94,15 @@ try {
     await new Promise(resolve => setTimeout(resolve, 60));
   }
   await page.waitForSelector('#match-summary-modal.active', { timeout: 1000 });
+  if (process.argv.includes('--force-tie')) {
+    const sudden = await page.evaluate(() => ({
+      visible: !document.querySelector('#summary-sudden-death').classList.contains('hidden'),
+      playerLegal: document.querySelectorAll('#summary-sudden-player-tracker .mini-dot:not(.extra)').length,
+      botLegal: document.querySelectorAll('#summary-sudden-bot-tracker .mini-dot:not(.extra)').length,
+    }));
+    if (!sudden.visible || sudden.playerLegal !== 1 || sudden.botLegal !== 1) throw new Error(`Incorrect sudden-death scorecard: ${JSON.stringify(sudden)}`);
+    console.log('Sudden-death scorecard has one legal ball per player.');
+  }
   if (swingDuringBatting && !swings) throw new Error('No batting swing was triggered');
   if (loftDuringBatting) {
     if (!selectedLoft) throw new Error('Lofted shot was not selected');
