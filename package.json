@@ -13,6 +13,7 @@
     "test:match": "node scripts/browser-match.mjs",
     "test:match:batting": "node scripts/browser-match.mjs --swing",
     "test:match:bat-first": "node scripts/browser-match.mjs --bat-first --swing",
+    "test:match:sixes": "node scripts/browser-match.mjs --bat-first --swing --loft",
     "test:rematch": "node scripts/browser-match.mjs --rematch"
   },
   "dependencies": {

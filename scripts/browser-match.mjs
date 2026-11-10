@@ -18,6 +18,21 @@ try {
   page.on('console', msg => { if (msg.type() === 'error') errors.push(`${msg.text()} ${msg.location().url ?? ''}`); });
   page.on('response', response => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${response.url()}`); });
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { waitUntil: 'networkidle0' });
+  if (process.argv.includes('--loft')) {
+    // Read the live delivery clock in this isolated test page so host/browser
+    // scheduling does not turn a deliberately well-timed swing into a late one.
+    await page.evaluate(async () => {
+      const game = await import('/src/game.ts');
+      const formula = await import('/src/formula.ts');
+      const clock = await import('/src/game-clock.ts');
+      window.__loftReady = () => {
+        const state = game.globalAutoAssistConfig;
+        if (!state.isDeliveryActive || !state.currentDelivery || state.deliveryStartTime === undefined) return true;
+        const ideal = formula.deliveryDurationMs(state.currentDelivery.type, state.currentDelivery.pace) * formula.batterContactProgress(state.currentDelivery) - 150;
+        return clock.gameNow() - state.deliveryStartTime >= ideal;
+      };
+    });
+  }
   await page.click('#btn-start-toss');
   // Force the toss only, then restore the seeded sequence.
   await page.evaluate(() => { window.__testRandom = Math.random; Math.random = () => 0; });
@@ -28,11 +43,14 @@ try {
   await page.click(batFirst ? '#btn-choice-bat' : '#btn-choice-bowl');
   const deadline = Date.now() + 240000;
   const swingDuringBatting = process.argv.includes('--swing');
-  let lastAttempt = 0, lastState = '', swings = 0;
+  const loftDuringBatting = process.argv.includes('--loft');
+  let lastAttempt = 0, lastState = '', swings = 0, selectedLoft = false;
   while (Date.now() < deadline) {
     const state = await page.evaluate(() => ({
       summary: document.querySelector('#match-summary-modal').classList.contains('active'),
       bowling: !document.querySelector('#control-bowling').classList.contains('hidden'),
+      batting: !document.querySelector('#control-batting').classList.contains('hidden'),
+      loftSelected: document.querySelector('#bat-type-group [data-val="lofted"]').classList.contains('active'),
       cue: !!document.querySelector('#hit-space-banner') && getComputedStyle(document.querySelector('#hit-space-banner')).display !== 'none',
       innings: document.querySelector('#hud-innings-title').textContent,
       balls: document.querySelector('#hud-balls-count').textContent,
@@ -42,7 +60,10 @@ try {
     if (label !== lastState) { console.log(label); lastState = label; }
     if (errors.length) throw new Error(`Browser errors:\n${errors.join('\n')}`);
     if (state.summary) break;
+    if (loftDuringBatting && state.batting && !state.loftSelected) await page.keyboard.press('1');
+    if (state.loftSelected && state.batting) selectedLoft = true;
     if (swingDuringBatting && state.cue) {
+      if (loftDuringBatting) await page.waitForFunction(() => window.__loftReady(), { timeout: 2000 });
       await page.keyboard.press('Space');
       if (await page.$eval('#timing-widget', el => !el.classList.contains('hidden'))) swings++;
     }
@@ -60,6 +81,24 @@ try {
   }
   await page.waitForSelector('#match-summary-modal.active', { timeout: 1000 });
   if (swingDuringBatting && !swings) throw new Error('No batting swing was triggered');
+  if (loftDuringBatting) {
+    if (!selectedLoft) throw new Error('Lofted shot was not selected');
+    const six = await page.evaluate(() => {
+      const markers = [...document.querySelectorAll('#summary-player-tracker .mini-dot.six')];
+      const noBallSixes = [...document.querySelectorAll('#summary-player-tracker .mini-dot.extra')].filter(el => el.textContent === 'NB6').length;
+      const distances = markers.map(el => Number(el.title.match(/\(([\d.]+)m\)/)?.[1]));
+      return {
+        count: Number(document.querySelector('#summary-player-six-count').textContent),
+        biggest: Number.parseFloat(document.querySelector('#summary-player-six').textContent),
+        distances, noBallSixes
+      };
+    });
+    if (!Number.isFinite(six.biggest) || (six.count === 0) !== (six.biggest === 0) || six.count !== six.distances.length + six.noBallSixes || six.distances.some(value => !Number.isFinite(value) || value > six.biggest + 0.01) || (!six.noBallSixes && six.distances.length > 0 && Math.abs(Math.max(...six.distances) - six.biggest) > 0.01)) {
+      throw new Error(`Lofted six not recorded consistently: ${JSON.stringify(six)}`);
+    }
+    if (process.argv.includes('--require-six') && !six.count) throw new Error('No six was scored in this timing-sensitive run');
+    console.log(`Lofted batting recorded ${six.count} six(es), biggest ${six.biggest.toFixed(1)}m.`);
+  }
   for (const selector of ['#summary-player-tracker .mini-dot', '#summary-bot-tracker .mini-dot']) {
     if (await page.$$eval(selector, els => els.length) < 6) throw new Error(`Incomplete scorecard: ${selector}`);
     if (await page.$$eval(`${selector}:not(.extra)`, els => els.length) !== 6) throw new Error(`Incorrect legal-ball count: ${selector}`);
