@@ -62,7 +62,7 @@ Run `npm run test:match` for a longer, seeded browser match: the player bowls fi
 | **Bowling Delivery Selection** | `1`–`5` (Fast, Medium, Slow Ball, Off Spin, Leg Spin) |
 | **Batting Shot Selection** | `1`–`4` (Lofted, Power, Grounded, Defensive) |
 | **Batting Footwork** | `Q` for front foot, `E` for back foot |
-| **Action Execution** | `Spacebar` (Stop bowling release point meter / Trigger bat swing timing) |
+| **Action Execution** | `Spacebar` (hold/release bowling meter or trigger a bat swing); focused action buttons also accept `Enter` |
 | **Shortcuts Modal** | Press `H` or click the HUD shortcuts button |
 
 On a phone, drag the left batting stick to aim, choose front or back foot, and tap a shot button with your other thumb as the ball arrives. The timing meter shows your actual swing timing: early means swing later next time, and late means swing earlier. Rookie and Medium difficulty make timing more forgiving when calculating the result. Front foot suits fuller balls; back foot suits short balls. Aim bowling deliveries on the pitch or the compact pitch map, choose a delivery type, adjust speed and swing for pace or turn for spin, then hold and release the delivery button in the green timing zone. Swing directions are shown from the bowler's view; releasing early or late also moves the bounce point away from the target.

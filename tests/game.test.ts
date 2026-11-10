@@ -817,6 +817,16 @@ test('interrupted keyboard holds clear without releasing a delivery', () => {
     active = false;
     listeners.keyup(space);
     assert.equal(releases, 1);
+    active = true;
+    const soundButton = { tagName: 'BUTTON', id: 'btn-sound-toggle', classList: { contains: () => false } };
+    listeners.keydown({ ...space, target: soundButton });
+    listeners.keyup({ ...space, target: soundButton });
+    assert.equal(starts, 3);
+    const bowlButton = { tagName: 'BUTTON', id: 'btn-bowl-pitch', classList: { contains: () => false } };
+    listeners.keydown({ key: 'Enter', code: 'Enter', target: bowlButton });
+    listeners.keyup({ key: 'Enter', code: 'Enter', target: { tagName: 'BODY' } });
+    assert.equal(starts, 4);
+    assert.equal(releases, 2);
     input.destroy();
   } finally {
     setGamePaused(false);
@@ -841,6 +851,10 @@ test('focused shot buttons do not also trigger the global batting shortcut', () 
     listeners.keydown({ key: ' ', code: 'Space', target });
     listeners.keyup({ key: ' ', code: 'Space', target });
     assert.equal(swings, 0);
+    const batButton = { tagName: 'BUTTON', id: 'btn-bat-swing', classList: { contains: () => false } };
+    listeners.keydown({ key: 'Enter', code: 'Enter', target: batButton });
+    listeners.keyup({ key: 'Enter', code: 'Enter', target: batButton });
+    assert.equal(swings, 1);
     input.destroy();
   } finally {
     globalAutoAssistConfig.isDeliveryActive = oldActive;

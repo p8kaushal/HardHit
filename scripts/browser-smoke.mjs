@@ -86,12 +86,19 @@ try {
           await new Promise(resolve => setTimeout(resolve, 800));
           if (await page.$('#over-tracker .over-dot:not(.upcoming)')) throw new Error('Rotation released an unintended delivery');
         }
-        const release = await page.$('#btn-bowl-pitch');
-        const box = await release.boundingBox();
-        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-        await page.mouse.down();
-        await new Promise(resolve => setTimeout(resolve, 300));
-        await page.mouse.up();
+        if (viewport.width === 1024) {
+          await page.focus('#btn-bowl-pitch');
+          await page.keyboard.down('Enter');
+          await new Promise(resolve => setTimeout(resolve, 300));
+          await page.keyboard.up('Enter');
+        } else {
+          const release = await page.$('#btn-bowl-pitch');
+          const box = await release.boundingBox();
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          await page.mouse.down();
+          await new Promise(resolve => setTimeout(resolve, 300));
+          await page.mouse.up();
+        }
         await page.waitForSelector('#over-tracker .over-dot:not(.upcoming)', { timeout: 30000 });
       } else {
         // The beginner's prompt is a visible cue for exercising a real batting input.

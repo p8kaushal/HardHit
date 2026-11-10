@@ -16,6 +16,7 @@ export class KeyboardInputManager {
 
     // Track key hold state
     private spacePressed = false;
+    private heldActionKey: string | null = null;
 
     // Lists of options for arrow key cycling
     // We will dynamically compute the aimX based on handedness, so we just track line index 0,1,2 for Leg, Middle, Off
@@ -62,6 +63,7 @@ export class KeyboardInputManager {
   public cancelHeldInputs(): void {
     this.pressedKeys.clear();
     this.spacePressed = false;
+    this.heldActionKey = null;
   }
 
   private setupListeners(): void {
@@ -143,6 +145,8 @@ export class KeyboardInputManager {
     if (target && (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable)) return;
     // Focused shot buttons handle their own keyboard/assistive activation.
     if (target?.tagName === 'BUTTON' && target.classList.contains('touch-shot')) return;
+    // Space and Enter on ordinary buttons must activate that button, not bowl.
+    if (target?.tagName === 'BUTTON' && target.id !== 'btn-bowl-pitch' && target.id !== 'btn-bat-swing' && (e.code === 'Space' || e.code === 'Enter')) return;
 
     // Toggle Help Modal on 'H' / 'h'
     if (e.key === 'h' || e.key === 'H') {
@@ -171,9 +175,10 @@ export class KeyboardInputManager {
 
   private handleKeyUp(e: KeyboardEvent): void {
     this.pressedKeys.delete(e.key.toLowerCase());
-    if (e.code === 'Space') {
+    if (e.code === this.heldActionKey) {
       const wasPressed = this.spacePressed;
       this.spacePressed = false;
+      this.heldActionKey = null;
       const gameplay = document.getElementById('screen-gameplay');
       if (wasPressed && gameplay?.classList.contains('active') && !isGamePaused() && !this.isPlayerBatting()) {
         // End release meter on bowling release
@@ -235,8 +240,10 @@ export class KeyboardInputManager {
     this.syncBowlTypeDOM();
 
     // 3. Spacebar Meter
-    if (e.code === 'Space' && !this.spacePressed) {
+    const focusedBowlButton = (e.target as HTMLElement | null)?.id === 'btn-bowl-pitch';
+    if ((e.code === 'Space' || (e.code === 'Enter' && focusedBowlButton)) && !this.spacePressed) {
       this.spacePressed = true;
+      this.heldActionKey = e.code;
       this.onStartBowling();
     }
   }
@@ -289,8 +296,10 @@ export class KeyboardInputManager {
     }
 
     // 3. Swing trigger (Spacebar)
-    if (e.code === 'Space' && !this.spacePressed) {
+    const focusedBatButton = (e.target as HTMLElement | null)?.id === 'btn-bat-swing';
+    if ((e.code === 'Space' || (e.code === 'Enter' && focusedBatButton)) && !this.spacePressed) {
       this.spacePressed = true;
+      this.heldActionKey = e.code;
       
       if (globalAutoAssistConfig.isDeliveryActive) {
         this.onBatSwing(this.intent.aimDirection, this.intent.shotType);
