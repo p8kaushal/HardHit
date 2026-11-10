@@ -14,7 +14,7 @@ try {
   }
   const address = server.httpServer.address();
   browser = await puppeteer.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-  for (const viewport of [{ width: 667, height: 300 }, { width: 1024, height: 768 }]) {
+  for (const viewport of [{ width: 568, height: 240 }, { width: 667, height: 300 }, { width: 1024, height: 768 }]) {
     for (const role of ['bat', 'bowl']) {
       const page = await browser.newPage();
       await page.setViewport({ ...viewport, isMobile: true, hasTouch: true });
