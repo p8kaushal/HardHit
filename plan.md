@@ -1,5 +1,9 @@
 # HardHit project plan index
 
+## Recorded replay coverage
+
+The replay reports confident rendered samples and mismatches for each segment, including zero coverage, and optionally requires selected segments. The user's existing recording passed with both shoulders required (4,609 total comparisons); both lower legs and feet had zero coverage. A separate run requiring the left foot correctly failed for lack of coverage. Counts are render samples, not independent video frames, and agreement with pose-model targets does not establish physical accuracy.
+
 ## Recorded-motion limb alignment checks
 
 The local replay now compares rendered arm, leg, hand and foot segment directions against the pose model's current targets only when both endpoint landmarks are visible. It also counts coverage and checks finite rig output, X-ray placement, cleanup and practice isolation. Two runs using the user's cropped screen recording passed; the second made 4,479 confident pose-target comparisons with none exceeding the 10-degree test tolerance. Both feet were visible in zero frames, so this does not validate the foot segments. The comparisons establish that the rig followed the model's own targets in this fixture; they do not establish that those targets accurately represented the person. The recording contains preview overlays and remains outside the repository.

@@ -8,6 +8,9 @@ const path = process.env.HARDHIT_POSE_REPLAY;
 if (!path) throw new Error('Set HARDHIT_POSE_REPLAY to a local, pre-cropped camera-view WebM.');
 const seek = Number(process.env.HARDHIT_POSE_REPLAY_SEEK ?? 0);
 if (!Number.isFinite(seek) || seek < 0) throw new Error('HARDHIT_POSE_REPLAY_SEEK must be a non-negative number of seconds.');
+const segmentNames = ['leftShoulder', 'leftElbow', 'rightShoulder', 'rightElbow', 'leftHip', 'leftKnee', 'rightHip', 'rightKnee', 'leftWrist', 'rightWrist', 'leftAnkle', 'rightAnkle'];
+const requiredSegments = (process.env.HARDHIT_POSE_REPLAY_REQUIRE ?? '').split(',').map(value => value.trim()).filter(Boolean);
+if (requiredSegments.some(name => !segmentNames.includes(name))) throw new Error(`Unknown required segment. Choose from: ${segmentNames.join(', ')}`);
 const encodedVideo = (await readFile(path)).toString('base64');
 const server = await createServer({ server: { host: '127.0.0.1', port: 0, open: false } });
 let browser;
@@ -19,10 +22,11 @@ try {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { waitUntil: 'networkidle0' });
-  await page.evaluate(async ({ encoded, seek }) => {
+  await page.evaluate(async ({ encoded, seek, segmentNames }) => {
     const { GameScene } = await import('/src/scene.ts');
     const original = GameScene.prototype.applyTrackedBatterPose;
     window.__replayStats = { frames: 0, personFrames: 0, wristFrames: 0, indexFrames: 0, earFrames: 0, footFrames: 0, applied: 0, nonfinite: 0, maxFacing: 0, rigSamples: 0, badRig: 0, maxJointError: 0, maxArmShift: 0, directionChecks: 0, directionMismatches: 0, maxDirectionErrorDeg: 0 };
+    window.__replayStats.segments = Object.fromEntries(segmentNames.map(name => [name, { checks: 0, mismatches: 0, maxErrorDeg: 0 }]));
     GameScene.prototype.applyTrackedBatterPose = function (pose, offset, facing, directions, confidence) {
       const values = Object.values(pose).flatMap(v => [v.x, v.y, v.z]).concat([offset.x, offset.y, offset.z], facing === null ? [] : [facing], ...Object.values(directions).map(v => [v.x, v.y, v.z]));
       if (values.some(value => !Number.isFinite(value))) window.__replayStats.nonfinite++;
@@ -63,8 +67,11 @@ try {
             const degrees = Math.acos(dot) * 180 / Math.PI;
             if (!Number.isFinite(degrees)) { stats.badRig++; continue; }
             stats.directionChecks++;
+            const segment = stats.segments[joint];
+            segment.checks++;
+            segment.maxErrorDeg = Math.max(segment.maxErrorDeg, degrees);
             stats.maxDirectionErrorDeg = Math.max(stats.maxDirectionErrorDeg, degrees);
-            if (degrees > 10) stats.directionMismatches++;
+            if (degrees > 10) { stats.directionMismatches++; segment.mismatches++; }
           }
           const arm = scene.getTransformNodeByName('LeftArm'), hand = scene.getTransformNodeByName('LeftHand');
           if (arm && hand) {
@@ -109,7 +116,7 @@ try {
     const interval = setInterval(() => { if (stream.getVideoTracks()[0].readyState === 'ended') clearInterval(interval); else draw(); }, 100);
     navigator.mediaDevices.getUserMedia = async () => stream;
     window.__replayVideo = replay; window.__replayStream = stream;
-  }, { encoded: encodedVideo, seek });
+  }, { encoded: encodedVideo, seek, segmentNames });
   const before = await page.evaluate(() => ({ player: localStorage.getItem('six_hitting_contest_player'), board: localStorage.getItem('six_hitting_contest_leaderboard') }));
   await page.click('#btn-playzone');
   await page.click('#playzone-camera-settings summary');
@@ -139,6 +146,7 @@ try {
   assert.ok(stats.maxArmShift > .03, `the replay should exercise visible arm movement: ${JSON.stringify(stats)}`);
   assert.ok(stats.directionChecks >= 20, `the replay must include confident tracked limb directions: ${JSON.stringify(stats)}`);
   assert.equal(stats.directionMismatches, 0, `rendered limbs must follow their tracked targets within 10 degrees: ${JSON.stringify(stats)}`);
+  for (const name of requiredSegments) assert.ok(stats.segments[name].checks >= 20, `Required segment ${name} needs at least 20 confident rendered samples: ${JSON.stringify(stats.segments)}`);
   assert.match(stats.score, /0 runs \/ 0 wickets · 0 balls/, 'replay must not score a practice ball');
   assert.deepEqual(await page.evaluate(() => ({ player: localStorage.getItem('six_hitting_contest_player'), board: localStorage.getItem('six_hitting_contest_leaderboard') })), before);
   await page.click('#playzone-exit');

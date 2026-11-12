@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+## Recorded replay coverage
+
+- [x] Report direction checks and mismatches separately for every limb segment, including zero-coverage segments.
+- [x] Allow an explicit replay coverage requirement and verify both passing and failing coverage checks.
+
 ## Recorded-motion limb alignment checks
 
 - [x] Measure rendered limb directions against confident pose-model targets throughout the local replay, including hand and foot endpoints when visible.
