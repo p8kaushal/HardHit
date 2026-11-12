@@ -12,6 +12,13 @@
 - [x] Reset session data on stop/restart; expire old samples and label the limits of the measurement.
 - [x] Verify unit edge cases, production build and camera browser lifecycle/rejection behavior, update docs, and commit. 122 unit tests and development/production camera browser regressions passed; actual-device measurements remain open.
 
+## Independent annotated pose validation
+
+- [x] Add explicit local clip/annotation inputs with strict schema, source-dimension and frame-seek checks.
+- [x] Compare real worker results against annotated image points with explicit pixel tolerance and confidence/coverage rejection; print aggregates only.
+- [x] Test malformed references, real pixel/aspect errors, missing/uncertain results, coverage and actual browser operation, then commit. 126 tests and build passed; synthetic browser smoke passed and a strict-tolerance browser fixture failed as expected.
+- [ ] Run independent human annotations; synthetic smoke references and prior overlaid recordings do not establish accuracy.
+
 ## Next: live movement review
 
 - [ ] Have the user refresh and use **Calibrate in 5 seconds** while upright, facing the camera with the whole body visible; review the character's neutral posture and bowler-facing alignment.

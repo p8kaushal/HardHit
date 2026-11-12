@@ -80,6 +80,8 @@ For local regression testing with recorded movement, provide a pre-cropped, unmi
 
 Replay results include checks per limb segment, including segments with zero coverage. To require coverage, set `HARDHIT_POSE_REPLAY_REQUIRE` to comma-separated segment names, for example `leftAnkle,rightAnkle`; each requires at least 20 confident rendered samples. These samples can include multiple renders of the same camera frame and do not establish movement accuracy.
 
+For an independent image-point check, supply a local clip and manually annotated reference JSON to `npm run test:pose-reference`. See [CAMERA_BATTING.md](CAMERA_BATTING.md) for the schema, evidence limits and remaining camera-batting stages. The check rejects missing/uncertain annotations and errors over the explicitly supplied pixel tolerance; it does not validate 3D motion or a physical bat.
+
 Choose **Bowling practice** to bowl at a bot batter. Aim using the line and length selectors or the pitch map on the left, or tap and drag the 3D pitch. Set delivery type, pace, swing or spin and bowling side on the right. Expand **Bot batter** to choose its shot style, difficulty and batting hand, or **Display** for camera and outcome options. Hold Space or the bowling button and release when the meter reaches the green zone. Practice continues beyond an over and does not update your match record or leaderboard. Run `npm run test:bowling-playzone` for the browser checks.
 
 The batter uses a low-poly skinned humanoid with an articulated skeleton. The CC0 source and attribution details are in [public/models/NOTICE.txt](public/models/NOTICE.txt). Two-hand bat constraints are not implemented yet.

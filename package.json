@@ -18,6 +18,7 @@
     "test:rematch": "node scripts/browser-match.mjs --rematch",
     "test:playzone": "node scripts/browser-playzone.mjs",
     "test:camera-preview": "node scripts/browser-camera-preview.mjs",
+    "test:pose-reference": "node scripts/browser-pose-reference.mjs",
     "test:bowling-playzone": "node scripts/browser-bowling-playzone.mjs"
   },
   "dependencies": {
