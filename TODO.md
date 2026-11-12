@@ -60,7 +60,7 @@
 ## Real-bat detector candidate investigation
 
 - [x] Inspect public bat-keypoint annotations and source video for usable local evidence, licensing and alignment.
-- [x] Evaluate a local browser-compatible detector candidate on sampled actual-bat frames, record coverage/overlap and limits, then commit findings. EfficientDet-Lite0 int8 found zero bats in 23 sampled frames at confidence ≥0.2; person positive control was detected on all 23. Candidate rejected; no runtime model added.
+- [x] Evaluate a local browser-compatible detector candidate on sampled actual-bat frames, record coverage/overlap and limits, then commit findings. Initial 23-frame stride missed intermittent detections. Full exact-index pass found boxes in 35/177 frames at confidence ≥0.2 (30 IoU≥0.5), but only 4/177 at ≥0.5; boxes have no endpoints and candidate remains rejected. Full metrics and limits recorded in `CAMERA_BATTING.md`.
 - [ ] Select an endpoint-capable bat-tracking implementation only with sufficient evidence; keep hand-only estimates out of physical-bat claims.
 
 ## Next: live movement review
