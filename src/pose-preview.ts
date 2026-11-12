@@ -67,6 +67,12 @@ export class PosePreview {
           this.onLandmarks([], [], NaN);
           return;
         }
+        if (performance.now() - this.lastFrameAt > 500) {
+          this.onLandmarks([], [], NaN);
+          this.draw([]);
+          this.show('tracking', 'Pose tracking is delayed. Improve lighting or close other apps.');
+          return;
+        }
         this.onLandmarks(event.data.landmarks, event.data.worldLandmarks ?? [], event.data.timestamp);
         this.draw(event.data.landmarks);
       };

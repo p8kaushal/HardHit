@@ -1,5 +1,11 @@
 # Gameplay to-do
 
+## Reject delayed pose frames
+
+- [x] Prevent old inference results from driving the character after a slow or stalled frame, and explain the delay.
+- [x] Verify delayed-frame rejection, fresh-frame recovery and existing pose lifecycle before committing.
+- [ ] Evaluate the 500 ms cutoff and device performance on real cameras, especially slower hardware.
+
 ## Recover from brief torso occlusion
 
 - [x] Hold the last calibrated pose briefly when a required torso landmark disappears, and visibly mark tracking as uncertain.

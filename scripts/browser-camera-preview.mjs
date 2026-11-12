@@ -353,6 +353,16 @@ try {
   });
   assert.match(staleFrame.status, /Tracking stopped or no person/, 'a worker result captured before a pause must be discarded');
   await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, staleFrame.serial);
+  await page.evaluate(() => { window.__holdPoseResult = true; window.__releasePoseFrame = null; });
+  await page.waitForFunction(() => typeof window.__releasePoseFrame === 'function');
+  const delayedFrame = await page.evaluate(async () => {
+    await new Promise(resolve => setTimeout(resolve, 650));
+    window.__holdPoseResult = false;
+    window.__releasePoseFrame();
+    return { status: document.querySelector('#playzone-pose-status').textContent, serial: window.__poseResultSerial };
+  });
+  assert.match(delayedFrame.status, /tracking is delayed/i, 'an old worker result must not drive the pose');
+  await page.waitForFunction(serial => window.__poseResultSerial > serial && !document.querySelector('#playzone-pose-status').textContent.includes('delayed'), {}, delayedFrame.serial);
   await page.click('#playzone-pose-toggle');
   assert.equal(await page.$eval('#playzone-intensity-strong', button => button.disabled), true, 'stopping tracking must clear personal samples');
   assert.match(await page.$eval('#playzone-intensity-status', element => element.textContent), /Record a gentler movement/);

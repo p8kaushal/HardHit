@@ -1,5 +1,9 @@
 # HardHit project plan index
 
+## Reject delayed pose frames
+
+Inference results arriving more than 500 ms after frame submission are discarded, their overlay is cleared and the preview reports a delay. Fresh frames can resume tracking; continued delay eventually resets calibrated movement through the existing loss handling. This prevents stale poses being applied but can make tracking unavailable on slow devices; the threshold is not yet validated on real hardware. Verified with 118 unit tests, a production build and the camera browser regression, including an intentionally held result and fresh-frame recovery.
+
 ## Recover from brief torso occlusion
 
 After a valid tracked pose, loss of required torso landmarks holds that pose for up to 500 ms, marks X-ray joints uncertain and resumes without recalibration if tracking returns. Longer loss resets calibration; interruption and watchdog behavior remain in place. The status explains the hold. Verified with 118 unit tests, production build and camera browser regression covering short loss, X-ray uncertainty, recovery, prolonged loss and lifecycle. Live-camera feel remains unverified.
