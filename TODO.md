@@ -19,6 +19,12 @@
 - [x] Test malformed references, real pixel/aspect errors, missing/uncertain results, coverage and actual browser operation, then commit. 126 tests and build passed; synthetic browser smoke passed and a strict-tolerance browser fixture failed as expected.
 - [ ] Run independent human annotations; synthetic smoke references and prior overlaid recordings do not establish accuracy.
 
+## Local bat keypoint annotation
+
+- [x] Add an offline browser tool for four named bat points and sampled-frame JSON export with explicit nominal FPS.
+- [x] Verify local clip load, frame-zero handling, point entry/save and exported dimensions/rate/names in browser. Smoke clicks are not human annotations.
+- [ ] Validate variable-frame-rate/source timing and connect exported references to endpoint detector scoring.
+
 ## Annotated video reference seek boundary
 
 - [x] Handle small positive frame-zero timestamps without waiting on a `seeked` event that will not fire.

@@ -73,6 +73,12 @@ Local files: `/private/tmp/hardhit-evaluate-cricket.py`, `/private/tmp/hardhit-c
 
 Next evidence needed remains representative full-body/actual-bat footage and live review of the corrected posture. The public single-stroke sample can support later bat experiments but does not close those gates. Physical-bat inference and camera scoring remain unimplemented.
 
+## Local bat keypoint annotation tool
+
+`scripts/bat-annotator.html` opens as a local static page. Select a clip, enter its nominal frame rate, set a frame stride, and click the bat points in order: handle top, splice, blade middle, toe. Press Enter to save the frame; A/D or arrow keys move by the selected stride. Export produces a JSON file with source dimensions, declared frame rate, frame index/time, and named normalized points. Video remains in the browser tab and is not uploaded. The exporter was exercised in headless Chromium with the local Pexels clip: frame-zero load, four clicks, save, and downloaded JSON checks passed at 1080×1920/30 fps with all four names and no browser errors. This verifies tool operation only; the clicks were synthetic and do not constitute human bat labels.
+
+The frame index is calculated from a user-entered nominal FPS, and the video is seeked by time. Variable-frame-rate sources or inaccurate FPS declarations can therefore mislabel frame indices/times; verify source timing and annotate decoded frames consistently before using the references for accuracy claims. The tool is not yet connected to a detector scorer. Keep source footage and exports outside the repository.
+
 ## Reference-harness frame-zero seek fix
 
 The annotated pose browser harness now skips a seek when the video is already within one 30 fps frame of the requested time. This avoids waiting forever for `seeked` when a tiny positive time (for example 0.0001 s) is clamped to the current 0 s position. After an actual seek, it checks the resulting `currentTime` against the requested time. A real-worker run at 0.0001 s on the existing synthetic smoke reference processed one frame and passed its deliberately loose 1000-pixel tolerance. This verifies the harness boundary only; it is not pose accuracy evidence. The requested time is still a media-time position, not a measured exposure timestamp.

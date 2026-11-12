@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Local cricket bat annotation</title>
+<style>
+body{font:16px system-ui;max-width:1000px;margin:1rem auto;padding:0 1rem;background:#121820;color:#f2f4f7}button,input{font:inherit;margin:.25rem;padding:.45rem}#stage{position:relative;max-width:100%;width:max-content}canvas{display:block;max-width:100%;max-height:72vh;background:#000}#view{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}.muted{color:#b9c2cc}
+</style>
+<h1>Cricket bat keypoint annotations</h1>
+<p>Select a local clip and enter its nominal frame rate. At each sampled frame, click handle top, splice, blade middle, then toe. Use A/D to step, Enter to save, and export JSON. All processing stays in this browser tab. Variable-frame-rate clips may need frame times checked against the source.</p>
+<input id="file" type="file" accept="video/*">
+<label>Source fps <input id="fps" type="number" value="30" min="1" max="240" step="0.001" style="width:5rem"></label>
+<label>Sample every <input id="stride" type="number" value="5" min="1" max="120" style="width:4rem"> frames</label>
+<button id="load">Load clip</button> <button id="export" disabled>Export annotations</button>
+<p id="status" class="muted">Choose a clip to begin.</p>
+<div id="stage"><video id="video" hidden></video><canvas id="frame"></canvas><canvas id="view"></canvas></div>
+<script type="module">
+const file=document.querySelector('#file'),video=document.querySelector('#video'),canvas=document.querySelector('#frame'),view=document.querySelector('#view'),ctx=canvas.getContext('2d'),overlay=view.getContext('2d'),status=document.querySelector('#status');
+let url=null,points=[],annotations=[],frameNo=0,frameRate=30;
+const names=['handle-top','splice','blade-middle','toe'];
+function draw(){if(!video.videoWidth)return;canvas.width=video.videoWidth;canvas.height=video.videoHeight;view.width=canvas.width;view.height=canvas.height;ctx.drawImage(video,0,0);overlay.clearRect(0,0,view.width,view.height);overlay.fillStyle='#ff5b5b';overlay.strokeStyle='#ff5b5b';overlay.lineWidth=Math.max(3,canvas.width/300);points.forEach((p,i)=>{overlay.beginPath();overlay.arc(p.x*view.width,p.y*view.height,canvas.width/120,0,Math.PI*2);overlay.fill();overlay.fillText(names[i],p.x*view.width+8,p.y*view.height-8);if(i){overlay.beginPath();overlay.moveTo(points[i-1].x*view.width,points[i-1].y*view.height);overlay.lineTo(p.x*view.width,p.y*view.height);overlay.stroke();}});status.textContent=`Frame ${frameNo} · ${(frameNo/frameRate).toFixed(3)} s · ${points.length}/4 points${points.length<4?` · click ${names[points.length]}`:''} · saved ${annotations.length}`;}
+async function seek(n){frameNo=Math.max(0,n);const target=Math.min(frameNo/frameRate,Math.max(0,video.duration-0.001));if(Math.abs(video.currentTime-target)>1/60)await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Frame seek timed out')),5000);video.onseeked=()=>{clearTimeout(timer);resolve();};video.onerror=()=>{clearTimeout(timer);reject(Error('Could not decode this frame'));};video.currentTime=target;});points=[];draw();}
+document.querySelector('#load').onclick=async()=>{if(!file.files[0])return;frameRate=Number(document.querySelector('#fps').value);if(!Number.isFinite(frameRate)||frameRate<=0){status.textContent='Enter the source clip frame rate.';return;}if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(file.files[0]);video.src=url;video.muted=true;await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=reject;});annotations=[];frameNo=0;document.querySelector('#export').disabled=false;await seek(0);};
+view.onclick=e=>{if(points.length>=4)return;const r=view.getBoundingClientRect();points.push({x:Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),y:Math.min(1,Math.max(0,(e.clientY-r.top)/r.height))});draw();};
+document.querySelector('#export').onclick=()=>{const data={version:1,annotationSource:'manual',keypoints:names,width:video.videoWidth,height:video.videoHeight,frameRate,sourceName:file.files[0]?.name,frames:annotations};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='bat-keypoint-reference.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
+addEventListener('keydown',async e=>{if(e.key==='d'||e.key==='ArrowRight')await seek(frameNo+Number(document.querySelector('#stride').value));if(e.key==='a'||e.key==='ArrowLeft')await seek(frameNo-Number(document.querySelector('#stride').value));if(e.key==='Enter'&&points.length===4){annotations.push({frame:frameNo,time:frameNo/frameRate,points:points.map((p,i)=>({...p,name:names[i]}))});await seek(frameNo+Number(document.querySelector('#stride').value));}});
+</script>
