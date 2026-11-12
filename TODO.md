@@ -41,6 +41,11 @@
 - [x] Test schema, tolerance boundaries and incomplete predictions; integrate with `npm test` (129 passing).
 - [ ] Connect a real endpoint-capable detector and evaluate on independently annotated varied footage.
 
+## High-frame-rate bat annotation
+
+- [x] Avoid skipping distinct 120 fps frame steps with a fixed 1/60-second seek tolerance; verify changed canvas, media time and exported nominal frame/time in browser.
+- [ ] Validate exact decoded-frame timing for variable-frame-rate sources before treating references as frame-accurate.
+
 ## Local bat keypoint annotation
 
 - [x] Add an offline browser tool for four named bat points and sampled-frame JSON export with explicit nominal FPS.
