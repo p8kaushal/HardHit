@@ -54,6 +54,8 @@ export class Playzone {
   private poseCalibrated = false;
   private poseAnimationUntil = 0;
   private poseWatchdog: number | null = null;
+  private calibrationTimer: number | null = null;
+  private poseLandmarksAt = -Infinity;
   private previousBotTrigger: (() => void) | null = null;
   private bowlingPointerId: number | null = null;
   private bowlingKey: string | null = null;
@@ -67,6 +69,7 @@ export class Playzone {
       get<HTMLElement>('playzone-pose-status').textContent = message;
       get<HTMLButtonElement>('playzone-pose-toggle').textContent = state === 'loading' ? 'Cancel pose tracking' : state === 'tracking' ? 'Stop pose tracking' : 'Start pose tracking';
       this.scene.setTrackingBatVisible(state !== 'tracking');
+      if (state !== 'tracking' && this.calibrationTimer !== null) this.resetPoseMovement('Delayed calibration cancelled. Start pose tracking and try again.');
       if (state !== 'tracking' && this.poseTrackingActive) { this.handMotionIntensity.reset(); this.intensityNotice = null; }
       this.poseTrackingActive = state === 'tracking';
       this.renderIntensityControls();
@@ -102,13 +105,8 @@ export class Playzone {
     for (const sample of ['gentle', 'strong'] as const) {
       get<HTMLButtonElement>(`playzone-intensity-${sample}`).addEventListener('click', () => this.startIntensitySample(sample));
     }
-    get<HTMLButtonElement>('playzone-pose-calibrate').addEventListener('click', () => {
-      const mirror = get<HTMLInputElement>('playzone-pose-mirror').checked;
-      this.resetPoseMovement('Calibrating movement.');
-      this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks);
-      get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? 'Calibrated! Your current stance is the reference. Move to control the character.' : 'Could not calibrate. Start pose tracking and show both shoulders and hips to the camera, then try again.';
-      if (this.poseCalibrated) this.updatePoseMovement(this.poseLandmarks, this.poseWorldLandmarks);
-    });
+    get<HTMLButtonElement>('playzone-pose-calibrate').addEventListener('click', () => this.calibratePose(false));
+    get<HTMLButtonElement>('playzone-pose-calibrate-delay').addEventListener('click', () => this.startDelayedCalibration());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.cameraPreview.stop('Camera stopped while the page was hidden.'); });
     window.addEventListener('pagehide', () => this.cameraPreview.stop());
     this.touchControls = new TouchBattingControls(get<HTMLElement>('practice-stick'), document.querySelectorAll<HTMLButtonElement>('[data-practice-shot]'), (direction, type) => {
@@ -449,6 +447,9 @@ export class Playzone {
   }
 
   private resetPoseMovement(message: string): void {
+    if (this.calibrationTimer !== null) window.clearInterval(this.calibrationTimer);
+    this.calibrationTimer = null;
+    get<HTMLButtonElement>('playzone-pose-calibrate-delay').textContent = 'Calibrate in 5 seconds';
     if (this.poseWatchdog !== null) window.clearTimeout(this.poseWatchdog);
     this.poseWatchdog = null;
     const wasCalibrated = this.poseCalibrated;
@@ -456,6 +457,32 @@ export class Playzone {
     this.poseRetarget.reset();
     if (wasCalibrated) this.scene.setBatterHandedness(this.batter.batterHand ?? 'RHB');
     get<HTMLElement>('playzone-retarget-status').textContent = message;
+  }
+
+  private calibratePose(requireFullBody: boolean): void {
+    const mirror = get<HTMLInputElement>('playzone-pose-mirror').checked;
+    this.resetPoseMovement('Calibrating movement.');
+    const fullBody = [0, 11, 12, 23, 24, 27, 28, 31, 32].every(index => {
+      const point = this.poseLandmarks[index];
+      return point && Number.isFinite(point.x) && Number.isFinite(point.y) && (point.visibility ?? 0) >= .45 && point.x > .02 && point.x < .98 && point.y > .02 && point.y < .98;
+    });
+    const fresh = performance.now() - this.poseLandmarksAt <= 500;
+    this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && (!requireFullBody || (fullBody && fresh)) && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks);
+    get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? 'Calibrated! Your current stance is the reference. Move to control the character.' : requireFullBody ? 'Could not calibrate. Stand upright facing the camera with your head and feet visible, then try again.' : 'Could not calibrate. Start pose tracking and show both shoulders and hips to the camera, then try again.';
+    if (this.poseCalibrated) this.updatePoseMovement(this.poseLandmarks, this.poseWorldLandmarks);
+  }
+
+  private startDelayedCalibration(): void {
+    if (this.calibrationTimer !== null) { this.resetPoseMovement('Delayed calibration cancelled.'); return; }
+    if (!this.active || this.mode === 'bowling' || !this.poseTrackingActive) { this.resetPoseMovement('Start pose tracking before delayed calibration.'); return; }
+    this.resetPoseMovement('Stand upright facing the camera with your whole body visible. Calibrating in 5 seconds.');
+    get<HTMLButtonElement>('playzone-pose-calibrate-delay').textContent = 'Cancel delayed calibration';
+    let seconds = 5;
+    this.calibrationTimer = window.setInterval(() => {
+      seconds--;
+      if (seconds === 0) this.calibratePose(true);
+      else get<HTMLElement>('playzone-retarget-status').textContent = `Stand upright facing the camera with your whole body visible. Calibrating in ${seconds} seconds.`;
+    }, 1000);
   }
 
   private resetHandMotion(message?: string): void {
@@ -548,6 +575,7 @@ export class Playzone {
     this.poseWatchdog = null;
     this.poseLandmarks = landmarks;
     this.poseWorldLandmarks = world;
+    this.poseLandmarksAt = landmarks.length ? performance.now() : -Infinity;
     if (!this.poseCalibrated) return;
     this.poseWatchdog = window.setTimeout(() => {
       this.poseWatchdog = null;

@@ -1,5 +1,12 @@
 # Gameplay to-do
 
+## Delayed full-body calibration from the November 12 recording
+
+- [x] Add a cancellable delayed calibration so a player can step away from the computer and stand upright before the reference is captured.
+- [x] Require fresh, visible full-body landmarks for delayed calibration and cancel safely when tracking or the session ends.
+- [x] Verify countdown, full-body rejection, cancellation, successful calibration and practice lifecycle; document the recording's limitations.
+- [ ] Review the excessive model lean with a live full-body calibration; the recording does not prove the cause.
+
 ## Limb directions with invalid depth
 
 - [x] Fall back to a complete screen-coordinate pair when either world landmark for a limb direction is invalid.

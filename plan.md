@@ -1,5 +1,11 @@
 # HardHit project plan index
 
+## Delayed full-body calibration from the November 12 recording
+
+The recording shows full-body movement with a strongly hunched character while the player is mostly upright, and the player approaches the computer to operate controls. A cancellable five-second calibration now allows stepping back before capturing the reference and requires recent visible head, shoulders, hips, ankles and toe landmarks. Stopping tracking or changing mode cancels the countdown. The existing immediate calibration remains available. The recording does not establish whether calibration is the sole cause of the posture mismatch; live review remains necessary.
+
+A cropped, mirrored-back section of the supplied screen recording was replayed locally through the pose worker and rig: both feet were visible in 131 processed frames, and all twelve limb segments were exercised with 8,279 confident rendered target comparisons and no mismatches over the 10-degree tolerance. An earlier seek position failed calibration; a later position passed. The source already has pose overlays and another person enters the scene, so the clip is not independent ground truth and cannot establish real-world accuracy. The recording stays outside the repository. Verified with 120 unit tests, production build and the camera browser regression covering the countdown, missing-body rejection, successful capture and cancellation. A browser test initially raced a fresh result after restart; after waiting for visible landmarks the rerun passed.
+
 ## Limb directions with invalid depth
 
 Rendered limb direction calculations now fall back to a complete screen-coordinate pair when either world landmark is missing or non-finite, rather than treating a visible limb as lost. The 2D and 3D estimates can still differ. Verified with 120 unit tests including mirrored arm and foot cases and recovery, production build and camera browser regression. Actual foot fidelity remains unverified on full-body camera footage.
