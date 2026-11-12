@@ -156,6 +156,14 @@ try {
   await page.click('#playzone-pose-calibrate');
   assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Calibrated!/);
   await page.waitForFunction(() => window.__poseFacing === 0 && window.__poseScene);
+  await page.waitForFunction(() => {
+    const scene = window.__poseScene.scene;
+    const spine = scene.getTransformNodeByName('Spine'), left = scene.getTransformNodeByName('LeftArm'), right = scene.getTransformNodeByName('RightArm');
+    if (!spine || !left || !right) return false;
+    spine.computeWorldMatrix(true); left.computeWorldMatrix(true); right.computeWorldMatrix(true);
+    const torso = left.getAbsolutePosition().add(right.getAbsolutePosition()).scale(.5).subtract(spine.getAbsolutePosition()).normalize();
+    return torso.y > .99999;
+  }, { timeout: 5000 });
   await page.waitForFunction(limbsFollowTargets);
   assert.equal(await page.evaluate(() => window.__poseScene.scene.getTransformNodeByName('batPivot').isEnabled()), false, 'bat should be hidden during pose tracking');
   await page.click('#playzone-pose-xray');

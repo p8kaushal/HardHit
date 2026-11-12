@@ -1,5 +1,9 @@
 # HardHit project plan index
 
+## Correct torso straightening pivot
+
+The skinned rig straightens the model by rotating its spine, but previously calculated that correction using a hips-to-shoulders vector. It now measures from the actual spine pivot to the shoulders. A browser regression checks the rendered spine-to-shoulder direction after neutral calibration; the stricter check failed with the previous pivot and passed with the correction. Synthetic bend and camera lifecycle checks also passed, as did 120 unit tests and production build. The user's full-body replay passed with all segments exercised. Two separate replay runs showed a modest reduction in average model lean during frames whose 2D torso appeared upright, but their samples differ, the recorded preview has overlays, and image-plane posture is not 3D ground truth. Live review remains necessary. One full browser run timed out later in the hand-intensity check; an isolated rerun passed.
+
 ## Delayed full-body calibration from the November 12 recording
 
 The recording shows full-body movement with a strongly hunched character while the player is mostly upright, and the player approaches the computer to operate controls. A cancellable five-second calibration now allows stepping back before capturing the reference and requires recent visible head, shoulders, hips, ankles and toe landmarks. Stopping tracking or changing mode cancels the countdown. The existing immediate calibration remains available. The recording does not establish whether calibration is the sole cause of the posture mismatch; live review remains necessary.

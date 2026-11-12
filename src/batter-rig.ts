@@ -211,11 +211,11 @@ export class BatterRig {
           }
         }
         if (this.trackingPose && this.pendingFacingAlignment && this.modelFacing) {
-          const hips = nodes.get('Hips'), spineNode = nodes.get('Spine');
-          if (hips && spineNode && !this.trackingSpineCorrection) {
-            hips.computeWorldMatrix(true); leftArm.computeWorldMatrix(true); rightArm.computeWorldMatrix(true);
+          const spineNode = nodes.get('Spine');
+          if (spineNode && !this.trackingSpineCorrection) {
+            spineNode.computeWorldMatrix(true); leftArm.computeWorldMatrix(true); rightArm.computeWorldMatrix(true);
             const shoulderCenter = leftArm.getAbsolutePosition().add(rightArm.getAbsolutePosition()).scale(.5);
-            const torso = shoulderCenter.subtract(hips.getAbsolutePosition());
+            const torso = shoulderCenter.subtract(spineNode.getAbsolutePosition());
             if (torso.length() > .05) {
               const worldCorrection = new BABYLON.Quaternion();
               BABYLON.Quaternion.FromUnitVectorsToRef(torso.normalize(), BABYLON.Axis.Y, worldCorrection);

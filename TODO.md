@@ -1,5 +1,11 @@
 # Gameplay to-do
 
+## Investigate torso straightening pivot
+
+- [x] Check whether the skinned rig's upright correction uses the actual spine pivot, and verify the rendered torso after calibration.
+- [x] Compare recorded-motion replay, synthetic bending and existing camera lifecycle before committing any correction.
+- [ ] Review the corrected posture and bending with a live full-body camera; 2D preview landmarks do not establish 3D torso angle.
+
 ## Delayed full-body calibration from the November 12 recording
 
 - [x] Add a cancellable delayed calibration so a player can step away from the computer and stand upright before the reference is captured.
