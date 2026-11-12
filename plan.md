@@ -1,10 +1,16 @@
 # HardHit project plan index
 
+## Local recorded camera-motion replay
+
+Added `scripts/browser-pose-replay.mjs`, which accepts an explicitly supplied pre-cropped camera-view WebM and optional seek time. It feeds changing frames through the real pose worker and calibrated character, checks finite poses and rendered X-ray joint positions, verifies that movement occurs without scoring or changing saved progression, and confirms camera and X-ray cleanup on exit. It prints aggregate counts only; recordings and extracted clips remain outside the repository.
+
+Two final isolated runs using a locally cropped, mirrored-back section of the user's screen recording passed. The later run processed 146 person frames and 727 rig samples, with finite outputs and no measured X-ray marker mismatch; both feet were visible in zero frames. The input already contained preview overlays and is not independently annotated ground truth, so it does not establish movement accuracy or validate feet. An earlier run timed out around a server restart; the cause is unconfirmed. The harness now provides playback diagnostics on timeout, and both subsequent runs passed.
+
 ## Camera movement: hands, feet, head and confidence
 
 The user requested a larger movement increment before live testing and asked for a focused commit after each verified stage. The skinned rig now uses visible wrist-to-index and ankle-to-toe landmarks for approximate hand and foot direction; short occlusion holds the last direction before falling back. When both ears are usable, an approximate head turn is calculated relative to body facing, with mirrored handling and occlusion fallback. The X-ray adds index and toe model points where the skinned model provides them, and colors markers green for visible corresponding camera landmarks or amber when uncertain/not tracked. The fallback figure has no separate finger or toe endpoints. This does not provide detailed finger articulation, reliable palm roll, gaze tracking, physical bat tracking or automatic batting.
 
-Verified: 116 unit tests, production build, development camera browser test (including all twelve limb/hand/foot directions, mirrored inputs, head movement and X-ray confidence), playzone/fallback regression, bowling-practice regression, production camera preview and full-match checks. A local recorded-camera replay is being added separately. Actual-camera hand, foot and head fidelity, particularly side-on and occluded poses, remains open.
+Verified: 116 unit tests, production build, development camera browser test (including all twelve limb/hand/foot directions, mirrored inputs, head movement and X-ray confidence), playzone/fallback regression, bowling-practice regression, production camera preview and full-match checks. See the separate recorded-camera replay above. Actual-camera hand, foot and head fidelity, particularly side-on and occluded poses, remains open.
 
 The older camera/practice work accumulated before the user's commit request and is captured as a consolidated verified baseline rather than represented as a sequence of historical stage commits. Future verified increments should be committed separately. Preserve the existing workspace and keep recordings outside the repository.
 

@@ -10,9 +10,10 @@
 
 ## Recorded camera-motion replay
 
-- [ ] Add an explicit local replay check for a user-supplied, pre-cropped camera clip without adding recordings or pose data to the repository.
-- [ ] Exercise the real pose worker, calibrated rig and X-ray over changing video frames; verify finite output, camera cleanup and practice isolation.
-- [ ] Record the replay scope and limitations, including that a screen-recorded preview is not a ground-truth motion fixture.
+- [x] Add an explicit local replay check for a user-supplied, pre-cropped camera clip without adding recordings or pose data to the repository.
+- [x] Exercise the real pose worker, calibrated rig and X-ray over changing video frames; verify finite output, camera cleanup and practice isolation.
+- [x] Record the replay scope and limitations, including that a screen-recorded preview is not a ground-truth motion fixture.
+- [ ] Validate against independently annotated full-body camera footage when available, including feet, side-on movement and timing.
 
 ## Camera movement: independent head turning
 
