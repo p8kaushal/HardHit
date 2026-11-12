@@ -85,6 +85,11 @@
 - [x] Verify preprocessing and labels, benchmark actual annotated bat frames with box overlap and positive controls, and assess browser feasibility.
 - [x] Document evidence and any implementation limits, commit the increment, and continue unblocked camera work without treating live tests as approval gates. Positive control passed; 15/23 bat detections and 2/23 IoU ≥0.5 matches are insufficient for runtime selection.
 
+## Second public bat clip
+
+- [x] Inspect a second differently framed 120 fps cricket clip and run a six-frame detector smoke locally. No bat boxes were emitted; this is unannotated and not accuracy evidence.
+- [ ] Obtain independent bat endpoint labels across this and more varied clips, including negative/occluded frames, before model evaluation.
+
 ## Bat-corner and toe model leads
 
 - [x] Inspect the public cricket bat corner repository notebook and dataset semantics; the available training code is whole-bat object detection, not established endpoint output. Checkpoint and license remain unverified.
