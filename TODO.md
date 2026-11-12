@@ -24,6 +24,11 @@
 - [x] Validate dimensions, exact reference frame index/time and ordered point names before scoring a prediction file.
 - [x] Verify mismatch/coverage behavior in unit tests and synthetic local CLI smoke; 130 tests pass. No detector accuracy is implied.
 
+## Bat-hand association sensitivity
+
+- [x] Run the actual association function against human handle annotations and real pose-worker output on 23 public-stroke frames, including shifted-handle synthetic negatives; record coverage and limitations.
+- [ ] Evaluate varied real users, independent negative examples and actual detector output before choosing thresholds or integrating gameplay.
+
 ## Bat-to-hand association foundation
 
 - [x] Add a pure aspect-corrected association check requiring independently observed handle points, both wrists and caller-supplied thresholds; verify geometry and uncertainty rejection.
