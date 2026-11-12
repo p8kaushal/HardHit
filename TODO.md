@@ -101,6 +101,11 @@
 - [x] Inspect the public cricket bat corner repository notebook and dataset semantics; the available training code is whole-bat object detection, not established endpoint output. Checkpoint and license remain unverified.
 - [ ] Inspect the separately indexed bat-toe dataset/model when its metadata is accessible; confirm labels, rights, local model availability and independent endpoint accuracy before selection.
 
+## Spatial heatmap keypoint feasibility
+
+- [x] Evaluate a pretrained spatial heatmap prototype on the same gapped temporal split. It improved error but placed all four points within 50 pixels on 0/64 holdout frames; no runtime model selected.
+- [ ] Obtain diverse independently labeled data and assess stronger endpoint models and real camera performance.
+
 ## Fine-tuned keypoint feasibility
 
 - [x] Evaluate one fixed fine-tuned four-point model on the same gapped temporal split. It improved on a constant baseline but had 0/64 holdout frames with all points within 50 pixels; no runtime model selected.
