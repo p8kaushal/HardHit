@@ -19,6 +19,12 @@
 - [x] Test malformed references, real pixel/aspect errors, missing/uncertain results, coverage and actual browser operation, then commit. 126 tests and build passed; synthetic browser smoke passed and a strict-tolerance browser fixture failed as expected.
 - [ ] Run independent human annotations; synthetic smoke references and prior overlaid recordings do not establish accuracy.
 
+## Cricket-specific checkpoint evaluation
+
+- [x] Inspect and load the available checkpoint through restricted deserialization in an isolated temporary environment.
+- [x] Verify preprocessing and labels, benchmark actual annotated bat frames with box overlap and positive controls, and assess browser feasibility.
+- [x] Document evidence and any implementation limits, commit the increment, and continue unblocked camera work without treating live tests as approval gates. Positive control passed; 15/23 bat detections and 2/23 IoU ≥0.5 matches are insufficient for runtime selection.
+
 ## Real-bat detector candidate investigation
 
 - [x] Inspect public bat-keypoint annotations and source video for usable local evidence, licensing and alignment.
