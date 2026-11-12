@@ -227,6 +227,26 @@ test('pose retarget calibration responds to motion and rejects occlusion', () =>
   assert.ok(Vector3.Dot(segmentTracker.getDirections().leftShoulder!, expected) > .99, 'limb targets should preserve 3D direction');
 });
 
+test('partial world landmarks never mix screen and world coordinates in an angle', () => {
+  const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, z: 0, visibility: 1 }));
+  for (const [index, x, y] of [[0,.5,.1],[11,.35,.25],[12,.65,.25],[13,.3,.4],[14,.7,.4],[15,.25,.55],[16,.75,.55],[23,.4,.55],[24,.6,.55],[25,.39,.7],[26,.61,.7],[27,.38,.85],[28,.62,.85]] as const) points[index] = { x, y, z: 0, visibility: 1 };
+  for (const mirror of [false, true]) {
+    const tracker = new PoseRetarget();
+    assert.equal(tracker.calibrate(points, mirror, [], 1000), true);
+    const partial = points.map(p => ({ ...p, x: p.x * 3 + 4, y: p.y * 3 - 2, z: 5 }));
+    partial[13] = undefined as unknown as typeof partial[number];
+    const result = tracker.update(points, mirror, partial, 1100)!;
+    const elbow = mirror ? result.rightElbow! : result.leftElbow!;
+    assert.ok(Math.abs(elbow.x) < 1e-8 && Math.abs(elbow.z) < 1e-8, 'missing depth must use screen coordinates for the entire limb angle');
+    const missingTorso = points.map(p => ({ ...p, x: p.x * 3 + 4, y: p.y * 3 - 2, z: 5 }));
+    missingTorso[11].x = NaN;
+    const torso = tracker.update(points, mirror, missingTorso, 1200)!;
+    assert.ok(Math.abs(torso.spine!.x) < 1e-8 && Math.abs(torso.spine!.z) < 1e-8, 'invalid depth must use screen coordinates for the whole torso');
+    const restored = tracker.update(points, mirror, points, 1300)!;
+    assert.ok(Math.abs(restored.spine!.x) < 1e-8 && Math.abs(restored.spine!.z) < 1e-8, 'valid depth can recover');
+  }
+});
+
 test('hand and foot directions hold briefly, then clear when landmarks are occluded', () => {
   const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, z: 0, visibility: 0 }));
   for (const [index, x, y] of [[0,.5,.1],[11,.35,.25],[12,.65,.25],[13,.32,.4],[14,.68,.4],[15,.3,.55],[16,.7,.55],[19,.25,.58],[20,.75,.58],[23,.4,.55],[24,.6,.55],[25,.39,.7],[26,.61,.7],[27,.38,.85],[28,.62,.85],[31,.32,.9],[32,.68,.9]] as const) points[index] = { x, y, z: 0, visibility: 1 };

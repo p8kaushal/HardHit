@@ -1,5 +1,11 @@
 # Gameplay to-do
 
+## Consistent landmark coordinates during partial tracking
+
+- [x] Calculate each body angle in one coordinate space when 3D landmarks are incomplete or invalid.
+- [x] Verify partial depth loss, mirrored poses and recovery, then commit the tested change.
+- [ ] Validate transitions between 2D and 3D estimates on live camera footage; the coordinate systems can still disagree.
+
 ## Recorded replay coverage
 
 - [x] Report direction checks and mismatches separately for every limb segment, including zero-coverage segments.

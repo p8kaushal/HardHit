@@ -1,5 +1,9 @@
 # HardHit project plan index
 
+## Consistent landmark coordinates during partial tracking
+
+Each limb, torso and head angle now uses a complete, finite set of 3D landmarks or falls back to screen coordinates for that entire calculation. This prevents a missing or invalid world landmark from mixing unrelated coordinate spaces in a single angle. Transitions between the two estimates can still cause motion because they are not equivalent. Verified with 117 unit tests (including partial depth loss, mirrored input and recovery), a production build and the camera browser regression. Live-camera behavior remains unverified.
+
 ## Recorded replay coverage
 
 The replay reports confident rendered samples and mismatches for each segment, including zero coverage, and optionally requires selected segments. The user's existing recording passed with both shoulders required (4,609 total comparisons); both lower legs and feet had zero coverage. A separate run requiring the left foot correctly failed for lack of coverage. Counts are render samples, not independent video frames, and agreement with pose-model targets does not establish physical accuracy.

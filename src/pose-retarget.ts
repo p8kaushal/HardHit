@@ -66,25 +66,33 @@ export class PoseRetarget {
   }
   private angles(points: PoseLandmark[], mirror: boolean, world: PoseLandmark[]): (Angles | null)[] {
     const mapped = (index: number) => mirror && index >= 11 && index <= 32 ? (index % 2 ? index + 1 : index - 1) : index;
-    const point = (index: number): PoseLandmark | null => {
-      const i = mapped(index), screen = points[i], p = world[i] ?? screen;
-      return screen && p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z ?? 0) && (screen.visibility ?? 0) >= 0.45 && screen.x > 0 && screen.x < 1 && screen.y > 0 && screen.y < 1 ? { x: p.x * (mirror ? -1 : 1), y: p.y, z: p.z ?? 0 } : null;
+    const group = (indices: number[]): PoseLandmark[] | null => {
+      const mappedIndices = indices.map(mapped);
+      if (!mappedIndices.every(i => { const p = points[i]; return p && Number.isFinite(p.x) && Number.isFinite(p.y) && (p.visibility ?? 0) >= .45 && p.x > 0 && p.x < 1 && p.y > 0 && p.y < 1; })) return null;
+      const valid = (p: PoseLandmark | undefined) => p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z ?? 0);
+      const source = mappedIndices.every(i => valid(world[i])) ? world : points;
+      if (!mappedIndices.every(i => valid(source[i]))) return null;
+      return mappedIndices.map(i => ({ x: source[i].x * (mirror ? -1 : 1), y: source[i].y, z: source[i].z ?? 0 }));
     };
     const direction = (a: PoseLandmark, b: PoseLandmark): Angles => ({ x: Math.atan2((b.z ?? 0) - (a.z ?? 0), b.y - a.y), y: 0, z: Math.atan2(b.x - a.x, b.y - a.y) });
     const values = segments.map(segment => {
-      const a = point(segment.from), b = point(segment.to), parent = segment.parent === undefined ? null : point(segment.parent);
-      if (!a || !b || (segment.parent !== undefined && !parent) || Math.hypot(a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0)) < 0.02) return null;
+      const groupPoints = group(segment.parent === undefined ? [segment.from, segment.to] : [segment.from, segment.to, segment.parent]);
+      if (!groupPoints) return null;
+      const [a, b, parent] = groupPoints;
+      if (Math.hypot(a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0)) < 0.02) return null;
       const value = direction(a, b);
       if (parent) { const p = direction(parent, a); value.x = wrap(value.x - p.x); value.z = wrap(value.z - p.z); }
       return value;
     });
-    const ls = point(11), rs = point(12), lh = point(23), rh = point(24), nose = point(0);
+    const torso = group([11, 12, 23, 24]);
     const mid = (a: PoseLandmark, b: PoseLandmark): PoseLandmark => ({ x: (a.x+b.x)/2, y: (a.y+b.y)/2, z: ((a.z ?? 0)+(b.z ?? 0))/2 });
-    if (ls && rs && lh && rh) {
+    if (torso) {
+      const [ls, rs, lh, rh] = torso;
       const shoulder = mid(ls, rs), hip = mid(lh, rh);
       const lean = direction(shoulder, hip);
       values.push({ x: lean.x, y: Math.atan2((rs.z ?? 0) - (ls.z ?? 0), rs.x - ls.x), z: lean.z });
-      values.push(nose ? direction(nose, shoulder) : null);
+      const head = group([0, 11, 12]);
+      values.push(head ? direction(head[0], mid(head[1], head[2])) : null);
     } else values.push(null, null);
     return values;
   }
