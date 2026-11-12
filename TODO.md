@@ -19,6 +19,11 @@
 - [x] Test malformed references, real pixel/aspect errors, missing/uncertain results, coverage and actual browser operation, then commit. 126 tests and build passed; synthetic browser smoke passed and a strict-tolerance browser fixture failed as expected.
 - [ ] Run independent human annotations; synthetic smoke references and prior overlaid recordings do not establish accuracy.
 
+## Calibration across pause boundaries
+
+- [x] Reject calibration while paused and from landmarks accepted before a pause/resume boundary.
+- [x] Verify pause, resume and fresh-frame recovery in browser, run unit tests and build, and record results.
+
 ## Reject stale immediate calibration
 
 - [x] Run the new freshness regression against the previous implementation as a negative control; it failed at the expected stale-calibration assertion.

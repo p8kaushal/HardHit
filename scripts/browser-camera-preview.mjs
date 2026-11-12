@@ -407,6 +407,16 @@ try {
   await page.evaluate(() => { window.__motionSequence = []; window.__holdMotionFrame = false; });
   await page.evaluate(() => { window.__holdPoseResult = true; window.__releasePoseFrame = null; });
   await page.waitForFunction(() => typeof window.__releasePoseFrame === 'function');
+  await page.evaluate(async () => {
+    const clock = await import('/src/game-clock.ts');
+    clock.setGamePaused(true);
+    document.querySelector('#playzone-pose-calibrate').click();
+    window.__pausedCalibrationStatus = document.querySelector('#playzone-retarget-status').textContent;
+    clock.setGamePaused(false);
+    document.querySelector('#playzone-pose-calibrate').click();
+  });
+  assert.match(await page.evaluate(() => window.__pausedCalibrationStatus), /Could not calibrate/, 'calibration must be rejected while paused');
+  assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Could not calibrate/, 'a pre-pause pose must not calibrate after resume');
   const staleFrame = await page.evaluate(async () => {
     const clock = await import('/src/game-clock.ts');
     clock.setGamePaused(true); clock.setGamePaused(false);

@@ -56,6 +56,7 @@ export class Playzone {
   private poseWatchdog: number | null = null;
   private calibrationTimer: number | null = null;
   private poseLandmarksAt = -Infinity;
+  private poseLandmarksRevision = -1;
   private previousBotTrigger: (() => void) | null = null;
   private bowlingPointerId: number | null = null;
   private bowlingKey: string | null = null;
@@ -472,7 +473,7 @@ export class Playzone {
       return point && Number.isFinite(point.x) && Number.isFinite(point.y) && (point.visibility ?? 0) >= .45 && point.x > .02 && point.x < .98 && point.y > .02 && point.y < .98;
     });
     const age = performance.now() - this.poseLandmarksAt;
-    const fresh = age >= 0 && age <= 500;
+    const fresh = age >= 0 && age <= 500 && !isGamePaused() && this.poseLandmarksRevision === gameClockRevision();
     this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && fresh && (!requireFullBody || fullBody) && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks);
     get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? 'Calibrated! Your current stance is the reference. Move to control the character.' : !fresh ? 'Could not calibrate. Wait for a fresh tracked pose, then try again.' : requireFullBody ? 'Could not calibrate. Stand upright facing the camera with your head and feet visible, then try again.' : 'Could not calibrate. Start pose tracking and show both shoulders and hips to the camera, then try again.';
     if (this.poseCalibrated) this.updatePoseMovement(this.poseLandmarks, this.poseWorldLandmarks, this.poseLandmarksAt);
@@ -582,6 +583,7 @@ export class Playzone {
     this.poseLandmarks = landmarks;
     this.poseWorldLandmarks = world;
     this.poseLandmarksAt = landmarks.length && Number.isFinite(frameSubmittedAt) ? frameSubmittedAt : -Infinity;
+    this.poseLandmarksRevision = landmarks.length ? gameClockRevision() : -1;
     if (!this.poseCalibrated) return;
     this.poseWatchdog = window.setTimeout(() => {
       this.poseWatchdog = null;
