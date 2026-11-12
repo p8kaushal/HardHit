@@ -19,6 +19,11 @@
 - [x] Test malformed references, real pixel/aspect errors, missing/uncertain results, coverage and actual browser operation, then commit. 126 tests and build passed; synthetic browser smoke passed and a strict-tolerance browser fixture failed as expected.
 - [ ] Run independent human annotations; synthetic smoke references and prior overlaid recordings do not establish accuracy.
 
+## Bat-to-hands association feasibility
+
+- [x] Measure real pose-worker wrists against the public annotated bat handle on exact indexed frames and record missing-wrist coverage. The single side-on stroke showed a wide distance spread and eight frames missing one wrist.
+- [x] Record limits: annotated handle is an oracle, wrist estimates are not ground truth, and this evidence does not support a calibrated two-hand rule or endpoint detection. Continue model investigation.
+
 ## Interrupted pose overlay
 
 - [x] Clear the previous skeleton and report interruption when a pose result crosses a pause boundary.
