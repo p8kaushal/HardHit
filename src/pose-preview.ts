@@ -1,5 +1,6 @@
 import type { PoseLandmark as Landmark } from './pose-retarget';
 import { gameClockRevision, isGamePaused } from './game-clock';
+import { PosePerformance, type PosePerformanceSnapshot } from './pose-performance';
 type PoseState = 'idle' | 'loading' | 'tracking' | 'error';
 type WorkerMessage = { type: 'ready' } | { type: 'error'; detail: string } | { type: 'result'; landmarks: Landmark[]; worldLandmarks: Landmark[]; timestamp: number };
 
@@ -17,8 +18,10 @@ export class PosePreview {
   private state: PoseState = 'idle';
   private lastMessage = '';
   private frameRevision = 0;
+  private readonly performanceStats = new PosePerformance();
+  private lastStatsAt = -Infinity;
 
-  constructor(private readonly video: HTMLVideoElement, private readonly canvas: HTMLCanvasElement, private readonly render: (state: PoseState, message: string) => void, private readonly onLandmarks: (landmarks: Landmark[], worldLandmarks: Landmark[], timestamp: number) => void = () => {}) {
+  constructor(private readonly video: HTMLVideoElement, private readonly canvas: HTMLCanvasElement, private readonly render: (state: PoseState, message: string) => void, private readonly onLandmarks: (landmarks: Landmark[], worldLandmarks: Landmark[], timestamp: number) => void = () => {}, private readonly onPerformance: (snapshot: PosePerformanceSnapshot | null) => void = () => {}) {
     this.show('idle', 'Pose tracking is off.');
   }
 
@@ -57,22 +60,31 @@ export class PosePreview {
           return;
         }
         if (event.data.type === 'ready') {
+          this.performanceStats.reset(performance.now());
+          this.lastStatsAt = -Infinity;
           this.show('tracking', 'Looking for a person…');
           this.canvas.hidden = false;
           this.frameRequest = requestAnimationFrame(now => this.tick(now, generation));
           return;
         }
         this.busy = false;
+        const receivedAt = performance.now();
         if (this.frameRevision !== gameClockRevision() || isGamePaused()) {
+          this.performanceStats.record(this.lastFrameAt, receivedAt, 'interrupted');
+          this.reportPerformance(receivedAt, true);
           this.onLandmarks([], [], NaN);
           return;
         }
-        if (performance.now() - this.lastFrameAt > 500) {
+        if (receivedAt - this.lastFrameAt > 500) {
+          this.performanceStats.record(this.lastFrameAt, receivedAt, 'delayed');
+          this.reportPerformance(receivedAt, true);
           this.onLandmarks([], [], NaN);
           this.draw([]);
           this.show('tracking', 'Pose tracking is delayed. Improve lighting or close other apps.');
           return;
         }
+        this.performanceStats.record(this.lastFrameAt, receivedAt, 'accepted');
+        this.reportPerformance(receivedAt);
         this.onLandmarks(event.data.landmarks, event.data.worldLandmarks ?? [], event.data.timestamp);
         this.draw(event.data.landmarks);
       };
@@ -86,6 +98,7 @@ export class PosePreview {
   private tick(now: number, generation: number): void {
     if (generation !== this.generation || !this.worker) return;
     this.frameRequest = requestAnimationFrame(next => this.tick(next, generation));
+    this.reportPerformance(now);
     if (this.busy || isGamePaused() || now - this.lastFrameAt < 1000 / 15 || this.video.readyState < 2 || this.video.currentTime === this.lastVideoTime) return;
     this.busy = true;
     const frameRevision = this.frameRevision = gameClockRevision();
@@ -95,6 +108,12 @@ export class PosePreview {
       if (generation !== this.generation || !this.worker || frameRevision !== gameClockRevision() || isGamePaused()) { bitmap.close(); if (generation === this.generation) this.busy = false; return; }
       this.worker.postMessage({ type: 'frame', bitmap, timestamp: now }, [bitmap]);
     }).catch(() => { if (generation === this.generation) this.stop('Camera frames could not be read. Try restarting pose tracking.', true); });
+  }
+
+  private reportPerformance(now: number, force = false): void {
+    if (!force && now - this.lastStatsAt < 1000) return;
+    this.lastStatsAt = now;
+    this.onPerformance(this.performanceStats.snapshot(now));
   }
 
   private draw(landmarks: Landmark[]): void {
@@ -134,6 +153,9 @@ export class PosePreview {
     this.busy = false;
     this.lastFrameAt = 0;
     this.lastVideoTime = -1;
+    this.performanceStats.reset();
+    this.lastStatsAt = -Infinity;
+    this.onPerformance(null);
     this.canvas.getContext('2d')?.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.canvas.hidden = true;
     this.onLandmarks([], [], NaN);

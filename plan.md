@@ -1,5 +1,15 @@
 # HardHit project plan index
 
+## Active camera-batting goal — November 12, 2026
+
+The user explicitly authorized autonomous implementation of the whole camera-batting feature with no personal approval between stages or phases. This supersedes historical stage-review stop instructions below. Keep working on `feature/camera-batting`, preserve unrelated changes, record scope and acceptance before code changes, and commit each verified increment. Merge and public deployment still require separate authorization. Stop only for necessary user input, physical validation or external access; keep independent work moving while those are pending.
+
+Remaining sequence: make tracking performance observable; validate and refine calibrated full-body motion; implement and independently validate physical-bat tracking and two-hand constraints; calibrate swing events and shot type, field direction, strength and timing; integrate an explicitly enabled practice camera-input path with timestamp and delivery lifecycle protection; then integrate match camera control after practice verification. Treat hand-only diagnostics as hand motion, never physical bat measurements. Real-camera/device accuracy gates stay open until measured.
+
+### Verified increment: camera performance feedback
+
+Expose a rolling accepted-result rate, recent frame-submission-to-result round-trip time, and session rejection counts, without storing video or landmarks. Reset on tracking restart/stop and distinguish pause rejection from slow results. Verify rolling-window expiry, timestamps, resets, delayed-frame rejection and camera lifecycle with unit/build/browser checks. These measurements exclude camera exposure and display latency and must not be called end-to-end latency. Implemented and verified with 122 unit tests, production build and development/production camera browser regressions, including nonzero interrupted/delayed counts and stop/restart reset. The sandbox initially prevented localhost binding; the authorized browser runs outside the sandbox passed. Actual-device rates and end-to-end latency remain unmeasured.
+
 ## Correct torso straightening pivot
 
 The skinned rig straightens the model by rotating its spine, but previously calculated that correction using a hips-to-shoulders vector. It now measures from the actual spine pivot to the shoulders. A browser regression checks the rendered spine-to-shoulder direction after neutral calibration; the stricter check failed with the previous pivot and passed with the correction. Synthetic bend and camera lifecycle checks also passed, as did 120 unit tests and production build. The user's full-body replay passed with all segments exercised. Two separate replay runs showed a modest reduction in average model lean during frames whose 2D torso appeared upright, but their samples differ, the recorded preview has overlays, and image-plane posture is not 3D ground truth. Live review remains necessary. One full browser run timed out later in the hand-intensity check; an isolated rerun passed.

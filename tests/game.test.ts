@@ -6,6 +6,7 @@ import { PoseRetarget } from '../src/pose-retarget';
 import { describeHandDirection, HandMotionPreview } from '../src/hand-motion';
 import { compareHandMotionTiming } from '../src/hand-motion-timing';
 import { HandMotionIntensity } from '../src/hand-motion-intensity';
+import { PosePerformance } from '../src/pose-performance';
 import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
@@ -34,6 +35,36 @@ Object.assign(globalThis, { localStorage: {
 
 const delivery = (timing: number, x = 0): DeliveryChoice => ({
   aimTarget: { x, z: -3.5 }, line: 'middle', length: 'good', type: 'fast', releaseTiming: timing
+});
+
+test('pose performance measures accepted round trips and expires stalled samples', () => {
+  const stats = new PosePerformance();
+  stats.reset(100);
+  assert.equal(stats.snapshot(100).acceptedFps, null, 'wait for a second before reporting rate');
+  stats.record(200, 250, 'accepted');
+  stats.record(400, 550, 'accepted');
+  stats.record(600, 1200, 'delayed');
+  stats.record(1300, 1350, 'interrupted');
+  assert.deepEqual(stats.snapshot(2100), { acceptedFps: 1, roundTripMs: 100, delayed: 1, interrupted: 1 });
+  assert.deepEqual(stats.snapshot(5550), { acceptedFps: 0, roundTripMs: null, delayed: 1, interrupted: 1 }, 'stalls must not leave a healthy rate or round trip on screen');
+  stats.record(5600, 5700, 'accepted');
+  assert.deepEqual(stats.snapshot(5750), { acceptedFps: .2, roundTripMs: 100, delayed: 1, interrupted: 1 });
+});
+
+test('pose performance resets sessions and ignores invalid or out-of-order samples', () => {
+  const stats = new PosePerformance();
+  stats.record(0, 50, 'delayed');
+  stats.reset(1000);
+  for (const [start, end] of [[NaN, 1200], [1100, Infinity], [1100, 1099], [900, 1200]]) stats.record(start, end, 'delayed');
+  stats.record(1100, 1200, 'accepted');
+  stats.record(1050, 1150, 'interrupted');
+  assert.deepEqual(stats.snapshot(2000), { acceptedFps: 1, roundTripMs: 100, delayed: 0, interrupted: 0 });
+  stats.reset();
+  assert.deepEqual(stats.snapshot(7000), { acceptedFps: null, roundTripMs: null, delayed: 0, interrupted: 0 });
+  stats.reset(8000);
+  assert.equal(stats.snapshot(7900).acceptedFps, null);
+  assert.equal(stats.snapshot(NaN).roundTripMs, null);
+  assert.deepEqual(stats.snapshot(9000), { acceptedFps: 0, roundTripMs: null, delayed: 0, interrupted: 0 });
 });
 
 test('hand-motion preview arms on stillness and rejects noise, tracking gaps and body translation', () => {

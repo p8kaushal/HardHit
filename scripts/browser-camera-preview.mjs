@@ -114,6 +114,8 @@ try {
   const poseStatus = await page.$eval('#playzone-pose-status', element => element.textContent);
   assert.match(poseStatus, fixture ? /Body landmarks visible|Move back/ : /No person detected/, 'real model should process the simulated camera');
   assert.equal(await page.$eval('#playzone-pose-overlay', element => element.hidden), false);
+  await page.waitForFunction(() => /Tracking: [\d.]+ results\/s · worker round trip \d+ ms/.test(document.querySelector('#playzone-pose-performance').textContent));
+  assert.equal(await page.$eval('#playzone-pose-performance', element => element.hidden), false);
   if (!production) {
   await page.evaluate(async () => {
     const { GameScene } = await import('/src/scene.ts');
@@ -373,6 +375,7 @@ try {
     return { status: document.querySelector('#playzone-motion-status').textContent, serial: window.__poseResultSerial };
   });
   assert.match(staleFrame.status, /Tracking stopped or no person/, 'a worker result captured before a pause must be discarded');
+  assert.match(await page.$eval('#playzone-pose-performance', element => element.textContent), /[1-9]\d* interrupted/, 'pause-crossing results should be counted');
   await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, staleFrame.serial);
   await page.evaluate(() => { window.__holdPoseResult = true; window.__releasePoseFrame = null; });
   await page.waitForFunction(() => typeof window.__releasePoseFrame === 'function');
@@ -383,6 +386,7 @@ try {
     return { status: document.querySelector('#playzone-pose-status').textContent, serial: window.__poseResultSerial };
   });
   assert.match(delayedFrame.status, /tracking is delayed/i, 'an old worker result must not drive the pose');
+  assert.match(await page.$eval('#playzone-pose-performance', element => element.textContent), /[1-9]\d* delayed/, 'slow results should be counted');
   await page.waitForFunction(serial => window.__poseResultSerial > serial && !document.querySelector('#playzone-pose-status').textContent.includes('delayed'), {}, delayedFrame.serial);
   await page.click('#playzone-pose-calibrate-delay');
   await page.click('#playzone-pose-toggle');
@@ -390,10 +394,13 @@ try {
   assert.equal(await page.$eval('#playzone-pose-calibrate-delay', e => e.textContent), 'Calibrate in 5 seconds');
   assert.equal(await page.$eval('#playzone-intensity-strong', button => button.disabled), true, 'stopping tracking must clear personal samples');
   assert.match(await page.$eval('#playzone-intensity-status', element => element.textContent), /Record a gentler movement/);
+  assert.equal(await page.$eval('#playzone-pose-performance', element => element.hidden), true);
+  assert.equal(await page.$eval('#playzone-pose-performance', element => element.textContent), '');
   const priorPoseSerial = await page.evaluate(() => window.__poseResultSerial);
   await page.click('#playzone-pose-toggle');
   await page.waitForFunction(() => document.querySelector('#playzone-pose-toggle').textContent === 'Stop pose tracking', { timeout: 30000 });
   await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, priorPoseSerial);
+  await page.waitForFunction(() => /rejected: 0 delayed, 0 interrupted/.test(document.querySelector('#playzone-pose-performance').textContent));
   await page.click('#playzone-motion-preview');
   assert.equal(await page.$eval('#playzone-motion-status', element => element.textContent), 'Hand-motion preview is off.');
   assert.equal(await page.$eval('#playzone-intensity-controls', element => element.hidden), true, 'turning off the preview clears and hides personal comparison');

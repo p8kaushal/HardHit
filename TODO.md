@@ -1,5 +1,17 @@
 # Gameplay to-do
 
+## Active goal: complete camera batting
+
+- User authorization (November 12): advance stages/phases autonomously; historical personal stage-approval gates are superseded. Preserve unrelated work and commit every verified increment. Merge/deployment authorization remains separate.
+- [ ] Finish and validate full-body movement, physical bat tracking/two-hand constraints, calibrated swing/shot inference, practice camera input, then match camera input.
+- [ ] Obtain live posture feedback and footage with an actual bat for independent validation; continue unrelated implementation while pending.
+
+## Camera performance feedback
+
+- [x] Show rolling accepted-result rate, recent submission-to-result round-trip time, delayed-result and interrupted-result counts.
+- [x] Reset session data on stop/restart; expire old samples and label the limits of the measurement.
+- [x] Verify unit edge cases, production build and camera browser lifecycle/rejection behavior, update docs, and commit. 122 unit tests and development/production camera browser regressions passed; actual-device measurements remain open.
+
 ## Next: live movement review
 
 - [ ] Have the user refresh and use **Calibrate in 5 seconds** while upright, facing the camera with the whole body visible; review the character's neutral posture and bowler-facing alignment.

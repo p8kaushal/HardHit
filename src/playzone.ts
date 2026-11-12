@@ -76,6 +76,10 @@ export class Playzone {
     }, (landmarks, world, timestamp) => {
       this.updateHandMotion(landmarks, timestamp);
       this.updatePoseMovement(landmarks, world);
+    }, stats => {
+      const output = get<HTMLElement>('playzone-pose-performance');
+      output.hidden = stats === null;
+      output.textContent = stats === null ? '' : `Tracking: ${stats.acceptedFps === null ? 'measuring' : `${stats.acceptedFps.toFixed(1)} results/s`} · worker round trip ${stats.roundTripMs === null ? '—' : `${Math.round(stats.roundTripMs)} ms`} · rejected: ${stats.delayed} delayed, ${stats.interrupted} interrupted.`;
     });
     this.cameraPreview = new CameraPreview(get<HTMLVideoElement>('playzone-camera-preview'), (state, message) => {
       get<HTMLElement>('playzone-camera-status').textContent = message;
