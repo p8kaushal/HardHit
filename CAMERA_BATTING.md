@@ -60,6 +60,10 @@ Local files: `/private/tmp/hardhit-evaluate-cricket.py`, `/private/tmp/hardhit-c
 
 Next evidence needed remains representative full-body/actual-bat footage and live review of the corrected posture. The public single-stroke sample can support later bat experiments but does not close those gates. Physical-bat inference and camera scoring remain unimplemented.
 
+## Reference-harness frame-zero seek fix
+
+The annotated pose browser harness now skips a seek when the video is already within one 30 fps frame of the requested time. This avoids waiting forever for `seeked` when a tiny positive time (for example 0.0001 s) is clamped to the current 0 s position. After an actual seek, it checks the resulting `currentTime` against the requested time. A real-worker run at 0.0001 s on the existing synthetic smoke reference processed one frame and passed its deliberately loose 1000-pixel tolerance. This verifies the harness boundary only; it is not pose accuracy evidence. The requested time is still a media-time position, not a measured exposure timestamp.
+
 ## Multi-person ambiguity handling
 
 The worker requests up to two poses and emits no player landmarks when it detects more than one person. This immediately resets movement, clears the overlay and cancels delayed calibration and pending hand-motion samples; returning to one detected person requires recalibration. The change passed development/production camera browser tests, a real-worker fixture with two composited people, 126 unit tests and production build. The existing full-body recording replay from 12 seconds processed 30 single-person frames and rejected 63 ambiguous frames, with 1,625 confident rig/target comparisons and no score changes. Comparison with the model's targets is not accuracy ground truth. A second person is visibly present later in that source segment.
