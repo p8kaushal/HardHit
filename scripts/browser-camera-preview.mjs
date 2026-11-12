@@ -25,6 +25,7 @@ try {
     window.__holdPoseInit = false;
     window.__poseOverride = null;
     window.__poseWorldOverride = null;
+    window.__poseCountOverride = 1;
     window.__motionSequence = [];
     window.__lastMotionFrame = null;
     window.__holdMotionFrame = false;
@@ -43,7 +44,7 @@ try {
           const frame = window.__motionSequence.shift();
           if (frame) window.__lastMotionFrame = frame;
           const controlled = frame ?? (window.__holdMotionFrame ? window.__lastMotionFrame : null);
-          const result = handler({ data: { type: 'result', landmarks: controlled?.points ?? window.__poseOverride, worldLandmarks: window.__poseWorldOverride ?? [], timestamp: controlled?.time ?? event.data.timestamp } });
+          const result = handler({ data: { type: 'result', landmarks: controlled?.points ?? window.__poseOverride, worldLandmarks: window.__poseWorldOverride ?? [], timestamp: controlled?.time ?? event.data.timestamp, poseCount: window.__poseCountOverride } });
           window.__poseResultSerial++;
           return result;
         };
@@ -116,6 +117,38 @@ try {
   assert.equal(await page.$eval('#playzone-pose-overlay', element => element.hidden), false);
   await page.waitForFunction(() => /Tracking: [\d.]+ results\/s · worker round trip \d+ ms/.test(document.querySelector('#playzone-pose-performance').textContent));
   assert.equal(await page.$eval('#playzone-pose-performance', element => element.hidden), false);
+  if (!production && fixture) {
+    const counts = await page.evaluate(async fixture => {
+      const { default: PoseWorker } = await import('/src/pose-worker.ts?worker');
+      const worker = new PoseWorker();
+      const request = (message, transfer = []) => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Person-count worker timed out')), 30000);
+        worker.onmessage = event => {
+          clearTimeout(timer);
+          if (event.data.type === 'error') reject(new Error(event.data.detail));
+          else resolve(event.data);
+        };
+        worker.onerror = () => { clearTimeout(timer); reject(new Error('Person-count worker failed')); };
+        worker.postMessage(message, transfer);
+      });
+      try {
+        await request({ type: 'init', modelUrl: new URL('/models/pose/pose_landmarker_lite.task', location.href).href });
+        const image = new Image(); image.src = `data:image/jpeg;base64,${fixture}`; await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+        canvas.getContext('2d').drawImage(image, 0, 0);
+        const singleBitmap = await createImageBitmap(canvas);
+        const single = await request({ type: 'frame', bitmap: singleBitmap, timestamp: 1000 }, [singleBitmap]);
+        canvas.width *= 2;
+        canvas.getContext('2d').drawImage(image, 0, 0);
+        canvas.getContext('2d').drawImage(image, image.naturalWidth, 0);
+        const doubleBitmap = await createImageBitmap(canvas);
+        const double = await request({ type: 'frame', bitmap: doubleBitmap, timestamp: 2000 }, [doubleBitmap]);
+        return { single: single.poseCount, double: double.poseCount, doubleLandmarks: double.landmarks.length, doubleWorld: double.worldLandmarks.length };
+      } finally { worker.terminate(); }
+    }, fixture);
+    assert.deepEqual(counts, { single: 1, double: 2, doubleLandmarks: 0, doubleWorld: 0 }, 'real worker must suppress player landmarks when both fixture people are detected');
+  }
   if (!production) {
   await page.evaluate(async () => {
     const { GameScene } = await import('/src/scene.ts');
@@ -396,11 +429,19 @@ try {
   assert.match(await page.$eval('#playzone-intensity-status', element => element.textContent), /Record a gentler movement/);
   assert.equal(await page.$eval('#playzone-pose-performance', element => element.hidden), true);
   assert.equal(await page.$eval('#playzone-pose-performance', element => element.textContent), '');
-  const priorPoseSerial = await page.evaluate(() => window.__poseResultSerial);
+  const priorPoseSerial = await page.evaluate(() => {
+    window.__performanceNotices = [];
+    window.__performanceObserver = new MutationObserver(() => window.__performanceNotices.push(document.querySelector('#playzone-pose-performance').textContent));
+    window.__performanceObserver.observe(document.querySelector('#playzone-pose-performance'), { childList: true });
+    return window.__poseResultSerial;
+  });
   await page.click('#playzone-pose-toggle');
   await page.waitForFunction(() => document.querySelector('#playzone-pose-toggle').textContent === 'Stop pose tracking', { timeout: 30000 });
   await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, priorPoseSerial);
-  await page.waitForFunction(() => /rejected: 0 delayed, 0 interrupted/.test(document.querySelector('#playzone-pose-performance').textContent));
+  assert.equal(await page.evaluate(() => {
+    window.__performanceObserver.disconnect();
+    return window.__performanceNotices.some(text => /rejected: 0 delayed, 0 interrupted/.test(text));
+  }), true, 'restart must reset prior session counts before counting new delayed results');
   await page.click('#playzone-motion-preview');
   assert.equal(await page.$eval('#playzone-motion-status', element => element.textContent), 'Hand-motion preview is off.');
   assert.equal(await page.$eval('#playzone-intensity-controls', element => element.hidden), true, 'turning off the preview clears and hides personal comparison');
@@ -490,6 +531,37 @@ try {
     const hasOverlay = await page.$eval('#playzone-pose-overlay', canvas => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, index) => index % 4 === 3 && value > 0));
     assert.ok(hasOverlay, 'detected person should produce a visible skeleton');
   }
+  const beforeAmbiguity = await page.evaluate(() => {
+    const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
+    for (const [index,x,y] of [[0,.5,.1],[11,.35,.25],[12,.65,.25],[15,.47,.55],[16,.53,.55],[23,.4,.55],[24,.6,.55],[27,.4,.9],[28,.6,.9],[31,.4,.94],[32,.6,.94]]) points[index] = { x, y, visibility: 1 };
+    window.__poseOverride = points; window.__poseWorldOverride = []; window.__poseCountOverride = 1;
+    return { score: document.querySelector('#playzone-score').textContent, player: localStorage.getItem('six_hitting_contest_player'), board: localStorage.getItem('six_hitting_contest_leaderboard') };
+  });
+  await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Body landmarks visible'));
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Calibrated!/);
+  if (!await page.$eval('#playzone-motion-preview', input => input.checked)) await page.click('#playzone-motion-preview');
+  await page.click('#playzone-intensity-gentle');
+  await page.evaluate(() => { window.__poseCountOverride = 2; });
+  await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Multiple people'));
+  assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Multiple people/);
+  assert.match(await page.$eval('#playzone-intensity-status', e => e.textContent), /Sample cancelled/);
+  assert.equal(await page.$eval('#playzone-pose-overlay', canvas => canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data.some((value,index) => index % 4 === 3 && value > 0)), false, 'ambiguous results must clear old overlay points');
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Could not calibrate/);
+  await page.click('#playzone-pose-calibrate-delay');
+  await page.waitForFunction(() => document.querySelector('#playzone-pose-calibrate-delay').textContent === 'Calibrate in 5 seconds');
+  assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Multiple people/);
+  const ambiguousApplied = !production ? await page.evaluate(() => window.__appliedPoses.length) : null;
+  await page.evaluate(() => { window.__poseCountOverride = 1; });
+  await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Body landmarks visible'));
+  assert.doesNotMatch(await page.$eval('#playzone-retarget-status', e => e.textContent), /Calibrated!/);
+  if (!production) assert.equal(await page.evaluate(() => window.__appliedPoses.length), ambiguousApplied, 'single-person recovery must wait for recalibration');
+  assert.deepEqual(await page.evaluate(() => ({ score: document.querySelector('#playzone-score').textContent, player: localStorage.getItem('six_hitting_contest_player'), board: localStorage.getItem('six_hitting_contest_leaderboard') })), beforeAmbiguity);
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Calibrated!/);
+  await page.click('#playzone-motion-preview');
+  await page.evaluate(() => { window.__poseOverride = null; });
   await page.click('#playzone-pose-toggle');
   assert.equal(await page.$eval('#playzone-pose-overlay', element => element.hidden), true);
   if (!production) assert.equal(await page.evaluate(() => window.__poseScene.scene.getTransformNodeByName('batPivot').isEnabled()), true, 'bat should return when tracking stops');

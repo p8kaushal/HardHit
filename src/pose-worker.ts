@@ -13,7 +13,7 @@ scope.onmessage = event => {
         const wasmBinaryPath = new URL('../node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_module_internal.wasm', import.meta.url).href;
         landmarker = await PoseLandmarker.createFromOptions({ wasmLoaderPath, wasmBinaryPath }, {
           baseOptions: { modelAssetPath: modelUrl, delegate: 'CPU' },
-          runningMode: 'VIDEO', numPoses: 1, canvas: new OffscreenCanvas(1, 1)
+          runningMode: 'VIDEO', numPoses: 2, canvas: new OffscreenCanvas(1, 1)
         });
         scope.postMessage({ type: 'ready' });
       } catch (error) {
@@ -26,7 +26,8 @@ scope.onmessage = event => {
   try {
     if (!landmarker) throw new Error('Pose tracker is not initialized');
     const result = landmarker.detectForVideo(bitmap, timestamp);
-    scope.postMessage({ type: 'result', landmarks: result.landmarks[0] ?? [], worldLandmarks: result.worldLandmarks[0] ?? [], timestamp });
+    const poseCount = result.landmarks.length;
+    scope.postMessage({ type: 'result', poseCount, landmarks: poseCount === 1 ? result.landmarks[0] : [], worldLandmarks: poseCount === 1 ? result.worldLandmarks[0] ?? [] : [], timestamp });
   } catch (error) {
     scope.postMessage({ type: 'error', detail: error instanceof Error ? error.message : String(error) });
   } finally {

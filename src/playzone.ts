@@ -73,7 +73,8 @@ export class Playzone {
       if (state !== 'tracking' && this.poseTrackingActive) { this.handMotionIntensity.reset(); this.intensityNotice = null; }
       this.poseTrackingActive = state === 'tracking';
       this.renderIntensityControls();
-    }, (landmarks, world, timestamp) => {
+    }, (landmarks, world, timestamp, multiplePeople) => {
+      if (multiplePeople) this.resetPoseMovement('Multiple people detected. Keep only the player in view, then calibrate again.');
       this.updateHandMotion(landmarks, timestamp);
       this.updatePoseMovement(landmarks, world);
     }, stats => {

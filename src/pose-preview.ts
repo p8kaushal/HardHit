@@ -2,7 +2,7 @@ import type { PoseLandmark as Landmark } from './pose-retarget';
 import { gameClockRevision, isGamePaused } from './game-clock';
 import { PosePerformance, type PosePerformanceSnapshot } from './pose-performance';
 type PoseState = 'idle' | 'loading' | 'tracking' | 'error';
-type WorkerMessage = { type: 'ready' } | { type: 'error'; detail: string } | { type: 'result'; landmarks: Landmark[]; worldLandmarks: Landmark[]; timestamp: number };
+type WorkerMessage = { type: 'ready' } | { type: 'error'; detail: string } | { type: 'result'; landmarks: Landmark[]; worldLandmarks: Landmark[]; timestamp: number; poseCount?: number };
 
 const CONNECTIONS = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28], [27, 31], [28, 32]];
 const REQUIRED = [0, 11, 12, 15, 16, 23, 24, 27, 28];
@@ -21,7 +21,7 @@ export class PosePreview {
   private readonly performanceStats = new PosePerformance();
   private lastStatsAt = -Infinity;
 
-  constructor(private readonly video: HTMLVideoElement, private readonly canvas: HTMLCanvasElement, private readonly render: (state: PoseState, message: string) => void, private readonly onLandmarks: (landmarks: Landmark[], worldLandmarks: Landmark[], timestamp: number) => void = () => {}, private readonly onPerformance: (snapshot: PosePerformanceSnapshot | null) => void = () => {}) {
+  constructor(private readonly video: HTMLVideoElement, private readonly canvas: HTMLCanvasElement, private readonly render: (state: PoseState, message: string) => void, private readonly onLandmarks: (landmarks: Landmark[], worldLandmarks: Landmark[], timestamp: number, multiplePeople?: boolean) => void = () => {}, private readonly onPerformance: (snapshot: PosePerformanceSnapshot | null) => void = () => {}) {
     this.show('idle', 'Pose tracking is off.');
   }
 
@@ -85,6 +85,12 @@ export class PosePreview {
         }
         this.performanceStats.record(this.lastFrameAt, receivedAt, 'accepted');
         this.reportPerformance(receivedAt);
+        if ((event.data.poseCount ?? 0) > 1) {
+          this.onLandmarks([], [], NaN, true);
+          this.draw([]);
+          this.show('tracking', 'Multiple people detected. Keep only the player in view, then calibrate again.');
+          return;
+        }
         this.onLandmarks(event.data.landmarks, event.data.worldLandmarks ?? [], event.data.timestamp);
         this.draw(event.data.landmarks);
       };

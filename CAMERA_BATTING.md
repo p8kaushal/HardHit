@@ -52,6 +52,12 @@ Local files: `/private/tmp/hardhit-evaluate-cricket.py`, `/private/tmp/hardhit-c
 
 Next evidence needed remains representative full-body/actual-bat footage and live review of the corrected posture. The public single-stroke sample can support later bat experiments but does not close those gates. Physical-bat inference and camera scoring remain unimplemented.
 
+## Multi-person ambiguity handling
+
+The worker requests up to two poses and emits no player landmarks when it detects more than one person. This immediately resets movement, clears the overlay and cancels delayed calibration and pending hand-motion samples; returning to one detected person requires recalibration. The change passed development/production camera browser tests, a real-worker fixture with two composited people, 126 unit tests and production build. The existing full-body recording replay from 12 seconds processed 30 single-person frames and rejected 63 ambiguous frames, with 1,625 confident rig/target comparisons and no score changes. Comparison with the model's targets is not accuracy ground truth. A second person is visibly present later in that source segment.
+
+This is an ambiguity check, not identity recognition. Missed people and sequential player replacement remain possible. A second pose can increase processing time; representative real-device measurements are still needed. The recording begins too close to the camera for calibration, so replay calibration must use a suitable seek point rather than assuming the first frame is valid.
+
 ## Independent image-point validation
 
 `npm run test:pose-reference` accepts a local unmirrored, pre-cropped WebM and its local JSON reference. It seeks to annotated times, runs the real pose worker sequentially and compares image points in source pixels. It does not run the rig or verify 3D accuracy, dynamic latency, bat detection or shot classification. Browser seeking selects the decoded frame at the requested media time; timestamps are not independent exposure measurements. Annotate the same decoded source frames.

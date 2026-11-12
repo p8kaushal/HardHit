@@ -19,6 +19,12 @@
 - [x] Test malformed references, real pixel/aspect errors, missing/uncertain results, coverage and actual browser operation, then commit. 126 tests and build passed; synthetic browser smoke passed and a strict-tolerance browser fixture failed as expected.
 - [ ] Run independent human annotations; synthetic smoke references and prior overlaid recordings do not establish accuracy.
 
+## Reject ambiguous multi-person tracking
+
+- [x] Request up to two poses and reject detected multi-person results without selecting the first person.
+- [x] Immediately reset movement and pending calibration/samples, clear stale landmarks/overlay, and require recalibration after single-person recovery.
+- [x] Verify simulated ambiguity and actual worker behavior, manual/scoring isolation, development/production browser checks, unit tests and build; document limitations and commit. 126 tests, build, both camera browser modes, real two-person fixture and recorded replay passed. Replay counted 63 ambiguous frames; person identity and device performance remain open.
+
 ## Cricket-specific checkpoint evaluation
 
 - [x] Inspect and load the available checkpoint through restricted deserialization in an isolated temporary environment.

@@ -25,7 +25,12 @@ try {
   await page.evaluate(async ({ encoded, seek, segmentNames }) => {
     const { GameScene } = await import('/src/scene.ts');
     const original = GameScene.prototype.applyTrackedBatterPose;
-    window.__replayStats = { frames: 0, personFrames: 0, wristFrames: 0, indexFrames: 0, earFrames: 0, footFrames: 0, applied: 0, nonfinite: 0, maxFacing: 0, rigSamples: 0, badRig: 0, maxJointError: 0, maxArmShift: 0, directionChecks: 0, directionMismatches: 0, maxDirectionErrorDeg: 0 };
+    const resetHandedness = GameScene.prototype.setBatterHandedness;
+    GameScene.prototype.setBatterHandedness = function (...args) {
+      window.__replayTargets = null;
+      return resetHandedness.apply(this, args);
+    };
+    window.__replayStats = { frames: 0, personFrames: 0, multiplePeopleFrames: 0, wristFrames: 0, indexFrames: 0, earFrames: 0, footFrames: 0, applied: 0, nonfinite: 0, maxFacing: 0, rigSamples: 0, badRig: 0, maxJointError: 0, maxArmShift: 0, directionChecks: 0, directionMismatches: 0, maxDirectionErrorDeg: 0 };
     window.__replayStats.segments = Object.fromEntries(segmentNames.map(name => [name, { checks: 0, mismatches: 0, maxErrorDeg: 0 }]));
     GameScene.prototype.applyTrackedBatterPose = function (pose, offset, facing, directions, confidence) {
       const values = Object.values(pose).flatMap(v => [v.x, v.y, v.z]).concat([offset.x, offset.y, offset.z], facing === null ? [] : [facing], ...Object.values(directions).map(v => [v.x, v.y, v.z]));
@@ -93,6 +98,7 @@ try {
             const points = event.data.landmarks;
             const visible = i => { const p = points[i]; return p && Number.isFinite(p.x) && Number.isFinite(p.y) && (p.visibility ?? 0) >= .45 && p.x > 0 && p.x < 1 && p.y > 0 && p.y < 1; };
             window.__replayStats.frames++;
+            if (event.data.poseCount > 1) window.__replayStats.multiplePeopleFrames++;
             if (points.length) window.__replayStats.personFrames++;
             if ([15,16].every(visible)) window.__replayStats.wristFrames++;
             if ([19,20].every(visible)) window.__replayStats.indexFrames++;
@@ -125,7 +131,8 @@ try {
   await page.click('#playzone-pose-toggle');
   await page.waitForFunction(() => {
     const p = window.__replayLastPoints;
-    return p?.length && [11,12,23,24].every(i => (p[i]?.visibility ?? 0) >= .45 && p[i].x > 0 && p[i].x < 1 && p[i].y > 0 && p[i].y < 1);
+    const status = document.querySelector('#playzone-pose-status').textContent;
+    return /Body landmarks visible|Move back/.test(status) && p?.length && [11,12,23,24].every(i => (p[i]?.visibility ?? 0) >= .45 && p[i].x > 0 && p[i].x < 1 && p[i].y > 0 && p[i].y < 1);
   }, { timeout: 30000 });
   await page.click('#playzone-pose-calibrate');
   assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Calibrated/);
