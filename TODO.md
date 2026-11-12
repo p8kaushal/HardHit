@@ -19,6 +19,11 @@
 - [x] Test malformed references, real pixel/aspect errors, missing/uncertain results, coverage and actual browser operation, then commit. 126 tests and build passed; synthetic browser smoke passed and a strict-tolerance browser fixture failed as expected.
 - [ ] Run independent human annotations; synthetic smoke references and prior overlaid recordings do not establish accuracy.
 
+## Local bat prediction scoring command
+
+- [x] Validate dimensions, exact reference frame index/time and ordered point names before scoring a prediction file.
+- [x] Verify mismatch/coverage behavior in unit tests and synthetic local CLI smoke; 130 tests pass. No detector accuracy is implied.
+
 ## Bat endpoint reference scorer
 
 - [x] Validate the four named normalized bat points, source metadata and frame ordering.

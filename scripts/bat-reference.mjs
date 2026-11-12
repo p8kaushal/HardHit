@@ -44,3 +44,22 @@ export function scoreBatReference(reference, predictions, maxErrorPixels) {
   summary.passed = summary.missingPoints === 0 && summary.outsideTolerance === 0;
   return summary;
 }
+
+/** Align predictions explicitly; arrays alone do not establish which source frame was processed. */
+export function scoreBatPredictionFile(reference, output, maxErrorPixels) {
+  validateBatReference(reference);
+  assert.ok(output && output.version === 1, 'Prediction version must be 1.');
+  assert.equal(output.width, reference.width, 'Prediction width must match the reference.');
+  assert.equal(output.height, reference.height, 'Prediction height must match the reference.');
+  assert.ok(Array.isArray(output.frames) && output.frames.length === reference.frames.length, 'Every reference frame needs one prediction frame.');
+  const predictions = output.frames.map((frame, index) => {
+    const target = reference.frames[index];
+    assert.ok(frame && frame.frame === target.frame && frame.time === target.time, 'Prediction frame index and time must match the reference in order.');
+    assert.ok(Array.isArray(frame.points) && frame.points.length === BAT_KEYPOINTS.length, 'Each prediction must have four ordered points; use null for missing points.');
+    for (const [pointIndex, point] of frame.points.entries()) {
+      assert.ok(point === null || (point && point.name === BAT_KEYPOINTS[pointIndex]), 'Prediction names must match canonical point order.');
+    }
+    return frame.points;
+  });
+  return scoreBatReference(reference, predictions, maxErrorPixels);
+}

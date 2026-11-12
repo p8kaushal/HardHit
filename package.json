@@ -19,7 +19,8 @@
     "test:playzone": "node scripts/browser-playzone.mjs",
     "test:camera-preview": "node scripts/browser-camera-preview.mjs",
     "test:pose-reference": "node scripts/browser-pose-reference.mjs",
-    "test:bowling-playzone": "node scripts/browser-bowling-playzone.mjs"
+    "test:bowling-playzone": "node scripts/browser-bowling-playzone.mjs",
+    "score:bat-reference": "node scripts/score-bat-reference.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.2.2",
