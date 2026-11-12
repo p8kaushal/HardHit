@@ -21,7 +21,7 @@
 
 ## Reject stale immediate calibration
 
-- [ ] Run the new freshness regression against the previous implementation as a negative control.
+- [x] Run the new freshness regression against the previous implementation as a negative control; it failed at the expected stale-calibration assertion.
 - [x] Require recent accepted landmarks in both calibration paths and show actionable freshness feedback.
 - [x] Verify fresh-frame recovery and existing lifecycle with unit/build/development/production browser checks and document results.
 
