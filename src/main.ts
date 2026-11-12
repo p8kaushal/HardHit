@@ -3,22 +3,30 @@ import { UIManager, renderProfile, renderLeaderboard } from './ui';
 import { runBotSimulation } from './simulate';
 import { setGamePaused, shouldPauseGameplay } from './game-clock';
 import { gameSound } from './sound';
+import { GameScene } from './scene';
+import { Playzone } from './playzone';
 
 let controller: MatchController | null = null;
 let ui: UIManager | null = null;
+let gameScene: GameScene | null = null;
+let playzone: Playzone | null = null;
+const canvasContainer = document.querySelector<HTMLElement>('.canvas-container')!;
+const gameCanvasParent = canvasContainer.parentElement!;
 
 // Unlock audio on a real input gesture, before automatic bowling begins.
 document.addEventListener('pointerdown', () => gameSound.unlock(), { capture: true });
 document.addEventListener('keydown', () => gameSound.unlock(), { capture: true });
 
 const portrait = window.matchMedia('(orientation: portrait)');
+const touchPrimary = window.matchMedia('(pointer: coarse)');
 function updateGameplayPause(): void {
-  const playing = document.getElementById('screen-gameplay')!.classList.contains('active');
-  const paused = shouldPauseGameplay(playing, portrait.matches, document.hidden);
+  const playing = document.getElementById('screen-gameplay')!.classList.contains('active') || document.getElementById('screen-playzone')!.classList.contains('active');
+  const paused = shouldPauseGameplay(playing, portrait.matches && touchPrimary.matches, document.hidden);
   setGamePaused(paused);
-  if (paused) ui?.interruptControls();
+  if (paused) { ui?.interruptControls(); playzone?.interrupt(); }
 }
 portrait.addEventListener('change', updateGameplayPause);
+touchPrimary.addEventListener('change', updateGameplayPause);
 document.addEventListener('visibilitychange', updateGameplayPause);
 
 function loadLobbyProfile(): void {
@@ -36,6 +44,19 @@ function showScreen(screenId: string): void {
 
 function initLobby(): void {
   loadLobbyProfile();
+  document.getElementById('btn-playzone')!.onclick = () => {
+    document.getElementById('playzone-canvas-slot')!.appendChild(canvasContainer);
+    showScreen('screen-playzone');
+    gameScene ??= new GameScene('game-canvas');
+    playzone ??= new Playzone(gameScene);
+    playzone.start();
+  };
+  document.getElementById('playzone-exit')!.onclick = () => {
+    playzone?.stop();
+    gameCanvasParent.appendChild(canvasContainer);
+    showScreen('screen-lobby');
+    loadLobbyProfile();
+  };
   
   const btnStartToss = document.getElementById('btn-start-toss')!;
   btnStartToss.onclick = () => {
@@ -126,7 +147,8 @@ function runToss(playerChoice: 'heads' | 'tails'): void {
 function proceedToMatchStart(): void {
   controller!.startMatch();
   if (!ui) {
-    ui = new UIManager(controller!);
+    gameScene ??= new GameScene('game-canvas');
+    ui = new UIManager(controller!, gameScene);
   } else {
     ui.setController(controller!);
   }

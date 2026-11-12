@@ -1,0 +1,521 @@
+import { createServer, preview } from 'vite';
+import puppeteer from 'puppeteer';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+
+const production = process.argv.includes('--preview');
+const server = production
+  ? await preview({ configFile: false, preview: { host: '127.0.0.1', port: 0, open: false } })
+  : await createServer({ server: { host: '127.0.0.1', port: 0, open: false } });
+let browser;
+try {
+  if (!production) await server.listen();
+  browser = await puppeteer.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 800 });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { waitUntil: 'networkidle0' });
+  const fixture = process.env.HARDHIT_POSE_FIXTURE ? (await readFile(process.env.HARDHIT_POSE_FIXTURE)).toString('base64') : null;
+  await page.evaluate(async fixture => {
+    window.__cameraMode = 'grant';
+    window.__cameraCalls = 0;
+    window.__cameraStreams = [];
+    window.__failPoseModel = false;
+    window.__holdPoseInit = false;
+    window.__poseOverride = null;
+    window.__poseWorldOverride = null;
+    window.__motionSequence = [];
+    window.__lastMotionFrame = null;
+    window.__holdMotionFrame = false;
+    window.__holdPoseResult = false;
+    window.__releasePoseFrame = null;
+    window.__poseResultSerial = 0;
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      set onmessage(handler) {
+        super.onmessage = event => {
+          if (event.data?.type !== 'result' || !window.__poseOverride) return handler(event);
+          if (window.__holdPoseResult) {
+            window.__releasePoseFrame = () => handler(event);
+            return;
+          }
+          const frame = window.__motionSequence.shift();
+          if (frame) window.__lastMotionFrame = frame;
+          const controlled = frame ?? (window.__holdMotionFrame ? window.__lastMotionFrame : null);
+          const result = handler({ data: { type: 'result', landmarks: controlled?.points ?? window.__poseOverride, worldLandmarks: window.__poseWorldOverride ?? [], timestamp: controlled?.time ?? event.data.timestamp } });
+          window.__poseResultSerial++;
+          return result;
+        };
+      }
+      postMessage(message, ...rest) {
+        if (message?.type === 'init' && window.__holdPoseInit) return;
+        if (message?.type === 'init' && window.__failPoseModel) message = { ...message, modelUrl: '/missing-pose-model.task' };
+        return super.postMessage(message, ...rest);
+      }
+    };
+    const image = fixture ? new Image() : null;
+    if (image) { image.src = `data:image/jpeg;base64,${fixture}`; await image.decode(); }
+    const makeStream = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image?.naturalWidth || 64; canvas.height = image?.naturalHeight || 36;
+      const paint = () => {
+        if (image) canvas.getContext('2d').drawImage(image, 0, 0);
+        else canvas.getContext('2d').fillRect(0, 0, 64, 36);
+      };
+      paint();
+      const stream = canvas.captureStream(5);
+      const timer = setInterval(() => {
+        if (stream.getVideoTracks()[0].readyState === 'ended') clearInterval(timer);
+        else paint();
+      }, 200);
+      window.__cameraStreams.push(stream);
+      return stream;
+    };
+    navigator.mediaDevices.getUserMedia = async constraints => {
+      window.__cameraCalls++;
+      window.__cameraConstraints = constraints;
+      if (window.__cameraMode === 'deny') throw new DOMException('Denied', 'NotAllowedError');
+      if (window.__cameraMode === 'missing') throw new DOMException('Missing', 'NotFoundError');
+      if (window.__cameraMode === 'busy') throw new DOMException('Busy', 'NotReadableError');
+      if (window.__cameraMode === 'defer') return new Promise(resolve => { window.__resolveCamera = () => resolve(makeStream()); });
+      return makeStream();
+    };
+  }, fixture);
+  await page.click('#btn-playzone');
+  await page.click('#playzone-camera-settings summary');
+  assert.equal(await page.$eval('#playzone-pose-mirror', input => input.checked), true, 'mirrored motion is the default');
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Could not calibrate/);
+  await page.click('#playzone-camera-size');
+  assert.equal(await page.$eval('#playzone-camera-size', button => button.getAttribute('aria-pressed')), 'true');
+  assert.equal(await page.$eval('.practice-dock-right', element => element.classList.contains('camera-enlarged')), true);
+  await page.click('#playzone-camera-size');
+  assert.equal(await page.evaluate(() => window.__cameraCalls), 0, 'opening settings must not start the camera');
+  await page.click('#playzone-camera-toggle');
+  await page.waitForFunction(() => document.querySelector('#playzone-camera-toggle').textContent === 'Stop camera');
+  await page.waitForFunction(() => document.querySelector('#playzone-camera-preview').videoWidth > 0, { timeout: 5000 });
+  await page.evaluate(() => { window.__holdPoseInit = true; });
+  await page.click('#playzone-pose-toggle');
+  assert.equal(await page.$eval('#playzone-pose-toggle', element => element.textContent), 'Cancel pose tracking');
+  await page.click('#playzone-pose-toggle');
+  assert.equal(await page.$eval('#playzone-pose-status', element => element.textContent), 'Pose tracking is off.');
+  await page.evaluate(() => { window.__holdPoseInit = false; });
+  await page.evaluate(() => { window.__failPoseModel = true; });
+  await page.click('#playzone-pose-toggle');
+  await page.waitForFunction(() => /failed|could not/.test(document.querySelector('#playzone-pose-status').textContent), { timeout: 30000 });
+  assert.equal(await page.$eval('#playzone-camera-toggle', button => button.textContent), 'Stop camera', 'camera preview must survive model errors');
+  await page.evaluate(() => { window.__failPoseModel = false; });
+  await page.click('#playzone-pose-toggle');
+  await page.waitForFunction(() => {
+    const status = document.querySelector('#playzone-pose-status').textContent;
+    return status.includes('No person detected') || status.includes('Body landmarks visible') || status.includes('Move back') || status.includes('failed') || status.includes('could not');
+  }, { timeout: 30000 });
+  const poseStatus = await page.$eval('#playzone-pose-status', element => element.textContent);
+  assert.match(poseStatus, fixture ? /Body landmarks visible|Move back/ : /No person detected/, 'real model should process the simulated camera');
+  assert.equal(await page.$eval('#playzone-pose-overlay', element => element.hidden), false);
+  if (!production) {
+  await page.evaluate(async () => {
+    const { GameScene } = await import('/src/scene.ts');
+    const original = GameScene.prototype.applyTrackedBatterPose;
+    window.__appliedPoses = [];
+    GameScene.prototype.applyTrackedBatterPose = function (pose, ...rest) { window.__poseScene = this; window.__lastPose = pose; window.__poseOffset = rest[0]; window.__poseFacing = rest[1]; window.__poseDirections = rest[2]; window.__appliedPoses.push(pose.leftShoulder?.z); return original.call(this, pose, ...rest); };
+    const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
+    for (const [index, x, y] of [[0,.5,.1],[7,.44,.12],[8,.56,.12],[11,.35,.25],[12,.65,.25],[13,.32,.4],[14,.68,.4],[15,.3,.55],[16,.7,.55],[19,.28,.58],[20,.72,.58],[23,.4,.55],[24,.6,.55],[25,.39,.7],[26,.61,.7],[27,.38,.9],[28,.62,.9],[31,.38,.92],[32,.62,.92]]) points[index] = { x, y, visibility: 1 };
+    window.__poseOverride = points;
+    window.__poseWorldOverride = points.map(point => ({ ...point, z: 0 }));
+    window.__poseWorldOverride[31].z = -.12;
+    window.__poseWorldOverride[32].z = -.12;
+  });
+  const limbsFollowTargets = () => {
+    const scene = window.__poseScene.scene;
+    const limbs = [['leftShoulder','LeftArm','LeftForeArm'],['leftElbow','LeftForeArm','LeftHand'],['rightShoulder','RightArm','RightForeArm'],['rightElbow','RightForeArm','RightHand'],['leftHip','LeftUpLeg','LeftLeg'],['leftKnee','LeftLeg','LeftFoot'],['rightHip','RightUpLeg','RightLeg'],['rightKnee','RightLeg','RightFoot'],['leftWrist','LeftHand','LeftHandIndex3'],['rightWrist','RightHand','RightHandIndex3'],['leftAnkle','LeftFoot','LeftToeBase'],['rightAnkle','RightFoot','RightToeBase']];
+    return limbs.every(([name, parent, child]) => {
+      const a = scene.getTransformNodeByName(parent), b = scene.getTransformNodeByName(child), target = window.__poseDirections[name];
+      if (!a || !b || !target) return false;
+      a.computeWorldMatrix(true); b.computeWorldMatrix(true);
+      const actual = b.getAbsolutePosition().subtract(a.getAbsolutePosition()).normalize();
+      return actual.x * target.x + actual.y * target.y + actual.z * target.z > .94;
+    });
+  };
+  await page.click('#playzone-pose-mirror');
+  await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Body landmarks visible'));
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Calibrated!/);
+  await page.waitForFunction(() => window.__poseFacing === 0 && window.__poseScene);
+  await page.waitForFunction(limbsFollowTargets);
+  assert.equal(await page.evaluate(() => window.__poseScene.scene.getTransformNodeByName('batPivot').isEnabled()), false, 'bat should be hidden during pose tracking');
+  await page.click('#playzone-pose-xray');
+  await page.waitForFunction(() => {
+    const scene = window.__poseScene.scene;
+    const marker = scene.getMeshByName('poseXray_leftKnee'), joint = scene.getTransformNodeByName('LeftLeg');
+    if (!marker?.isEnabled() || !joint) return false;
+    joint.computeWorldMatrix(true);
+    return marker.position.subtract(joint.getAbsolutePosition()).length() < .03 && scene.getMeshByName('poseXrayBones')?.isEnabled();
+  });
+  await page.waitForFunction(() => window.__poseScene.scene.getMeshByName('poseXray_leftWrist')?.material?.name === 'poseXrayMaterial');
+  if (process.env.HARDHIT_XRAY_SCREENSHOT) await page.screenshot({ path: process.env.HARDHIT_XRAY_SCREENSHOT });
+  await page.waitForFunction(() => {
+    const scene = window.__poseScene.scene;
+    const left = scene.getTransformNodeByName('LeftArm'), right = scene.getTransformNodeByName('RightArm');
+    const foot = scene.getTransformNodeByName('LeftFoot'), toe = scene.getTransformNodeByName('LeftToeBase');
+    left.computeWorldMatrix(true); right.computeWorldMatrix(true);
+    foot.computeWorldMatrix(true); toe.computeWorldMatrix(true);
+    const delta = right.getAbsolutePosition().subtract(left.getAbsolutePosition());
+    const toeDirection = toe.getAbsolutePosition().subtract(foot.getAbsolutePosition());
+    return Math.abs(delta.z) < Math.abs(delta.x) * .2 && toeDirection.z > 0;
+  });
+  await new Promise(resolve => setTimeout(resolve, 800));
+  const aligned = await page.evaluate(() => {
+    const scene = window.__poseScene.scene;
+    const left = scene.getTransformNodeByName('LeftArm'), right = scene.getTransformNodeByName('RightArm');
+    const foot = scene.getTransformNodeByName('LeftFoot'), toe = scene.getTransformNodeByName('LeftToeBase');
+    left.computeWorldMatrix(true); right.computeWorldMatrix(true); foot.computeWorldMatrix(true); toe.computeWorldMatrix(true);
+    const shoulders = right.getAbsolutePosition().subtract(left.getAbsolutePosition());
+    return { x: shoulders.x, z: shoulders.z, forward: toe.getAbsolutePosition().z - foot.getAbsolutePosition().z };
+  });
+  assert.ok(Math.abs(aligned.z) < Math.abs(aligned.x) * .2 && aligned.forward > 0, `Front-facing alignment must remain correct after settling: ${JSON.stringify(aligned)}`);
+  const headBefore = await page.evaluate(() => window.__poseScene.scene.getTransformNodeByName('Head').rotationQuaternion.asArray());
+  await page.evaluate(() => { window.__poseWorldOverride[8].z = .06; });
+  await page.waitForFunction(() => (window.__lastPose.head?.y ?? 0) > .1);
+  await page.waitForFunction(before => {
+    const q = window.__poseScene.scene.getTransformNodeByName('Head').rotationQuaternion.asArray();
+    return Math.abs(q.reduce((sum, value, i) => sum + value * before[i], 0)) < .999;
+  }, {}, headBefore);
+  await page.evaluate(() => { window.__poseWorldOverride[8].z = 0; });
+  await page.waitForFunction(() => Math.abs(window.__lastPose.head?.y ?? 0) < .03);
+  await page.waitForFunction(() => {
+    const game = window.__poseScene, scene = game.scene;
+    const feet = ['LeftFoot', 'LeftToeBase', 'RightFoot', 'RightToeBase'].map(name => scene.getTransformNodeByName(name));
+    return feet.every(node => { node.computeWorldMatrix(true); return node.getAbsolutePosition().y >= game.batterRoot.getAbsolutePosition().y - .01; });
+  }, { timeout: 5000 });
+  await page.waitForFunction(() => {
+    const scene = window.__poseScene.scene, upper = scene.getTransformNodeByName('LeftArm'), lower = scene.getTransformNodeByName('LeftForeArm');
+    upper.computeWorldMatrix(true); lower.computeWorldMatrix(true);
+    const actual = lower.getAbsolutePosition().subtract(upper.getAbsolutePosition()).normalize(), target = window.__poseDirections.leftShoulder;
+    return target && actual.x * target.x + actual.y * target.y + actual.z * target.z > .96 && actual.y < -.8;
+  });
+  await page.evaluate(() => { window.__poseWorldOverride[13].x = .2; window.__poseWorldOverride[13].y = .25; });
+  await page.waitForFunction(() => {
+    const scene = window.__poseScene.scene, upper = scene.getTransformNodeByName('LeftArm'), lower = scene.getTransformNodeByName('LeftForeArm');
+    upper.computeWorldMatrix(true); lower.computeWorldMatrix(true);
+    const actual = lower.getAbsolutePosition().subtract(upper.getAbsolutePosition()).normalize(), target = window.__poseDirections.leftShoulder;
+    return target && target.x < -.8 && actual.x * target.x + actual.y * target.y + actual.z * target.z > .96;
+  });
+  await page.waitForFunction(limbsFollowTargets);
+  await page.evaluate(() => { window.__poseWorldOverride[13].x = .32; window.__poseWorldOverride[13].y = .4; });
+  await page.evaluate(() => { window.__poseWorldOverride[12].z = .2; });
+  await page.waitForFunction(() => window.__poseFacing > .1);
+  const turnRight = await page.evaluate(() => window.__poseScene.scene.getTransformNodeByName('batterModelFacing').rotation.y);
+  await page.evaluate(() => { window.__poseWorldOverride[12].z = -.2; });
+  await page.waitForFunction(() => window.__poseFacing < -.1);
+  const turnLeft = await page.evaluate(() => window.__poseScene.scene.getTransformNodeByName('batterModelFacing').rotation.y);
+  assert.ok(turnRight > turnLeft + .2, 'the actual model should turn in opposite directions');
+  await page.evaluate(() => { window.__poseWorldOverride[12].z = 0; });
+  await page.waitForFunction(() => Math.abs(window.__poseFacing) < .03);
+  await page.click('#playzone-pose-mirror');
+  await page.click('#playzone-pose-calibrate');
+  await page.waitForFunction(() => window.__poseFacing === 0);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  await page.waitForFunction(limbsFollowTargets);
+  const mirroredBase = await page.evaluate(() => window.__poseScene.scene.getTransformNodeByName('batterModelFacing').rotation.y);
+  await page.evaluate(() => { window.__poseWorldOverride[12].z = .2; });
+  await page.waitForFunction(() => window.__poseFacing < -.1);
+  await page.waitForFunction(limbsFollowTargets);
+  const mirroredTurn = await page.evaluate(() => window.__poseScene.scene.getTransformNodeByName('batterModelFacing').rotation.y);
+  assert.ok(mirroredTurn < mirroredBase - .08, 'mirroring must reverse the actual model turn');
+  await page.evaluate(() => { window.__poseWorldOverride[12].z = 0; });
+  await page.click('#playzone-pose-mirror');
+  await page.click('#playzone-pose-calibrate');
+  await page.waitForFunction(() => Math.abs(window.__poseFacing) < .03);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const torsoBefore = await page.evaluate(() => {
+    const scene = window.__poseScene.scene, chest = scene.getTransformNodeByName('Spine2'), hips = scene.getTransformNodeByName('Hips');
+    chest.computeWorldMatrix(true); hips.computeWorldMatrix(true);
+    return chest.getAbsolutePosition().subtract(hips.getAbsolutePosition()).asArray();
+  });
+  await page.evaluate(() => { window.__poseWorldOverride[12].z = 0; window.__poseWorldOverride[11].z = -.2; window.__poseWorldOverride[12].z = -.2; });
+  await page.waitForFunction(() => Math.abs(window.__lastPose.spine?.x ?? 0) > .05 && Math.abs(window.__lastPose.chest?.x ?? 0) > .05);
+  await page.waitForFunction(before => {
+    const scene = window.__poseScene.scene, chest = scene.getTransformNodeByName('Spine2'), hips = scene.getTransformNodeByName('Hips');
+    chest.computeWorldMatrix(true); hips.computeWorldMatrix(true);
+    const torso = chest.getAbsolutePosition().subtract(hips.getAbsolutePosition());
+    return Math.hypot(torso.x - before[0], torso.y - before[1], torso.z - before[2]) > .02;
+  }, {}, torsoBefore);
+  await page.waitForFunction(() => {
+    const scene = window.__poseScene.scene, marker = scene.getMeshByName('poseXray_chest'), joint = scene.getTransformNodeByName('Spine2');
+    joint.computeWorldMatrix(true);
+    return marker.position.subtract(joint.getAbsolutePosition()).length() < .03;
+  });
+  await page.click('#playzone-pose-xray');
+  assert.equal(await page.evaluate(() => window.__poseScene.scene.getMeshByName('poseXray_chest').isEnabled()), false);
+  await page.evaluate(() => { window.__poseWorldOverride = null; });
+  await page.evaluate(() => { window.__poseOverride[13].x = .2; });
+  await page.waitForFunction(() => window.__appliedPoses.some(value => Math.abs(value + .12) > .05));
+  const footBefore = await page.evaluate(() => { const foot = window.__poseScene.scene.getTransformNodeByName('LeftFoot'); foot.computeWorldMatrix(true); return foot.getAbsolutePosition().asArray(); });
+  await page.evaluate(() => { window.__poseOverride[25].x = .23; });
+  await page.waitForFunction(before => {
+    const foot = window.__poseScene.scene.getTransformNodeByName('LeftFoot');
+    foot.computeWorldMatrix(true);
+    const p = foot.getAbsolutePosition();
+    return Math.hypot(p.x - before[0], p.y - before[1], p.z - before[2]) > .025;
+  }, {}, footBefore);
+  const originBefore = await page.evaluate(() => window.__poseScene.batterRoot.position.asArray());
+  await page.evaluate(() => { for (const i of [11,12,13,14,15,16,23,24,25,26,27,28]) window.__poseOverride[i].x += .08; });
+  await page.waitForFunction(() => Math.abs(window.__poseScene.scene.getTransformNodeByName('batterModelFacing').position.x) + Math.abs(window.__poseScene.scene.getTransformNodeByName('batterModelFacing').position.z) > .03);
+  assert.deepEqual(await page.evaluate(() => window.__poseScene.batterRoot.position.asArray()), originBefore, 'camera movement must not change match position');
+  await page.evaluate(() => { window.__poseOverride[11].y -= .08; window.__poseOverride[12].y -= .08; });
+  await new Promise(resolve => setTimeout(resolve, 500));
+  assert.equal(await page.evaluate(() => window.__poseOffset.z), 0, 'depth estimate is opt-in');
+  await page.click('#playzone-pose-depth');
+  await page.waitForFunction(() => window.__poseOffset.z < -.02);
+  assert.deepEqual(await page.evaluate(() => window.__poseScene.batterRoot.position.asArray()), originBefore, 'depth approximation must not change match position');
+  await page.click('#playzone-pose-depth');
+  await page.click('#playzone-pose-xray');
+  await page.evaluate(() => { window.__poseOverride[15].visibility = 0; });
+  await page.waitForFunction(() => window.__poseScene.scene.getMeshByName('poseXray_leftWrist')?.material?.name === 'poseXrayUncertain');
+  await new Promise(resolve => setTimeout(resolve, 500));
+  assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Calibrated!/);
+  await page.evaluate(() => { window.__poseOverride[15].visibility = 1; });
+  await page.waitForFunction(() => window.__poseScene.scene.getMeshByName('poseXray_leftWrist')?.material?.name === 'poseXrayMaterial');
+  await page.click('#playzone-pose-xray');
+  await page.evaluate(() => { window.__poseOverride[27].visibility = 0; });
+  await page.waitForFunction(() => document.querySelector('#playzone-retarget-status').textContent.includes('feet are visible'));
+  await page.evaluate(() => { window.__poseOverride[27].visibility = 1; });
+  const beforeMotion = await page.evaluate(() => ({ score: document.querySelector('#playzone-score').textContent, player: localStorage.getItem('six_hitting_contest_player'), board: localStorage.getItem('six_hitting_contest_leaderboard') }));
+  await page.click('#playzone-motion-preview');
+  await page.evaluate(() => {
+    const base = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
+    for (const [index, x, y] of [[11,.35,.25],[12,.65,.25],[15,.47,.55],[16,.53,.55],[23,.4,.55],[24,.6,.55]]) base[index] = { x, y, visibility: 1 };
+    const at = (time, dx) => { const points = structuredClone(base); points[15].x += dx; points[16].x += dx; return { time, points }; };
+    window.__motionSequence = [at(1000,0),at(1100,0),at(1200,0),at(1300,0),at(1400,.06),at(1500,.12),at(1600,.06),at(1700,0),at(1800,0)];
+    window.__holdMotionFrame = true;
+  });
+  await page.waitForFunction(() => document.querySelector('#playzone-motion-status').textContent.includes('Fast two-hand movement:'), { timeout: 10000 });
+  assert.match(await page.$eval('#playzone-motion-status', element => element.textContent), /No shot recorded/);
+  assert.match(await page.$eval('#playzone-motion-status', element => element.textContent), /Camera view: left/, 'camera direction should follow the mirrored preview');
+  assert.deepEqual(await page.evaluate(() => ({ score: document.querySelector('#playzone-score').textContent, player: localStorage.getItem('six_hitting_contest_player'), board: localStorage.getItem('six_hitting_contest_leaderboard') })), beforeMotion, 'hand-motion preview must not change scoring or storage');
+  const queueIntensity = async (distance, startTime) => page.evaluate((dx, start) => {
+    const base = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
+    for (const [index, x, y] of [[11,.35,.25],[12,.65,.25],[15,.47,.55],[16,.53,.55],[23,.4,.55],[24,.6,.55]]) base[index] = { x, y, visibility: 1 };
+    const at = (time, amount) => { const points = structuredClone(base); points[15].x += amount; points[16].x += amount; return { time: start + time, points }; };
+    window.__motionSequence = [at(0,0),at(100,0),at(200,0),at(300,0),at(400,dx*.4),at(500,dx),at(600,dx)];
+    window.__holdMotionFrame = true;
+  }, distance, startTime);
+  assert.equal(await page.$eval('#playzone-intensity-strong', button => button.disabled), true);
+  await page.click('#playzone-intensity-gentle');
+  await queueIntensity(.10, 5000);
+  await page.waitForFunction(() => document.querySelector('#playzone-intensity-status').textContent.includes('Gentler sample saved'), { timeout: 10000 });
+  await page.click('#playzone-intensity-strong');
+  await queueIntensity(.10, 7000);
+  await page.waitForFunction(() => document.querySelector('#playzone-intensity-status').textContent.includes('too close'), { timeout: 10000 });
+  await page.click('#playzone-intensity-strong');
+  await queueIntensity(.16, 9000);
+  await page.waitForFunction(() => document.querySelector('#playzone-intensity-status').textContent.includes('Comparison ready'), { timeout: 10000 });
+  await queueIntensity(.13, 11000);
+  await page.waitForFunction(() => document.querySelector('#playzone-motion-status').textContent.includes('Relative hand-motion intensity:'), { timeout: 10000 });
+  const intensity = Number((await page.$eval('#playzone-motion-status', element => element.textContent)).match(/intensity: (\d+)%/)[1]);
+  assert.ok(intensity >= 45 && intensity <= 55, `A midpoint sample should be about 50%: ${intensity}`);
+  if (process.env.HARDHIT_INTENSITY_SCREENSHOT) await page.screenshot({ path: process.env.HARDHIT_INTENSITY_SCREENSHOT });
+  assert.deepEqual(await page.evaluate(() => ({ score: document.querySelector('#playzone-score').textContent, player: localStorage.getItem('six_hitting_contest_player'), board: localStorage.getItem('six_hitting_contest_leaderboard') })), beforeMotion, 'personal comparison must not change scoring or storage');
+  await page.click('#playzone-intensity-gentle');
+  await page.evaluate(() => { window.__motionSequence = []; window.__holdMotionFrame = false; });
+  await page.select('#playzone-mode', 'delivery');
+  assert.match(await page.$eval('#playzone-intensity-status', element => element.textContent), /Sample cancelled/);
+  assert.equal(await page.$eval('#playzone-intensity-strong', button => button.disabled), false, 'completed calibration should survive batting mode changes');
+  assert.doesNotMatch(await page.$eval('#playzone-motion-status', element => element.textContent), /Fast two-hand movement:/, 'changing practice mode should clear the last movement');
+  await page.select('#playzone-mode', 'free');
+  await page.evaluate(() => {
+    const base = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
+    for (const [index, x, y] of [[11,.35,.25],[12,.65,.25],[15,.47,.55],[16,.53,.55],[23,.4,.55],[24,.6,.55]]) base[index] = { x, y, visibility: 1 };
+    const at = (time, dx) => { const points = structuredClone(base); points[15].x += dx; points[16].x += dx; return { time, points }; };
+    window.__motionSequence = [at(3000,0),at(3100,0),at(3200,0),at(3300,0),at(3400,.06)];
+    window.__holdMotionFrame = true;
+    window.__resumeMotionFrames = [at(3500,.12),at(3600,.12)];
+  });
+  await page.waitForFunction(() => document.querySelector('#playzone-motion-status').textContent.includes('in progress'), { timeout: 10000 });
+  await page.evaluate(async () => {
+    const clock = await import('/src/game-clock.ts');
+    clock.setGamePaused(true); clock.setGamePaused(false);
+    window.__motionSequence = window.__resumeMotionFrames;
+  });
+  await page.waitForFunction(() => window.__motionSequence.length === 0, { timeout: 10000 });
+  assert.doesNotMatch(await page.$eval('#playzone-motion-status', element => element.textContent), /Fast two-hand movement:/, 'a movement crossing a pause must not produce an event');
+  await page.evaluate(() => { window.__motionSequence = []; window.__holdMotionFrame = false; });
+  await page.evaluate(() => { window.__holdPoseResult = true; window.__releasePoseFrame = null; });
+  await page.waitForFunction(() => typeof window.__releasePoseFrame === 'function');
+  const staleFrame = await page.evaluate(async () => {
+    const clock = await import('/src/game-clock.ts');
+    clock.setGamePaused(true); clock.setGamePaused(false);
+    window.__holdPoseResult = false;
+    window.__releasePoseFrame();
+    return { status: document.querySelector('#playzone-motion-status').textContent, serial: window.__poseResultSerial };
+  });
+  assert.match(staleFrame.status, /Tracking stopped or no person/, 'a worker result captured before a pause must be discarded');
+  await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, staleFrame.serial);
+  await page.click('#playzone-pose-toggle');
+  assert.equal(await page.$eval('#playzone-intensity-strong', button => button.disabled), true, 'stopping tracking must clear personal samples');
+  assert.match(await page.$eval('#playzone-intensity-status', element => element.textContent), /Record a gentler movement/);
+  const priorPoseSerial = await page.evaluate(() => window.__poseResultSerial);
+  await page.click('#playzone-pose-toggle');
+  await page.waitForFunction(() => document.querySelector('#playzone-pose-toggle').textContent === 'Stop pose tracking', { timeout: 30000 });
+  await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, priorPoseSerial);
+  await page.click('#playzone-motion-preview');
+  assert.equal(await page.$eval('#playzone-motion-status', element => element.textContent), 'Hand-motion preview is off.');
+  assert.equal(await page.$eval('#playzone-intensity-controls', element => element.hidden), true, 'turning off the preview clears and hides personal comparison');
+  await page.select('#playzone-mode', 'delivery');
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Calibrated!/);
+  assert.match(await page.$eval('#playzone-score', element => element.textContent), /0 balls/, 'camera movement must not record a shot');
+  await page.click('#playzone-motion-preview');
+  await page.click('#playzone-bowl');
+  await page.waitForFunction(() => document.querySelector('#playzone-feedback').textContent.includes('Ball incoming'), { timeout: 10000 });
+  await page.evaluate(async () => {
+    const game = await import('/src/game.ts'), formula = await import('/src/formula.ts'), clock = await import('/src/game-clock.ts');
+    const state = game.globalAutoAssistConfig;
+    const contact = state.deliveryStartTime + formula.deliveryDurationMs(state.currentDelivery.type, state.currentDelivery.pace) * formula.batterContactProgress(state.currentDelivery);
+    const peak = performance.now() + contact - clock.gameNow() - 80;
+    const base = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
+    for (const [index, x, y] of [[11,.35,.25],[12,.65,.25],[15,.47,.55],[16,.53,.55],[23,.4,.55],[24,.6,.55]]) base[index] = { x, y, visibility: 1 };
+    const at = (time, dx) => { const points = structuredClone(base); points[15].x += dx; points[16].x += dx; return { time, points }; };
+    window.__motionSequence = [at(peak-500,0),at(peak-400,0),at(peak-300,0),at(peak-200,0),at(peak-100,.04),at(peak,.12),at(peak+100,.12)];
+    window.__holdMotionFrame = true;
+  });
+  await page.waitForFunction(() => document.querySelector('#playzone-motion-timing').textContent.includes('before modeled contact'), { timeout: 12000 });
+  const comparison = await page.$eval('#playzone-motion-timing', element => element.textContent);
+  const comparisonMs = Number(comparison.match(/peak: (\d+) ms/)[1]);
+  assert.ok(comparisonMs >= 60 && comparisonMs <= 100, `Frame peak should compare about 80 ms early: ${comparison}`);
+  assert.match(comparison, /not bat contact/);
+  assert.doesNotMatch(await page.$eval('#playzone-feedback', element => element.textContent), /EARLY|PERFECT|LATE/, 'camera motion must not create a batting shot');
+  await page.waitForFunction(() => /1 balls/.test(document.querySelector('#playzone-score').textContent), { timeout: 30000 });
+  await page.waitForFunction(() => document.querySelector('#playzone-phase').textContent.includes('READY'), { timeout: 30000 });
+  await page.evaluate(() => { window.__motionSequence = []; window.__holdMotionFrame = false; });
+  await page.click('#playzone-motion-preview');
+  await page.click('#playzone-bowl');
+  await page.waitForFunction(() => document.querySelector('#playzone-feedback').textContent.includes('Ball incoming'), { timeout: 10000 });
+  await page.waitForFunction(async () => {
+    const game = await import('/src/game.ts'), formula = await import('/src/formula.ts'), clock = await import('/src/game-clock.ts');
+    const state = game.globalAutoAssistConfig;
+    return state.isDeliveryActive && clock.gameNow() - state.deliveryStartTime >= formula.deliveryDurationMs(state.currentDelivery.type, state.currentDelivery.pace) * formula.batterContactProgress(state.currentDelivery) - 150;
+  }, { timeout: 5000 });
+  await page.click('#playzone-swing');
+  await page.waitForFunction(() => /EARLY|PERFECT|LATE/.test(document.querySelector('#playzone-feedback').textContent));
+  await page.waitForFunction(() => window.__poseScene.batterRig.trackingPose === true, { timeout: 5000 });
+  await page.waitForFunction(() => /2 balls/.test(document.querySelector('#playzone-score').textContent), { timeout: 30000 });
+  assert.equal(await page.$eval('#playzone-camera-toggle', button => button.textContent), 'Stop camera', 'camera should remain active through a manual shot');
+  await page.evaluate(() => { window.__poseOverride[11].visibility = 0; });
+  await page.waitForFunction(() => document.querySelector('#playzone-retarget-status').textContent.includes('Tracking was lost'));
+  assert.deepEqual(await page.evaluate(() => window.__poseScene.scene.getTransformNodeByName('batterModelFacing').position.asArray()), [0, 0, 0], 'visual offset must reset after tracking loss');
+  await page.evaluate(() => { window.__poseOverride = null; });
+  await page.select('#playzone-mode', 'free');
+  }
+  if (production) {
+    const beforeComparison = await page.evaluate(() => ({ score: document.querySelector('#playzone-score').textContent, player: localStorage.getItem('six_hitting_contest_player'), board: localStorage.getItem('six_hitting_contest_leaderboard') }));
+    await page.evaluate(() => {
+      const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
+      for (const [index, x, y] of [[11,.35,.25],[12,.65,.25],[15,.47,.55],[16,.53,.55],[23,.4,.55],[24,.6,.55]]) points[index] = { x, y, visibility: 1 };
+      window.__poseOverride = points;
+    });
+    await page.click('#playzone-motion-preview');
+    const productionSample = async (distance, startTime) => page.evaluate((dx, start) => {
+      const base = structuredClone(window.__poseOverride);
+      const at = (time, amount) => { const points = structuredClone(base); points[15].x += amount; points[16].x += amount; return { time: start + time, points }; };
+      window.__motionSequence = [at(0,0),at(100,0),at(200,0),at(300,0),at(400,dx*.4),at(500,dx),at(600,dx)];
+      window.__holdMotionFrame = true;
+    }, distance, startTime);
+    await page.click('#playzone-intensity-gentle');
+    await productionSample(.10, 5000);
+    await page.waitForFunction(() => document.querySelector('#playzone-intensity-status').textContent.includes('Gentler sample saved'), { timeout: 10000 });
+    await page.click('#playzone-intensity-strong');
+    await productionSample(.16, 7000);
+    await page.waitForFunction(() => document.querySelector('#playzone-intensity-status').textContent.includes('Comparison ready'), { timeout: 10000 });
+    await productionSample(.13, 9000);
+    await page.waitForFunction(() => document.querySelector('#playzone-motion-status').textContent.includes('Relative hand-motion intensity:'), { timeout: 10000 });
+    const intensity = Number((await page.$eval('#playzone-motion-status', element => element.textContent)).match(/intensity: (\d+)%/)[1]);
+    assert.ok(intensity >= 45 && intensity <= 55, `Production midpoint should be about 50%: ${intensity}`);
+    assert.deepEqual(await page.evaluate(() => ({ score: document.querySelector('#playzone-score').textContent, player: localStorage.getItem('six_hitting_contest_player'), board: localStorage.getItem('six_hitting_contest_leaderboard') })), beforeComparison);
+    await page.evaluate(() => { window.__poseOverride = null; window.__motionSequence = []; window.__holdMotionFrame = false; });
+    await page.click('#playzone-motion-preview');
+  }
+  if (fixture) {
+    const hasOverlay = await page.$eval('#playzone-pose-overlay', canvas => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, index) => index % 4 === 3 && value > 0));
+    assert.ok(hasOverlay, 'detected person should produce a visible skeleton');
+  }
+  await page.click('#playzone-pose-toggle');
+  assert.equal(await page.$eval('#playzone-pose-overlay', element => element.hidden), true);
+  if (!production) assert.equal(await page.evaluate(() => window.__poseScene.scene.getTransformNodeByName('batPivot').isEnabled()), true, 'bat should return when tracking stops');
+  await page.click('#playzone-pose-toggle');
+  await page.waitForFunction(() => document.querySelector('#playzone-pose-toggle').textContent === 'Stop pose tracking', { timeout: 30000 });
+  assert.equal(await page.$eval('#playzone-camera-preview', video => video.hidden), false);
+  assert.equal(await page.evaluate(() => window.__cameraConstraints.audio), false);
+  await page.select('#playzone-mode', 'delivery');
+  assert.equal(await page.$eval('#playzone-camera-toggle', button => button.textContent), 'Stop camera', 'camera should remain active between batting modes');
+  if (!production) await page.click('#playzone-pose-xray');
+  await page.select('#playzone-mode', 'bowling');
+  if (!production) assert.equal(await page.evaluate(() => window.__poseScene.scene.getMeshByName('poseXray_chest').isEnabled()), false, 'X-ray should close when leaving batting');
+  assert.equal(await page.evaluate(() => window.__cameraStreams[0].getTracks()[0].readyState), 'ended');
+  assert.equal(await page.$eval('#playzone-camera-preview', video => video.srcObject), null);
+  assert.equal(await page.$eval('#playzone-pose-overlay', canvas => canvas.hidden), true);
+  assert.equal(await page.$eval('#playzone-pose-toggle', button => button.disabled), true);
+  await page.select('#playzone-mode', 'free');
+  await page.evaluate(() => { window.__cameraMode = 'deny'; });
+  await page.click('#playzone-camera-toggle');
+  await page.waitForFunction(() => document.querySelector('#playzone-camera-status').textContent.includes('permission was denied'));
+  await page.evaluate(() => { window.__cameraMode = 'missing'; });
+  await page.click('#playzone-camera-toggle');
+  await page.waitForFunction(() => document.querySelector('#playzone-camera-status').textContent.includes('No suitable camera'));
+  await page.evaluate(() => { window.__cameraMode = 'busy'; });
+  await page.click('#playzone-camera-toggle');
+  await page.waitForFunction(() => document.querySelector('#playzone-camera-status').textContent.includes('in use'));
+  await page.evaluate(() => { window.__cameraMode = 'defer'; });
+  await page.click('#playzone-camera-toggle');
+  await page.waitForFunction(() => document.querySelector('#playzone-camera-toggle').textContent === 'Cancel camera request');
+  await page.click('#playzone-camera-toggle');
+  await page.evaluate(() => { window.__cameraMode = 'grant'; });
+  await page.click('#playzone-camera-toggle');
+  await page.waitForFunction(() => document.querySelector('#playzone-camera-toggle').textContent === 'Stop camera');
+  await page.evaluate(() => window.__resolveCamera());
+  await page.waitForFunction(() => window.__cameraStreams.at(-1)?.getTracks()[0].readyState === 'ended');
+  assert.equal(await page.$eval('#playzone-camera-preview', video => video.hidden), false, 'late permission must not interrupt a newer preview');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  assert.equal(await page.evaluate(() => window.__cameraStreams.at(-2).getTracks()[0].readyState), 'ended');
+  assert.match(await page.$eval('#playzone-camera-status', element => element.textContent), /page was hidden/);
+  await page.evaluate(() => { delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); });
+  await page.click('#playzone-camera-toggle');
+  await page.waitForFunction(() => document.querySelector('#playzone-camera-toggle').textContent === 'Stop camera');
+  await page.evaluate(() => window.__cameraStreams.at(-1).getVideoTracks()[0].dispatchEvent(new Event('ended')));
+  await page.waitForFunction(() => document.querySelector('#playzone-camera-status').textContent.includes('disconnected'));
+  assert.equal(await page.evaluate(() => window.__cameraStreams.at(-1).getTracks()[0].readyState), 'ended');
+  await page.click('#playzone-camera-toggle');
+  await page.waitForFunction(() => document.querySelector('#playzone-camera-toggle').textContent === 'Stop camera');
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  assert.equal(await page.evaluate(() => window.__cameraStreams.at(-1).getTracks()[0].readyState), 'ended');
+  await page.evaluate(() => { window.__cameraMode = 'defer'; });
+  await page.click('#playzone-camera-toggle');
+  await page.waitForFunction(() => document.querySelector('#playzone-camera-toggle').textContent === 'Cancel camera request');
+  await page.click('#playzone-exit');
+  await page.evaluate(() => window.__resolveCamera());
+  await page.waitForFunction(() => window.__cameraStreams.at(-1).getTracks()[0].readyState === 'ended');
+  assert.equal(await page.$eval('#playzone-camera-preview', video => video.srcObject), null);
+  assert.equal(await page.evaluate(() => window.__cameraStreams.at(-1).getTracks()[0].readyState), 'ended');
+  assert.deepEqual(errors, []);
+  const mobile = await browser.newPage();
+  await mobile.setViewport({ width: 667, height: 300, isMobile: true, hasTouch: true });
+  await mobile.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { waitUntil: 'networkidle0' });
+  await mobile.tap('#btn-playzone');
+  await mobile.tap('#playzone-camera-settings summary');
+  const reachable = await mobile.$eval('#playzone-camera-toggle', element => {
+    element.scrollIntoView({ block: 'center' });
+    const rect = element.getBoundingClientRect();
+    return document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) === element;
+  });
+  assert.ok(reachable, 'camera control must be reachable in landscape touch layout');
+  await mobile.close();
+  console.log('Camera preview passed: opt-in, mode changes, errors, cancellation, hidden-page and exit cleanup.');
+} finally {
+  if (browser) await browser.close();
+  await server.close();
+}

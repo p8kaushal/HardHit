@@ -18,6 +18,32 @@ try {
   page.on('console', msg => { if (msg.type() === 'error') errors.push(`${msg.text()} ${msg.location().url ?? ''}`); });
   page.on('response', response => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${response.url()}`); });
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { waitUntil: 'networkidle0' });
+  await page.evaluate(async () => {
+    const { GameScene } = await import('/src/scene.ts');
+    const { globalAutoAssistConfig } = await import('/src/game.ts');
+    const { MatchController } = await import('/src/game.ts');
+    const { deliveryContactPoint, BALL_RADIUS_METERS } = await import('/src/formula.ts');
+    const animateDelivery = GameScene.prototype.animateDelivery;
+    window.__matchContacts = [];
+    const recordBall = MatchController.prototype.recordBall;
+    MatchController.prototype.recordBall = function (delivery, shot) {
+      const contact = window.__matchContacts.at(-1);
+      const result = recordBall.call(this, delivery, shot);
+      if (contact && !contact.recorded) {
+        contact.recorded = true;
+        contact.shot = !!shot && !!result.shot;
+      }
+      return result;
+    };
+    GameScene.prototype.animateDelivery = function (target, length, type, arrived, ...rest) {
+      return animateDelivery.call(this, target, length, type, () => {
+        const position = this.scene.getMeshByName('cricketBall').position;
+        const expected = deliveryContactPoint(globalAutoAssistConfig.currentDelivery);
+        window.__matchContacts.push({ error: Math.hypot(position.x - expected.x, position.y - expected.y - (0.075 - BALL_RADIUS_METERS), position.z - expected.z), swung: this.hasBotSwung });
+        arrived();
+      }, ...rest);
+    };
+  });
   if (process.argv.includes('--force-tie')) {
     // Test-only fixture: make regular-innings deliveries legal dots so the
     // real UI must play both sudden-death innings. Production code is unchanged.
@@ -94,6 +120,10 @@ try {
     await new Promise(resolve => setTimeout(resolve, 60));
   }
   await page.waitForSelector('#match-summary-modal.active', { timeout: 1000 });
+  const contacts = await page.evaluate(() => window.__matchContacts);
+  // The sudden-death fixture intentionally records no shot in the regular innings.
+  const requireRecordedShot = !process.argv.includes('--force-tie');
+  if (contacts.length < 6 || contacts.some(contact => contact.error >= 1e-6 || !contact.swung || !contact.recorded || (requireRecordedShot && !contact.shot))) throw new Error(`Bowling contact mismatch: ${JSON.stringify(contacts)}`);
   if (process.argv.includes('--force-tie')) {
     const sudden = await page.evaluate(() => ({
       visible: !document.querySelector('#summary-sudden-death').classList.contains('hidden'),

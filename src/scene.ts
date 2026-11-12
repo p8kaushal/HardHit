@@ -1,6 +1,8 @@
+import { BatterRig, type BatterPose } from './batter-rig';
+import type { TrackedConfidence, TrackedDirections } from './pose-retarget';
 import * as BABYLON from 'babylonjs';
-import { gameNow, isGamePaused, setGameTimeout } from './game-clock';
-import { CameraMode, DeliveryChoice, DeliveryType } from './types';
+import { clearGameTimeout, gameNow, isGamePaused, setGameTimeout } from './game-clock';
+import { CameraMode, DeliveryChoice, DeliveryType, ShotType } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
@@ -37,7 +39,7 @@ export class GameScene {
   public batterRoot: BABYLON.TransformNode | null = null;
   private batterHead: BABYLON.TransformNode | null = null;
   public batMesh: BABYLON.Mesh | null = null;
-  private batPivot: BABYLON.TransformNode | null = null;
+  private batterRig: BatterRig | null = null;
 
 
   // Animation state
@@ -49,6 +51,7 @@ export class GameScene {
   private onBallArrivedCallback: (() => void) | null = null;
   private onBallResolvedCallback: (() => void) | null = null;
   private onBallCreaseCrossedCallback: (() => void) | null = null;
+  private missTimer: number | null = null;
   private creaseCrossedFired = false;
   
   private batterHand: 'RHB' | 'LHB' = 'RHB';
@@ -101,14 +104,6 @@ export class GameScene {
         }
         if ((globalAutoAssistConfig.isDeliveryActive || globalAutoAssistConfig.isBallInPlay || this.isAnimatingBall) && this.ballMesh) {
           this.ballMesh.rotation.x += Math.min(this.engine.getDeltaTime(), 50) * 0.012;
-        }
-        if (this.isAnimatingBall && this.isBotBatting) {
-          if (this.ballMesh && this.ballMesh.position.z <= -7.5 && !this.hasBotSwung) {
-            this.hasBotSwung = true;
-            if (this.botBattingTriggerCallback) {
-              this.botBattingTriggerCallback();
-            }
-          }
         }
         if (this.activeCameraMode === 'follow_shot' && this.ballMesh) {
           const pose = followShotPose(this.ballMesh.position, this.shotCameraDirection);
@@ -354,6 +349,36 @@ export class GameScene {
     this.primaryCamera.fov = 0.85;
   }
 
+  public setPracticeCameraView(): void {
+    this.setCameraMode('stadium_wide');
+    this.primaryCamera.setTarget(new BABYLON.Vector3(this.batterRoot?.position.x ?? -0.35, 1, this.batterRoot?.position.z ?? -8.8));
+    this.primaryCamera.setPosition(new BABYLON.Vector3(2.1, 1.9, -11.8));
+    this.primaryCamera.fov = 0.75;
+  }
+
+  /** Receive already-retargeted local joint rotations from a pose controller. */
+  public applyBatterPose(pose: BatterPose, batRotation?: BABYLON.Vector3): boolean {
+    return this.batterRig?.applyPose(pose, batRotation) ?? false;
+  }
+
+  public applyTrackedBatterPose(pose: BatterPose, screenOffset: { x: number; y: number; z: number }, facing: number | null, directions: TrackedDirections, confidence: TrackedConfidence = {}): boolean {
+    if (!this.batterRig || !this.batterRoot) return false;
+    const right = this.primaryCamera.getDirection(BABYLON.Axis.X);
+    right.y = 0;
+    right.normalize();
+    const forward = this.primaryCamera.getDirection(BABYLON.Axis.Z);
+    forward.y = 0;
+    forward.normalize();
+    const worldOffset = right.scale(screenOffset.x).add(forward.scale(screenOffset.z)).add(new BABYLON.Vector3(0, screenOffset.y, 0));
+    const localOffset = BABYLON.Vector3.TransformNormal(worldOffset, BABYLON.Matrix.Invert(this.batterRoot.computeWorldMatrix(true)));
+    this.batterRig.setTrackingOffset(localOffset);
+    this.batterRig.setTrackingFacing(facing);
+    return this.batterRig.applyTrackingPose(pose, directions, confidence);
+  }
+
+  public setTrackingBatVisible(visible: boolean): void { this.batterRig?.setBatVisible(visible); }
+  public setBatterXrayVisible(visible: boolean): void { this.batterRig?.setXrayVisible(visible); }
+
   public setBowlingCameraView(): void {
     this.primaryCamera.position = new BABYLON.Vector3(0.0, 2.6, 13.5);
     this.primaryCamera.setTarget(new BABYLON.Vector3(0.0, 0.5, -8.8));
@@ -421,42 +446,19 @@ export class GameScene {
     });
     this.bowlerRoot = bowler;
 
-    const batter = new BABYLON.TransformNode('batterRoot', this.scene);
-    batter.position.set(-0.35, 0, -8.8);
-    limb('batterTorso', batter, blue, 0, 1.23, 0, 0.67, 0.42);
-    const head = new BABYLON.TransformNode('batterHeadPivot', this.scene);
-    head.parent = batter;
-    head.position.y = 1.76;
-    head.rotation.y = -this.batterStanceAngle();
-    this.batterHead = head;
-    ball('batterHead', head, skin, 0, 0, 0, 0.27);
-    const cap = ball('batterHelmet', head, helmet, 0, 0.08, 0, 0.29);
-    cap.scaling.y = 0.75;
-    box('helmetPeak', head, helmet, 0, 0.05, 0.15, 0.26, 0.035, 0.16);
-    [-1, 1].forEach((side, i) => {
-      limb(`batterLeg${i}`, batter, trousers, side * 0.13, 0.48, 0, 0.86, 0.17);
-      box(`batterPad${i}`, batter, pads, side * 0.13, 0.38, 0.095, 0.19, 0.57, 0.1);
-      box(`batterShoe${i}`, batter, shoes, side * 0.13, 0.06, 0.06, 0.18, 0.1, 0.3);
-      const arm = limb(`batterArm${i}`, batter, blue, side * 0.27, 1.18, 0.07, 0.58, 0.13);
-      arm.rotation.z = side * 0.24;
-      ball(`batterGlove${i}`, batter, pads, side * 0.3, 0.89, 0.13, 0.16);
-    });
-    const batPivot = new BABYLON.TransformNode('batPivot', this.scene);
-    batPivot.parent = batter;
-    batPivot.position.set(0.30, 0.91, 0.40);
-    batPivot.rotation.z = -0.2;
-    const bat = box('batMesh', batPivot, batWood, 0, -0.43, 0, 0.22, 0.64, 0.065);
-    bat.rotation.y = Math.PI / 2;
-    limb('batHandle', batPivot, grip, 0, -0.03, 0, 0.27, 0.05);
-    this.batMesh = bat;
-    this.batPivot = batPivot;
-    batter.rotation.y = this.batterStanceAngle();
-    this.batterRoot = batter;
+    const rig = new BatterRig(this.scene, { blue, trousers, skin, helmet, pads, shoes, batWood, grip });
+    this.batterRig = rig;
+    this.batterRoot = rig.root;
+    this.batterHead = rig.joints.head;
+    this.batMesh = rig.batMesh;
+    rig.root.rotation.y = this.batterStanceAngle();
+    rig.joints.head.rotation.y = -this.batterStanceAngle();
     this.updateBatterPosition();
   }
 
   public setBatterHandedness(hand: 'RHB' | 'LHB'): void {
     this.batterHand = hand;
+    this.batterRig?.setHandedness(hand);
     if (!this.batterRoot) return;
     
     this.batterRoot.parent = null;
@@ -604,6 +606,33 @@ export class GameScene {
     }
   }
 
+  /** Stop a practice delivery without invoking its completion callbacks. */
+  public cancelPracticeDelivery(): void {
+    if (this.missTimer != null) clearGameTimeout(this.missTimer);
+    this.missTimer = null;
+    this.isAnimatingBall = false;
+    this.updateDeliveryAnimation = null;
+    this.updateMissedAnimation = null;
+    this.onBallArrivedCallback = null;
+    this.onBallResolvedCallback = null;
+    this.onBallCreaseCrossedCallback = null;
+    this.shotPhysics = null;
+    this.currentBallPos = null;
+    this.shotOrigin = null;
+    globalAutoAssistConfig.isBallInPlay = false;
+    globalAutoAssistConfig.isDeliveryActive = false;
+    globalAutoAssistConfig.isRunUpActive = false;
+    globalAutoAssistConfig.currentDelivery = null;
+    this.ballMesh?.setEnabled(false);
+    this.hideBounceMarker();
+    this.clearBallTrail();
+    if (this.batterRoot) {
+      this.scene.stopAnimation(this.batterRoot);
+      this.batterRoot.rotation.x = 0;
+      this.batterRoot.rotation.y = this.batterStanceAngle();
+    }
+  }
+
 
   public animateDelivery(
     aimTarget: { x: number; z: number },
@@ -625,6 +654,10 @@ export class GameScene {
     this.onBallCreaseCrossedCallback = onCreaseCrossed || null;
     this.creaseCrossedFired = false;
     this.hasBotSwung = false;
+    const delivery: DeliveryChoice = { aimTarget: { ...aimTarget }, type: deliveryType, line: 'middle', length: 'good', releaseTiming: 0.5, overTheWicket, bowlingArm: globalAutoAssistConfig.bowlerArm || 'Right', turn, swing, pace };
+    const contactProgress = batterContactProgress(delivery);
+    // Swing animation reaches its strike phase about 150 ms after it starts.
+    const botSwingProgress = Math.max(0, contactProgress - 150 / deliveryDurationMs(deliveryType, pace));
     
     // Ensure active camera remains strictly locked in player's perspective during delivery
     const preContactCam: CameraMode = this.isBotBatting ? 'bowler_eye' : 'batter_eye';
@@ -635,7 +668,6 @@ export class GameScene {
       this.bounceMarker.parent = null;
       this.bounceMarker.isVisible = true;
       this.bounceMarker.setEnabled(true);
-      const delivery: DeliveryChoice = { aimTarget, type: deliveryType, line: 'middle', length: 'good', releaseTiming: 0.5, overTheWicket, bowlingArm: globalAutoAssistConfig.bowlerArm || 'Right', turn, swing, pace };
       const pitch = deliveryPitchPoint(delivery);
       this.bounceMarker.position.set(pitch.x, 0.08, pitch.z);
     }
@@ -730,8 +762,15 @@ export class GameScene {
       }
 
       this.ballAnimationTime += deliveryAnimationStep(this.engine.getDeltaTime(), currentSpeedScale);
-      this.notifyDeliveryBounce(this.ballAnimationTime / 60, deliveryType, aimTarget.z);
+      const progress = Math.min(contactProgress, this.ballAnimationTime / 60);
+      this.notifyDeliveryBounce(progress, deliveryType, delivery.aimTarget.z);
       const index = Math.floor(this.ballAnimationTime);
+
+      // Trigger before resolving even if a single frame crosses both thresholds.
+      if (this.isBotBatting && !this.hasBotSwung && progress >= botSwingProgress) {
+        this.hasBotSwung = true;
+        this.botBattingTriggerCallback?.();
+      }
 
       if (this.timingRing && this.ballMesh) {
         const startZ = 10.0;
@@ -761,9 +800,10 @@ export class GameScene {
         }
       }
 
-      if (index >= this.ballTrajectoryPoints.length - 1) {
-        // Ball passed/reached batter stumps
-        this.ballMesh?.position.copyFrom(this.ballTrajectoryPoints[this.ballTrajectoryPoints.length - 1]);
+      if (progress >= contactProgress) {
+        // The displayed ball must be at the same sampled contact point used by adjudication.
+        const contact = sampleDeliveryPath(delivery, contactProgress);
+        this.ballMesh?.position.set(contact.x, contact.y + BALL_VISUAL_OFFSET, contact.z);
         this.isAnimatingBall = false;
         this.updateDeliveryAnimation = null;
         this.ballMesh?.setEnabled(false);
@@ -772,6 +812,10 @@ export class GameScene {
         if (this.predictionPath) {
           this.predictionPath.dispose();
           this.predictionPath = null;
+        }
+        if (!this.creaseCrossedFired) {
+          this.creaseCrossedFired = true;
+          this.onBallCreaseCrossedCallback?.();
         }
         if (this.onBallArrivedCallback) this.onBallArrivedCallback();
         return;
@@ -782,13 +826,6 @@ export class GameScene {
         BABYLON.Vector3.LerpToRef(this.ballTrajectoryPoints[index], next, this.ballAnimationTime - index, this.ballMesh.position);
       }
       
-      if (!this.creaseCrossedFired && this.ballMesh && this.ballMesh.position.z <= -8.5) {
-        this.creaseCrossedFired = true;
-        if (this.onBallCreaseCrossedCallback) {
-          this.onBallCreaseCrossedCallback();
-        }
-      }
-
       // Draw custom line trail
       this.drawBallTrail();
 
@@ -827,26 +864,20 @@ export class GameScene {
     this.ballTrail.color.copyFrom(color);
   }
 
-  public animateBatterSwing(_directionAngle: number, successCallback: () => void): void {
-    if (this.batPivot && this.batterRoot) {
-      const batter = this.batterRoot;
-      const stance = this.batterStanceAngle();
-      const pivot = this.batPivot;
-      this.scene.stopAnimation(pivot);
-      this.scene.stopAnimation(batter);
-      const bodySwing = BABYLON.Animation.CreateAndStartAnimation(
-        'batterBodySwing', batter, 'rotation.y', 60, 12, stance, stance + 0.45,
-        BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
-      );
-      bodySwing?.onAnimationEndObservable.add(() => { batter.rotation.y = stance; });
-      const swing = new BABYLON.Animation('batSwing', 'rotation.z', 60, BABYLON.Animation.ANIMATIONTYPE_FLOAT);
-      swing.setKeys([{ frame: 0, value: -0.2 }, { frame: 4, value: -1.4 }, { frame: 10, value: 1.1 }, { frame: 18, value: -0.2 }]);
-      this.scene.beginDirectAnimation(pivot, [swing], 0, 18, false, 1, () => {
-        successCallback();
-      });
-    } else {
+  public animateBatterSwing(directionAngle: number, successCallback: () => void, shotType: ShotType = 'grounded', footwork: 'front_foot' | 'back_foot' = 'front_foot'): void {
+    if (!this.batterRig || !this.batterRoot) {
       successCallback();
+      return;
     }
+    const batter = this.batterRoot;
+    const stance = this.batterStanceAngle();
+    this.scene.stopAnimation(batter);
+    const bodySwing = BABYLON.Animation.CreateAndStartAnimation(
+      'batterBodySwing', batter, 'rotation.y', 60, 12, stance, stance + 0.45,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
+    bodySwing?.onAnimationEndObservable.add(() => { batter.rotation.y = stance; });
+    this.batterRig.animateSwing(directionAngle, successCallback, shotType, footwork);
   }
 
   public detachCameraFromBall(): void {
@@ -993,7 +1024,7 @@ export class GameScene {
   }
 
 
-  public animateHitPath(distance: number, direction: number, V_out?: { x: number, y: number, z: number }): void {
+  public animateHitPath(distance: number, direction: number, V_out?: { x: number, y: number, z: number }, keepBattingView = false): void {
     this.isAnimatingBall = false;
     this.updateMissedAnimation = null;
     this.clearBallTrail();
@@ -1015,10 +1046,12 @@ export class GameScene {
     }
 
     this.shotCameraDirection = shotCameraDirection(currentVelocity);
-    const cameraPose = followShotPose(startPoint, this.shotCameraDirection);
-    this.setCameraMode('follow_shot');
-    this.primaryCamera.setTarget(new BABYLON.Vector3(cameraPose.target.x, cameraPose.target.y, cameraPose.target.z));
-    this.primaryCamera.setPosition(new BABYLON.Vector3(cameraPose.position.x, cameraPose.position.y, cameraPose.position.z));
+    if (!keepBattingView) {
+      const cameraPose = followShotPose(startPoint, this.shotCameraDirection);
+      this.setCameraMode('follow_shot');
+      this.primaryCamera.setTarget(new BABYLON.Vector3(cameraPose.target.x, cameraPose.target.y, cameraPose.target.z));
+      this.primaryCamera.setPosition(new BABYLON.Vector3(cameraPose.position.x, cameraPose.position.y, cameraPose.position.z));
+    }
 
     this.ballPathPoints = [startPoint.add(new BABYLON.Vector3(0, BALL_VISUAL_OFFSET, 0))];
     this.currentBallPos = startPoint.clone();
@@ -1077,7 +1110,8 @@ export class GameScene {
     
     const onResolved = this.onBallResolvedCallback;
     this.onBallResolvedCallback = null;
-    setGameTimeout(() => {
+    this.missTimer = setGameTimeout(() => {
+      this.missTimer = null;
       if (this.batterRoot) this.batterRoot.rotation.x = 0;
       onResolved?.();
     }, 1500);

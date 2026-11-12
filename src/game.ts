@@ -1,5 +1,6 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { battingAssistanceMultiplier, evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, deliveryContactPoint, deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
+import { deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier } from './formula';
+import { resolveBattingDelivery, resolveShotFlight } from './batting-resolution';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
@@ -288,110 +289,28 @@ export class MatchController {
     if (this.state.status !== 'playing' || !innings || innings.finished) {
       throw new Error('Cannot record a delivery after the innings has finished');
     }
-    // A completed ball must not change when controls prepare the next delivery.
-    const delivery: DeliveryChoice = {
-      ...inputDelivery,
-      aimTarget: { ...inputDelivery.aimTarget },
-      ...(inputDelivery.batterPosition ? { batterPosition: { ...inputDelivery.batterPosition } } : {})
-    };
-    const shot: ShotChoice | null = inputShot ? { ...inputShot } : null;
-    
-    // Save whether this ball is a Free Hit
-    const isFreeHit = innings.isNextFreeHit;
-    // Reset next ball's Free Hit state
-    innings.isNextFreeHit = false;
-
-    // Reset bounce state for the new delivery
+    const { outcome, nextFreeHit } = resolveBattingDelivery({
+      delivery: inputDelivery,
+      shot: inputShot,
+      batter: innings.batter,
+      bowler: innings.bowler,
+      difficulty: this.botDifficulty,
+      ballNumber: innings.ballsBowled + 1,
+      isFreeHit: innings.isNextFreeHit
+    });
+    innings.isNextFreeHit = nextFreeHit;
     globalAutoAssistConfig.hasBounced = false;
-
-    const ballNumber = innings.ballsBowled + 1;
-
-    let extra = checkExtraBall(delivery, innings.batter.batterHand || 'RHB');
-    
-    let isWicket = false;
-    let wicketReason = '';
-    let distance = 0;
-    let missed = shot === null;
-
-    const assistMultiplier = battingAssistanceMultiplier(innings.batter, innings.bowler, this.botDifficulty);
-
-    const wicketResult = shot ? evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier) : null;
-    if (wicketResult) missed = wicketResult.missed ?? false;
-    const relativeLine = deliveryContactPoint(delivery).x - (delivery.batterPosition?.x ?? 0);
-    if (shot && Math.abs(relativeLine) > 1.25) missed = true;
-    // A ball contacted by the bat is not a wide, provided it is within reach.
-    if (extra.type === 'wide' && shot && !missed && Math.abs(relativeLine) <= 1.25) {
-      extra = { isExtra: false, type: null };
-    }
-    if (extra.type === 'wide') missed = true;
-
-    if (extra.isExtra) {
-      innings.score += 1; // +1 run penalty
-      innings.isNextFreeHit = isFreeHit || extra.type === 'noball';
-      
-      if (extra.type === 'wide') {
-        wicketReason = 'Penalty - Wide ball!';
-      } else {
-        wicketReason = 'Front-foot no-ball! (Free hit next)';
-      }
-      distance = 0;
-      console.log(`[GAME EVENT] Extra ball penalty: ${extra.type?.toUpperCase()}. Innings score: ${innings.score}.`);
-    }
-    if (!extra.isExtra && shot === null) {
-      const dismissal = isFreeHit ? null : resolveMissedDelivery(delivery, innings.batter.batterHand || 'RHB', false);
-      isWicket = dismissal !== null;
-      wicketReason = dismissal === 'lbw' ? 'LBW' : dismissal === 'bowled' ? 'Bowled' : 'Missed delivery!';
-      distance = 0;
-      console.log(`[GAME EVENT] Missed delivery. Ball number ${ballNumber}`);
-    } else if (shot && wicketResult && extra.type !== 'wide') {
-      isWicket = wicketResult.isWicket;
-      wicketReason = extra.type === 'noball' ? 'Front-foot no-ball! (Free hit next)' : wicketResult.reason;
-      
-      if (!isWicket && !missed) {
-        const distResult = calculateDistance(innings.batter, innings.bowler, delivery, shot, wicketResult.safeWindowMs, wicketResult.isEdgeFallback, assistMultiplier);
-        distance = distResult.distance;
-        if (distResult.isMiscueWicket) {
-          isWicket = true;
-          wicketReason = distResult.miscueReason;
-          distance = 0;
-        }
-      }
-
-      // Check Free Hit survival rules
-      if (isWicket && (isFreeHit || extra.type === 'noball')) {
-        isWicket = false;
-        wicketReason = `Free Hit Survival! Batter mistimed shot but is not out. Original reason: ${wicketReason}`;
-        console.log(`[GAME EVENT] Batter survived a dismissal due to active Free Hit!`);
-      }
-
-      if (!isWicket) {
-        // Runs are now dynamically resolved after ball motion finishes
-        console.log(`[GAME EVENT] Ball hit into the field. Pending physical resolution for runs.`);
-      }
-    }
-
-    const outcome: BallOutcome = {
-      ballNumber,
-      delivery,
-      shot,
-      missed,
-      distance,
-      isWicket,
-      wicketReason,
-      isFreeHit,
-      isExtra: extra.isExtra,
-      extraType: extra.type
-    };
+    if (outcome.isExtra) innings.score += 1;
 
     innings.balls.push(outcome);
 
-    if (!extra.isExtra) {
+    if (!outcome.isExtra) {
       innings.ballsBowled += 1;
     }
 
-    if (isWicket) {
+    if (outcome.isWicket) {
       innings.wicketsLost += 1;
-      console.log(`[GAME EVENT] WICKET! Batter dismissed: ${wicketReason}.`);
+      console.log(`[GAME EVENT] WICKET! Batter dismissed: ${outcome.wicketReason}.`);
     }
 
     // A regular contest always gives each batter six legal deliveries.
@@ -406,20 +325,13 @@ export class MatchController {
 
   public finalizeBallOutcome(rawDistance: number, hasBounced: boolean, reachedBoundary?: boolean): number {
     try {
-      let distance = rawDistance;
-      if (isNaN(distance) || !isFinite(distance) || distance < 0) {
-        distance = 0.0;
-      }
-      distance = Math.min(distance, 130.0);
-
       const innings = this.getCurrentInnings();
       const lastBall = innings.balls[innings.balls.length - 1];
       if (!lastBall || !lastBall.shot || lastBall.missed || lastBall.isWicket || lastBall.extraType === 'wide') return 0;
       if (lastBall.runs !== undefined) return lastBall.runs;
-      
-      // Evaluate outcome using formula
-      const runs = evaluateFinalOutcome(distance, hasBounced, reachedBoundary);
-      
+
+      const { distance, runs } = resolveShotFlight(rawDistance, hasBounced, reachedBoundary);
+
       innings.score += runs;
       if (runs === 6) {
         innings.biggestSix = Math.max(innings.biggestSix, distance);

@@ -63,6 +63,7 @@ export interface ShotChoice {
   type: ShotType;
   timing: number;       // 0.0 to 1.0 (0.5 is perfect)
   contactZone: number;
+  strength?: number;    // 0 to 1; omitted uses existing full-strength behavior
   footwork?: 'front_foot' | 'back_foot';  // 0.0 to 1.0 (0.5 is perfect sweet spot)
 }
 

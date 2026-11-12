@@ -15,10 +15,15 @@
     "test:match:bat-first": "node scripts/browser-match.mjs --bat-first --swing",
     "test:match:sixes": "node scripts/browser-match.mjs --bat-first --swing --loft",
     "test:match:sudden": "node scripts/browser-match.mjs --force-tie",
-    "test:rematch": "node scripts/browser-match.mjs --rematch"
+    "test:rematch": "node scripts/browser-match.mjs --rematch",
+    "test:playzone": "node scripts/browser-playzone.mjs",
+    "test:camera-preview": "node scripts/browser-camera-preview.mjs",
+    "test:bowling-playzone": "node scripts/browser-bowling-playzone.mjs"
   },
   "dependencies": {
-    "babylonjs": "^6.33.0"
+    "@mediapipe/tasks-vision": "^1.2.2",
+    "babylonjs": "^6.33.0",
+    "babylonjs-loaders": "^6.49.0"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

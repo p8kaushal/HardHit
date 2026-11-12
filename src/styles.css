@@ -2908,7 +2908,7 @@ kbd {
 /* Touch batting: aim with one thumb and strike with the other. */
 .touch-batting-controls { display: none; }
 .rotate-hint { display: none; }
-@media (orientation: portrait) {
+@media (orientation: portrait) and (pointer: coarse) {
   .rotate-hint {
     position: fixed;
     z-index: 20000;
@@ -3232,4 +3232,186 @@ body { min-height: 100dvh; }
 .toast-kicker { font-size: .55rem; }
 @media (orientation: landscape) and (max-height: 320px) {
   .broadcast-brand, .toast-kicker { display: none; }
+}
+
+/* Batting playzone controls sit above the shared game canvas. */
+#screen-playzone { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
+#screen-playzone .playzone-panel { position: absolute; z-index: 2; top: 12px; left: 12px; width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; padding: 14px; border-radius: 12px; background: rgba(8, 24, 35, .92); color: #fff; pointer-events: auto; }
+.playzone-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.playzone-heading h1 { font-size: 1.2rem; margin: 0; }
+.playzone-panel label { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0; }
+.playzone-panel select { max-width: 60%; color: #10202a; background: white; padding: 5px; border-radius: 4px; }
+.playzone-panel input[type="range"] { width: 50%; }
+.playzone-panel .playzone-check { justify-content: flex-start; }
+.playzone-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.playzone-actions .btn, .playzone-heading .btn { padding: 7px 10px; }
+.playzone-help, #playzone-feedback { font-size: .85rem; margin: 8px 0 0; }
+#playzone-feedback { color: #9ef2c4; }
+.practice-touch { display: none; }
+@media (pointer: coarse), (max-width: 768px) {
+  .practice-touch { display: flex; align-items: center; gap: 10px; touch-action: none; }
+  .practice-shot-buttons { display: grid; grid-template-columns: repeat(2, minmax(55px, 1fr)); gap: 4px; }
+  .practice-shot-buttons .btn { padding: 8px; touch-action: none; }
+}
+
+/* Playzone: keep the pitch clear and the next action visible. */
+#screen-playzone { color: #f4f4e9; font-family: inherit; }
+.practice-header { position: absolute; z-index: 3; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 24px; min-height: 76px; padding: 12px 22px; background: linear-gradient(180deg, rgba(6,20,17,.94), rgba(6,20,17,.64) 75%, transparent); pointer-events: auto; }
+.practice-brand { flex: 1; min-width: 0; }
+.practice-kicker, .practice-section-label, .practice-divider { color: #cab677; font-size: .62rem; font-weight: 800; letter-spacing: .15em; }
+.practice-brand h1 { margin: 2px 0 0; color: #fff; font-size: 1.2rem; line-height: 1.1; }
+#playzone-score { margin: 0; color: #d6e5d8; font-size: .78rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.practice-exit, .practice-secondary { color: #edf4e8; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 9px 12px; cursor: pointer; font-weight: 700; }
+.practice-exit:hover, .practice-secondary:hover { background: rgba(255,255,255,.16); }
+#screen-playzone .playzone-panel { top: 92px; right: 20px; left: auto; bottom: auto; width: min(310px, calc(100vw - 30px)); max-height: calc(100dvh - 190px); padding: 18px; border: 1px solid rgba(219,229,201,.18); border-radius: 10px; background: rgba(9,27,24,.94); box-shadow: 0 12px 35px rgba(0,0,0,.25); }
+.practice-panel-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.practice-live { color: #8fdbad; font-size: .6rem; font-weight: 800; letter-spacing: .12em; }
+.practice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#screen-playzone .practice-field { display: flex; flex-direction: column; align-items: stretch; gap: 5px; margin: 0 0 10px; color: #bccdc2; font-size: .7rem; font-weight: 700; }
+#screen-playzone .practice-field select { width: 100%; max-width: none; min-width: 0; min-height: 36px; padding: 6px 8px; color: #f4f4e9; background: #203c33; border: 1px solid #4b6255; border-radius: 5px; font-size: .76rem; }
+#screen-playzone .practice-field input[type=range] { width: 100%; accent-color: #d5b765; min-height: 36px; }
+.practice-divider { display: flex; align-items: center; gap: 8px; margin: 11px 0; }
+.practice-divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.13); }
+.practice-delivery-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.practice-display-options { display: grid; gap: 8px; }
+.practice-settings { border-top: 1px solid rgba(255,255,255,.13); }
+.practice-settings summary { padding: 8px 0; color: #cab677; font-size: .68rem; font-weight: 800; cursor: pointer; }
+.practice-camera-frame { position: relative; width: 100%; transform: scaleX(-1); }
+#playzone-camera-preview { display: block; width: 100%; height: auto; background: #06130e; border-radius: 5px; }
+#playzone-camera-preview[hidden] { display: none; }
+#playzone-pose-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#playzone-pose-overlay[hidden] { display: none; }
+#playzone-camera-status, #playzone-pose-status { margin: 7px 0; color: #dce8da; font-size: .68rem; line-height: 1.35; }
+#playzone-camera-toggle, #playzone-pose-toggle { width: 100%; padding: 7px; font-size: .7rem; }
+#playzone-pose-toggle:disabled { opacity: .5; }
+#playzone-camera-size, #playzone-pose-calibrate { width: 100%; padding: 7px; font-size: .7rem; margin-top: 5px; }
+.practice-intensity { margin-top: 8px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,.13); }
+.practice-intensity[hidden] { display: none; }
+.practice-intensity button { min-width: 0; padding: 7px; font-size: .68rem; }
+.practice-intensity button:disabled { opacity: .5; cursor: default; }
+#playzone-pose-calibrate:disabled { opacity: .5; }
+#screen-playzone .practice-dock-right.camera-enlarged { width: min(640px, calc(100vw - 30px)); }
+#playzone-camera-settings a { color: #efd28b; }
+#screen-playzone .practice-settings summary:focus-visible { outline: 3px solid #fff0a8; outline-offset: 2px; }
+#screen-playzone #playzone-bowling-settings[hidden] { display: none; }
+#screen-playzone.practice-bowling .practice-dock-right .practice-grid > div { min-width: 0; }
+#screen-playzone #playzone-pitch-picker[hidden] { display: none; }
+#screen-playzone .bowling-pitch-map { height: 100px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  #screen-playzone .bowling-pitch-map { height: 48px; }
+  #screen-playzone.practice-bowling .practice-panel-top { margin-bottom: 2px; }
+  #screen-playzone.practice-bowling .practice-divider { margin: 3px 0; }
+  #screen-playzone.practice-bowling .practice-settings summary { padding: 4px 0; font-size: .61rem; }
+  #screen-playzone.practice-bowling .practice-dock-left { padding-bottom: 9px; }
+  #screen-playzone.practice-bowling .practice-dock-left, #screen-playzone.practice-bowling .practice-dock-right { max-height: calc(100dvh - 108px); }
+  #screen-playzone.practice-bowling #playzone-manual-options > .practice-divider,
+  #screen-playzone.practice-bowling #playzone-pitch-picker .pitch-map-label { display: none; }
+}
+@media (orientation: landscape) and (max-height: 260px) {
+  #screen-playzone.practice-bowling .practice-dock-left, #screen-playzone.practice-bowling .practice-dock-right { max-height: calc(100dvh - 98px); padding: 5px; }
+  #screen-playzone.practice-bowling .practice-field { margin-bottom: 2px; gap: 0; font-size: .56rem; }
+  #screen-playzone.practice-bowling .practice-field select { min-height: 24px; }
+  #screen-playzone.practice-bowling .practice-field input[type=range] { min-height: 24px; }
+  #screen-playzone.practice-bowling .bowling-pitch-map { height: 32px; }
+  #screen-playzone.practice-bowling .practice-settings summary { padding: 2px 0; }
+}
+#screen-playzone .playzone-check { justify-content: flex-start; gap: 6px; color: #dce8da; font-size: .72rem; }
+.playzone-check input { accent-color: #d5b765; }
+.practice-footwork { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 3px 0 12px; }
+.practice-footwork button { min-height: 36px; padding: 6px; border: 1px solid #4b6255; background: #173128; color: #cddbd0; border-radius: 5px; font-size: .7rem; cursor: pointer; }
+.practice-footwork button.active { background: #d7bd72; border-color: #e7d093; color: #15271f; font-weight: 800; }
+.practice-footwork kbd, .practice-bottom kbd, .practice-swing kbd { padding: 2px 4px; border-radius: 3px; background: rgba(255,255,255,.12); font: inherit; }
+.practice-swing { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 43px; padding: 10px 12px; border: 0; border-radius: 6px; background: #dfc477; color: #16271c; font-weight: 900; cursor: pointer; }
+.practice-swing:hover { background: #f0d990; }
+.practice-swing kbd { background: rgba(16,36,23,.14); font-size: .62rem; }
+.practice-bottom { position: absolute; z-index: 3; bottom: 14px; left: 20px; right: 20px; display: flex; align-items: end; justify-content: space-between; gap: 12px; pointer-events: none; }
+.practice-status { max-width: min(45vw, 440px); display: flex; align-items: center; gap: 8px; padding: 11px 13px; border: 1px solid rgba(212,230,207,.16); border-radius: 6px; background: rgba(9,27,24,.9); }
+.practice-status-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #a8e5b1; }
+#screen-playzone #playzone-feedback { margin: 0; color: #e2efe2; font-size: .76rem; line-height: 1.35; }
+.practice-movement { display: grid; gap: 5px; color: #dce8da; font-size: .59rem; font-weight: 800; letter-spacing: .08em; pointer-events: auto; }
+.practice-movement > div { display: flex; gap: 4px; }
+.practice-movement button { width: 36px; height: 34px; color: white; background: rgba(9,27,24,.9); border: 1px solid #789184; border-radius: 5px; font-size: 1rem; cursor: pointer; }
+#screen-playzone .playzone-help { margin: 0; padding: 9px; color: #d4e1d4; background: rgba(9,27,24,.82); border-radius: 5px; font-size: .65rem; }
+#screen-playzone button:focus-visible, #screen-playzone select:focus-visible, #screen-playzone input:focus-visible { outline: 3px solid #fff0a8; outline-offset: 2px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .practice-header { min-height: 42px; padding: 5px 10px; gap: 8px; }
+  .practice-brand h1 { font-size: .92rem; }
+  .practice-kicker { font-size: .48rem; }
+  #playzone-score { font-size: .65rem; }
+  .practice-exit { padding: 5px 8px; font-size: .65rem; }
+  #screen-playzone .playzone-panel { top: 48px; right: 8px; width: min(275px, 48vw); max-height: calc(100dvh - 103px); padding: 9px; }
+  .practice-panel-top { margin-bottom: 5px; }
+  .practice-divider { margin: 5px 0; }
+  #screen-playzone .practice-field { margin-bottom: 5px; gap: 2px; font-size: .62rem; }
+  #screen-playzone .practice-field select { min-height: 29px; padding: 3px; }
+  .practice-footwork { margin: 3px 0 6px; }
+  .practice-footwork button { min-height: 29px; }
+  .practice-swing { min-height: 34px; padding: 6px 10px; }
+  .practice-bottom { bottom: 6px; left: 8px; right: 8px; }
+  .practice-status { padding: 7px; max-width: 42vw; }
+  #screen-playzone #playzone-feedback { font-size: .66rem; }
+  .practice-movement button { width: 30px; height: 28px; }
+  #screen-playzone .playzone-help { display: none; }
+}
+.practice-bowl { min-height: 38px; padding: 8px 14px; border: 1px solid #e4ce92; border-radius: 6px; background: #d7bd72; color: #16271c; font-weight: 900; cursor: pointer; pointer-events: auto; }
+.practice-bowl[hidden] { display: none; }
+@media (pointer: coarse), (max-width: 768px) {
+  #screen-playzone .practice-touch { display: flex; gap: 6px; pointer-events: auto; }
+  #screen-playzone .practice-touch .touch-stick { width: clamp(72px, 24dvh, 120px); }
+  #screen-playzone .practice-shot-buttons { grid-template-columns: repeat(2, minmax(48px, 1fr)); }
+  #screen-playzone .practice-shot-buttons .btn { font-size: .6rem; min-height: 34px; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  #screen-playzone .practice-status { position: absolute; left: 0; bottom: 75px; max-width: 39vw; }
+  #screen-playzone .practice-bowl { min-height: 30px; padding: 5px 8px; font-size: .68rem; }
+  #screen-playzone .practice-movement > span { display: none; }
+}
+/* Split training setup and batting controls to leave the pitch open. */
+#screen-playzone .practice-dock-left { left: 18px; right: auto; width: min(245px, 24vw); }
+#screen-playzone .practice-dock-right { right: 18px; left: auto; width: min(245px, 24vw); }
+@media (orientation: landscape) and (max-height: 500px) {
+  #screen-playzone .practice-dock-left { left: 6px; right: auto; width: min(172px, 26vw); }
+  #screen-playzone .practice-dock-right { right: 6px; left: auto; width: min(172px, 26vw); }
+  #screen-playzone .practice-grid { gap: 4px; }
+  #screen-playzone .practice-field select { font-size: .62rem; }
+  #screen-playzone .practice-bottom { z-index: 4; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  #screen-playzone .practice-dock-left { padding-bottom: 32px; }
+  #screen-playzone .practice-status { left: 50%; bottom: 42px; transform: translateX(-50%); max-width: 35vw; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  #screen-playzone .practice-dock-left, #screen-playzone .practice-dock-right { max-height: calc(100dvh - 130px); }
+}
+
+/* Match the main batting controls while keeping the selected shot visible. */
+#screen-playzone .practice-shot-buttons [data-practice-shot] {
+  color: #f4f2df;
+  background: rgba(17, 49, 39, .96);
+  border: 2px solid #b5a975;
+  border-radius: 8px;
+  font-weight: 900;
+  letter-spacing: .03em;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .22);
+  -webkit-tap-highlight-color: transparent;
+}
+#screen-playzone .practice-shot-buttons [data-practice-shot][aria-pressed="true"] {
+  color: #15271f;
+  background: #dfc477;
+  border-color: #fff0bc;
+  box-shadow: 0 0 0 2px rgba(223, 196, 119, .3), 0 4px 12px rgba(0, 0, 0, .25);
+}
+#screen-playzone .practice-shot-buttons [data-practice-shot]:active { transform: scale(.96); }
+.practice-bowler-hint { margin: 4px 0 8px; color: #c5d7c8; font-size: .68rem; line-height: 1.35; }
+#playzone-spin-value { float: right; color: #efd28b; font-variant-numeric: tabular-nums; }
+#screen-playzone .practice-touch-hidden, #screen-playzone .practice-movement[hidden] { display: none !important; }
+#playzone-release-meter { width: 100%; margin: 12px 0 8px; }
+#playzone-bowl-action:disabled { opacity: .5; cursor: not-allowed; }
+#screen-playzone #playzone-repeat-control[hidden], #screen-playzone #playzone-meter-wrap[hidden] { display: none !important; }
+.bowling-practice-meter { width: min(220px, 25vw); padding: 7px 10px; border: 1px solid rgba(219,229,201,.18); border-radius: 6px; background: rgba(9,27,24,.92); color: #e7ebdb; font-size: .6rem; font-weight: 800; letter-spacing: .08em; }
+#playzone-meter-wrap #playzone-release-meter { width: 100%; margin: 6px 0 2px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .bowling-practice-meter { width: min(160px, 26vw); padding: 5px 7px; font-size: .5rem; }
+  #playzone-meter-wrap #playzone-release-meter { height: 10px; margin: 4px 0 2px; }
+  #playzone-meter-wrap .release-meter-marker { height: 18px; top: -4px; }
 }

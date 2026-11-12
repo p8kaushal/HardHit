@@ -1,5 +1,216 @@
 # Gameplay to-do
 
+## Camera movement: hands, feet and X-ray confidence
+
+- [x] Extend the skinned character's movement replication to approximate hand and foot direction using visible pose landmarks; hold briefly and safely fall back when those landmarks are missing.
+- [x] Make the X-ray distinguish model joints backed by visible camera landmarks from uncertain ones, with a clear legend and fallback behavior.
+- [x] Verify mirrored hands and feet, occlusion and recovery, X-ray accuracy and ordinary practice/match behavior with simulated and available recorded input.
+- [x] Document limitations and keep physical-bat/shot inference separate until validated.
+- [ ] Validate hand/foot orientations and occlusion transitions on live cameras with the whole body visible; detailed fingers and palm roll are not tracked.
+
+## Recorded camera-motion replay
+
+- [ ] Add an explicit local replay check for a user-supplied, pre-cropped camera clip without adding recordings or pose data to the repository.
+- [ ] Exercise the real pose worker, calibrated rig and X-ray over changing video frames; verify finite output, camera cleanup and practice isolation.
+- [ ] Record the replay scope and limitations, including that a screen-recorded preview is not a ground-truth motion fixture.
+
+## Camera movement: independent head turning
+
+- [x] Estimate head turn relative to the shoulders when both ear landmarks are usable, with mirrored mapping and safe fallback on occlusion.
+- [x] Verify head-only turns, whole-body turns, mirroring, landmark loss and rendered rig response without claiming eye or gaze tracking.
+- [ ] Validate head-turn direction and stability with real camera motion; side-on ears and gaze remain uncertain.
+
+## Hand-motion intensity calibration preview
+
+- [x] Add an opt-in, session-only calibration using explicitly recorded gentler and stronger hand movements.
+- [x] Show a bounded relative intensity for later movements without treating it as bat speed, shot power or gameplay input.
+- [x] Verify invalid samples, retries, resets, mode changes and scoring isolation with unit and browser tests; document real-camera limitations.
+- [ ] Validate repeatability, thresholds and perceived intensity with real recorded movements and devices before considering any use for gameplay.
+
+## Hand-motion direction preview
+
+- [x] Report the approximate hand-motion direction in the mirrored camera image, clearly separate from a cricket shot direction.
+- [x] Detect a movement that follows through and returns, while retaining timing, confidence checks and score isolation.
+- [x] Verify mirrored direction, returning motion, false starts, lifecycle and practice regressions; document real-camera limitations.
+- [ ] Validate camera-view direction and false positives against real swings before considering any mapping to cricket-field shot direction.
+
+## Practice hand-motion timing preview
+
+- [x] Compare a timestamped hand-speed peak to the modeled contact time for the same practice delivery, without recording a shot or changing scores.
+- [x] Invalidate stale frames and movement across pause, mode changes, cancellation and subsequent deliveries; label the estimate and its limitations.
+- [x] Test early/late comparisons, capture-to-game clock mapping, pauses, stale events and practice isolation with unit and browser checks.
+- [ ] Measure real camera/frame latency and validate timing against independently observed swings and contact before using it for gameplay.
+
+## Experimental hand-motion preview
+
+- [x] Add an opt-in practice preview for fast two-hand movement using timestamped pose frames, with stationary arming and safe reset on tracking loss.
+- [x] Show measured movement duration and relative peak speed without registering shots, changing scores or claiming to detect the bat.
+- [x] Verify stillness, synthetic movement, false starts, dropped frames, lifecycle and practice isolation; document the live-camera limitations.
+- [ ] Validate and calibrate detection thresholds, false positives, delay and movement quality against real recorded swings and different camera placements before using the result for gameplay.
+
+## Correct limb retargeting from second recording
+
+- [x] Correct the mismatch between tracked limb directions and the model's pre-bent bind pose, without relying on unseen leg landmarks.
+- [x] Use the joint X-ray and simulated tracked poses to verify the actual character's arm and leg directions and lifecycle.
+- [x] Document the framing and live-camera limitations shown in the recording.
+- [ ] Check real-camera fidelity, mirrored direction, foot contact and movement quality with the user; the recording does not show the full legs.
+
+## Camera turning, posture and joint X-ray
+
+- [x] Improve continuous left/right body turning and reproduce changes in back bend from the tracked torso.
+- [x] Add an optional in-game X-ray showing the character's actual joints and bones, including fallback and cleanup.
+- [x] Exercise the X-ray view while verifying turn direction, bending, mirror behavior and tracking lifecycle; document live-camera limitations.
+- [ ] Verify turn accuracy, upright calibration and bending with the user's live camera; single-camera depth and occlusion remain approximate.
+
+## Fix camera-facing alignment from recording
+
+- [x] Reproduce the reported facing error with a frame from the recording and correct the visible character's bowler-facing alignment.
+- [x] Verify the settled model alignment and turn behavior, including the recorded frame; document remaining live-camera limits.
+- [ ] Confirm the correction with the user's live camera; full-body framing and realistic posture remain open.
+
+## Camera-facing body orientation
+
+- [x] Hide the character's bat during camera-driven movement and restore it when tracking ends.
+- [x] Map camera-facing body orientation to the bowler end, estimate turns from tracked shoulders, and keep scoring positions unchanged.
+- [x] Verify facing, mirror behavior, missing landmarks and bat lifecycle with simulated landmarks; document the limits of single-camera orientation.
+- [ ] Verify and refine facing and turn direction with the user's live camera, including side-on and turned-away poses.
+
+## Camera tracking responsiveness and depth
+
+- [x] Reduce brief single-limb tracking dropouts and improve movement response without letting stale joints remain indefinitely.
+- [x] Add an optional, bounded visual approximation for moving toward or away from the camera; keep gameplay position unchanged.
+- [x] Verify depth, limb dropout recovery and practice lifecycle with simulated input; document live-camera limits.
+- [ ] Review responsiveness, depth drift and left/right movement on the user's live camera.
+
+## Camera whole-body movement revision
+
+- [x] Improve leg and body response, use the working mirrored mapping by default, and explain framing and tracking state.
+- [x] Verify leg bends, movement, occlusion and resets in unit and browser tests; distinguish visible motion from match physics.
+- [ ] Review movement fidelity with the user's live camera.
+
+## Improve camera movement and calibration
+
+- [x] Make calibration feedback clear and available in both batting practice modes, including incomplete framing.
+- [x] Expand retargeting to use 3D pose estimates and tolerate individual occluded joints, while keeping manual shot scoring and safe fallback.
+- [x] Verify calibration, synthetic body movement, occlusion and practice lifecycle; document real-camera limitations.
+- [ ] Verify and refine actual movement fidelity with the user's camera. Full body translation, precise rotations, hands, bat tracking and shot inference remain unimplemented.
+
+## Camera batting — stage 8 calibrated pose preview
+
+- [x] Add an accessible larger camera preview option.
+- [x] Add opt-in, calibrated landmark-to-rig movement in free movement, with confidence handling, mirror control and a safe reset; keep shot decisions unchanged.
+- [x] Verify calibration, motion, loss of tracking and cleanup with automated fixtures; document limitations and testing instructions.
+- [ ] Review the movement with a live camera, including side-on stances, occlusion, handedness, latency and movement quality; refine 3D retargeting and bat constraints separately.
+
+## Pose tracker startup failure
+
+- [x] Add diagnostics for worker startup and inference errors; exercise startup and recovery in browser tests.
+- [ ] Investigate the original startup failure if it recurs. The user reports tracking now works, but the original cause was not identified.
+
+## Desktop portrait play
+
+- [x] Restrict the landscape prompt and orientation pause to devices with a coarse primary pointer; keep background-tab pausing for all devices.
+- [x] Verify portrait desktop play and portrait-to-landscape touch behavior in the browser; physical devices remain untested.
+
+## Camera batting — stage 7 pose tracking preview
+
+- [x] Integrate MediaPipe Pose Landmarker Lite and a landmark overlay for the opt-in camera preview.
+- [x] Run inference in a worker, handle camera/model lifecycle and disclose the dependency's documented metrics behavior.
+- [x] Verify model initialization, blank-frame and person-image detection, lifecycle, failure paths and practice regressions with simulated video.
+- [x] Present stage 7 for review and obtain approval before starting the next implementation stage.
+- [ ] Validate pose tracking, performance, permissions and framing on real cameras and physical devices when available; the user currently cannot test.
+- [x] Update the README's camera section to describe the pose preview and its limitations.
+
+## Camera batting — stage 6 camera setup
+
+- [x] Add opt-in camera preview to batting practice with clear permission and device errors.
+- [x] Stop camera tracks on exit, bowling mode, hidden page and stale permission requests.
+- [x] Verify lifecycle and regressions; document manual testing and present this stage for review.
+
+## Next stage: bot delivery contact alignment
+
+- [x] Align the rendered bowling delivery and bot swing trigger with the modeled batter contact point.
+- [x] Verify pace and spin, low-frame-rate triggering, practice and match behavior; document limitations and testing.
+
+## Bowling practice layout and regression audit
+
+- [x] Split bowling setup across both sides, with accessible collapsible secondary settings and no scrolling for essential controls at tested landscape sizes.
+- [x] Run the configured unit, production, practice and match checks; record remaining limitations and manual testing instructions.
+
+## Bowling playzone
+
+- [x] Add bowling practice with delivery controls and configurable bot batting style, difficulty and handedness.
+- [x] Reuse match bowling timing, ball flight and batting decisions without changing match progression.
+- [x] Verify bowling, bot configuration, cancellation and responsive controls; document how to test.
+
+## Practice spin and simulated bowling
+
+- [x] Add a visible spin-strength control for manual spin deliveries.
+- [x] Add a separate simulated bowler with difficulty, while keeping manual auto bowl a repeat of the chosen delivery.
+- [x] Verify mode switching, delivery parameters, difficulty and practice controls.
+
+## Practice shot selection styling
+
+- [x] Show the selected practice shot consistently across touch, keyboard and the selector, using the game's batting palette.
+- [x] Verify selection feedback in desktop and touch practice.
+
+## Practice controls and direction
+
+- [x] Split practice delivery and batting controls across both sides of the pitch.
+- [x] Synchronize direction selection across touch, keyboard and menus, and verify the resulting ball flight.
+- [x] Exercise practice controls and responsive layouts; document testing.
+
+## Playzone orientation and usability
+
+- [x] Correct batter facing and make shot type, direction and footwork visible in free practice.
+- [x] Redesign free and delivery practice controls for desktop and landscape touch.
+- [x] Verify character orientation, shot variations, controls, delivery flow and layouts.
+
+## Camera batting — stage 1 baseline
+
+- [x] Trace and document the current match, pause, delivery, scoring and innings lifecycles and future integration points.
+- [x] Run unit tests, production build, browser smoke and existing match checks; record results and limitations in `plan.md`.
+- [x] Present the baseline for review before starting the next stage.
+
+## Camera batting — stage 2 shared batting behavior
+
+- [x] Extract reusable delivery and shot adjudication without match-state mutation.
+- [x] Keep score, innings and flight finalization behavior compatible with existing matches.
+- [x] Test isolated resolution and match compatibility; run the build and relevant browser checks.
+- [x] Document how to test this stage and present it for review.
+
+## Camera batting — stage 3 articulated batter
+
+- [x] Build a procedural joint hierarchy with fixed limb segments, constrained pose controls and a bat attached to the hand.
+- [x] Connect existing player and bot swing animations and handedness to the rig.
+- [x] Verify rig geometry, pose limits and existing gameplay; provide manual testing instructions.
+- [x] Present this stage for review before starting the playzone.
+
+## Camera batting — stage 4 batting playzone
+
+- [x] Add lobby entry and isolated playzone state with free-movement and practice-delivery modes.
+- [x] Add repeatable configurable deliveries and per-swing feedback without match scorecard or leaderboard changes.
+- [x] Test playzone entry, both modes, exit and session isolation; document manual testing.
+- [x] Present this stage for review before camera capture/tracking.
+
+## Camera batting — stage 5 swing strength
+
+- [x] Add optional normalized swing strength to shot inputs with backward-compatible defaults.
+- [x] Apply the same strength scaling to estimated distance and match/practice shot flight.
+- [x] Verify strength boundaries and existing shot behavior; document testing and present for review.
+
+## Batter rig and practice gameplay revision
+
+## Simplified skinned batter model
+
+- [x] Select and inspect a redistributable humanoid model with a suitable skeleton and no Blender dependency.
+- [x] Integrate the model with batting animation, handedness, bat attachment and the pose interface.
+- [x] Verify match and practice behavior and document the model and testing steps.
+
+- [x] Strengthen the articulated rig and directional batting animations for future pose control.
+- [x] Align practice delivery presentation, controls and timing with match batting while retaining configurable, unlimited deliveries.
+- [x] Verify rig and practice behavior, and document how to test the changes.
+
 Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. The user approved proceeding phase by phase. Unchecked items are not verified or complete.
 
 ## Phase index
@@ -39,8 +250,10 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 
 ## Audit findings and next-feature readiness
 
-- [ ] **BUG: Align bot batting visual contact with adjudicated contact.** When the human bowls, the incoming delivery animation currently travels to the modeled popping crease while contact and shot resolution use `batterContactProgress` (the batter contact plane). Verify the bot swing trigger, animated ball position, timing and recorded outcome share the same contact instant/position; add regression coverage for pace and spin and a browser match check.
+- [x] Align the rendered human-bowled ball with the adjudicated contact plane and trigger the bot swing before resolution; cover pace, spin, frame crossings, practice and match recording.
+- [ ] Validate the animated bat against the ball and model each bot shot's early or late timing in its swing animation. Contact remains timing-based rather than spatial, so the bat mesh is not guaranteed to meet the ball.
 - [ ] Run the full readiness suite before starting the next feature: unit tests, production build and preview smoke across supported emulated landscape sizes, full match in both innings orders, sudden-death fixture, rematch/lobby, extras and a confirmed-six scenario. Record results and remaining physical-device coverage.
+- [ ] Confirm a six through the browser match flow; the lofted-shot run on this audit completed with zero sixes, although six finalization has unit coverage.
 
 ## Match reliability and presentation — current priority
 
@@ -124,3 +337,12 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [ ] Calibrate front-foot variability, add a visible delivery-stride/foot replay and cover back-foot faults, wides, LBW and free-hit edge cases.
 - [ ] Profile frame pacing and input latency on real phones and tablets; build repeatable multi-device gameplay tests.
 - [ ] Refine the existing basic character animations after the control and physics foundations are stable; implement authoritative real-player multiplayer in Phase 7.
+## Practice camera and outcome options
+
+- [x] Add follow-ball and detailed outcome controls to batting and bowling practice.
+- [x] Verify both modes and document how to use the controls.
+
+## Bowling practice pitch aiming
+
+- [x] Add match-style pitch map and direct pitch targeting to bowling practice.
+- [x] Verify aiming synchronization, input locking and touch access; document testing.

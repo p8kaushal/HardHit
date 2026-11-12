@@ -72,9 +72,9 @@ export class UIManager {
     this.controller = controller;
   }
 
-  constructor(controller: MatchController) {
+  constructor(controller: MatchController, scene?: GameScene) {
     this.controller = controller;
-    this.gameScene = new GameScene('game-canvas');
+    this.gameScene = scene ?? new GameScene('game-canvas');
     this.keyboardInputManager = new KeyboardInputManager(
       () => this.controller.getCurrentInnings().batter.id === this.controller.state.player.id,
       () => this.startUserBowlingDelivery(),
@@ -315,6 +315,7 @@ export class UIManager {
   // --- Pointer & Aim Gesture Recognition ---
 
   private handlePointerDown(e: PointerEvent): void {
+    if (!document.getElementById('screen-gameplay')?.classList.contains('active')) return;
     if (!e.isPrimary) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
@@ -329,6 +330,7 @@ export class UIManager {
   }
 
   private handlePointerMove(e: PointerEvent): void {
+    if (!document.getElementById('screen-gameplay')?.classList.contains('active')) return;
     if (!e.isPrimary || !this.isPointerDown) return;
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
     if (!isPlayerBatting) {
@@ -337,6 +339,7 @@ export class UIManager {
   }
 
   private handlePointerUp(e: PointerEvent): void {
+    if (!document.getElementById('screen-gameplay')?.classList.contains('active')) { this.isPointerDown = false; return; }
     if (!e.isPrimary || !this.isPointerDown) return;
     this.isPointerDown = false;
     
@@ -565,7 +568,7 @@ export class UIManager {
 
     this.gameScene.animateBatterSwing(direction, () => {
       // Swing visual completes
-    });
+    }, type, this.activeShot.footwork);
   }
 
   // --- Ball Trajectory Animation Trigger ---
@@ -859,7 +862,7 @@ export class UIManager {
       const assist = battingAssistanceMultiplier(innings.batter, innings.bowler, this.controller.botDifficulty);
       const quality = shotFlightQuality(outcome.shot, outcome.delivery, assist);
       const batterPower = innings.batter.stats.batting.power;
-      const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, deliveryVelocityAtCrease(outcome.delivery), {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower);
+      const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, deliveryVelocityAtCrease(outcome.delivery), {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower, outcome.shot.strength);
       
       this.gameScene.animateHitPath(outcome.distance, outcome.shot.direction, vOut);
       this.controller.setCameraMode('follow_shot');

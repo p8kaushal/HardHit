@@ -1,0 +1,4 @@
+Batter humanoid: original CC0 character by Quaternius, distributed in UMRAM-Bilkent/supine-human-model as assets/human.glb.
+Source: https://github.com/UMRAM-Bilkent/supine-human-model
+License: Creative Commons CC0 1.0 Universal (https://creativecommons.org/publicdomain/zero/1.0/)
+The source rigged file is used directly; Blender is not required.

@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NullEngine, Scene, Vector3 } from 'babylonjs';
+import { NullEngine, Scene, StandardMaterial, Vector3 } from 'babylonjs';
+import { BatterRig } from '../src/batter-rig';
+import { PoseRetarget } from '../src/pose-retarget';
+import { describeHandDirection, HandMotionPreview } from '../src/hand-motion';
+import { compareHandMotionTiming } from '../src/hand-motion-timing';
+import { HandMotionIntensity } from '../src/hand-motion-intensity';
 import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
@@ -9,11 +14,13 @@ import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
 import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
-import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout, shouldPauseGameplay } from '../src/game-clock';
+import { clearGameTimeout, gameClockRevision, gameNow, isGamePaused, setGamePaused, setGameTimeout, shouldPauseGameplay } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
 import { UIManager, opponentBadgeText } from '../src/ui';
 import { GameScene } from '../src/scene';
 import { battingTimingFeedback } from '../src/batting-timing';
+import { calculateDistance, swingStrengthFactor } from '../src/formula';
+import { resolveBattingDelivery, resolveShotFlight } from '../src/batting-resolution';
 import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryBounceProgress, deliveryContactPoint, deliveryHitsPad, deliveryProgressAtZ, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
@@ -27,6 +34,382 @@ Object.assign(globalThis, { localStorage: {
 
 const delivery = (timing: number, x = 0): DeliveryChoice => ({
   aimTarget: { x, z: -3.5 }, line: 'middle', length: 'good', type: 'fast', releaseTiming: timing
+});
+
+test('hand-motion preview arms on stillness and rejects noise, tracking gaps and body translation', () => {
+  const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
+  for (const [index, x, y] of [[11,.35,.25],[12,.65,.25],[15,.47,.55],[16,.53,.55],[23,.4,.55],[24,.6,.55]] as const) points[index] = { x, y, visibility: 1 };
+  const tracker = new HandMotionPreview();
+  for (const time of [0,100,200,300]) tracker.update(points, time, 1);
+  assert.equal(tracker.update(points, 350, 1).state, 'ready');
+  const translated = structuredClone(points);
+  for (const index of [11,12,15,16,23,24]) translated[index].x += .1;
+  assert.equal(tracker.update(translated, 450, 1).state, 'ready', 'whole-body translation is not hand motion');
+  const shifted = structuredClone(translated);
+  shifted[15].x += .09; shifted[16].x += .09;
+  assert.equal(tracker.update(shifted, 550, 1).state, 'moving');
+  shifted[15].x += .12; shifted[16].x += .12;
+  tracker.update(shifted, 650, 1);
+  const result = tracker.update(shifted, 750, 1);
+  assert.equal(result.state, 'cooldown');
+  assert.ok(result.event && result.event.peakSpeed > 2.2 && result.event.durationMs >= 120);
+  assert.equal(result.event!.peakTimestamp, 650, 'peak time should use the frame timestamp');
+  assert.equal(describeHandDirection(result.event!, true), 'left', 'the camera preview mirrors horizontal direction');
+  assert.equal(describeHandDirection(result.event!, false), 'right');
+  assert.equal(tracker.update(shifted, 800, 1).event, undefined, 'cooldown must prevent duplicate events');
+  tracker.update(shifted, 1400, 1);
+  assert.equal(tracker.update(shifted, 1800, 1).state, 'waiting', 'a frame gap must reset the gesture');
+  const missing = structuredClone(points); missing[15].visibility = 0;
+  assert.equal(tracker.update(missing, 1900, 1).state, 'waiting');
+  tracker.reset();
+  for (const time of [2000,2100,2200,2300]) tracker.update(points, time, 1);
+  const short = structuredClone(points); short[15].x += .07; short[16].x += .07;
+  tracker.update(short, 2400, 1);
+  assert.equal(tracker.update(short, 2500, 1).event, undefined, 'a short twitch should not be emitted');
+  tracker.reset();
+  for (const time of [3000,3100,3200,3300]) tracker.update(points, time, 1);
+  const jump = structuredClone(points); jump[15].x += .3; jump[16].x += .3;
+  assert.equal(tracker.update(jump, 3350, 1).state, 'waiting', 'implausible tracking jumps should reset');
+});
+
+test('hand-motion preview keeps the furthest excursion when hands return', () => {
+  const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
+  for (const [index, x, y] of [[11,.35,.25],[12,.65,.25],[15,.47,.55],[16,.53,.55],[23,.4,.55],[24,.6,.55]] as const) points[index] = { x, y, visibility: 1 };
+  const tracker = new HandMotionPreview();
+  for (const time of [0,100,200,300]) tracker.update(points, time, 1);
+  const moved = structuredClone(points);
+  moved[15].x += .09; moved[16].x += .09; tracker.update(moved, 400, 1);
+  moved[15].x += .09; moved[16].x += .09; tracker.update(moved, 500, 1);
+  moved[15].x -= .09; moved[16].x -= .09; tracker.update(moved, 600, 1);
+  tracker.update(points, 700, 1);
+  const event = tracker.update(points, 800, 1).event;
+  assert.ok(event && event.maxDisplacement > .55, 'returning to the start should not erase the movement');
+  assert.equal(describeHandDirection(event!, true), 'left');
+  assert.equal(describeHandDirection({ displacementX: 0, displacementY: -1 }, true), 'up');
+  assert.equal(describeHandDirection({ displacementX: 1, displacementY: 1 }, true), 'down-left');
+  assert.equal(describeHandDirection({ displacementX: 0, displacementY: 0 }, true), null);
+  assert.equal(describeHandDirection({ displacementX: NaN, displacementY: 1 }, true), null);
+});
+
+test('practice hand-motion timing uses capture time and rejects unrelated deliveries', () => {
+  const event = { durationMs: 300, peakSpeed: 3, peakTimestamp: 9800 };
+  const deliveryWindow = { generation: 7, releaseGameTime: 4000, contactGameTime: 4800 };
+  assert.equal(compareHandMotionTiming(event, deliveryWindow, 7, 10000, 4900), -100);
+  assert.equal(compareHandMotionTiming({ ...event, peakTimestamp: 10100 }, deliveryWindow, 7, 10300, 5200), 200);
+  assert.equal(compareHandMotionTiming(event, deliveryWindow, 8, 10000, 4900), null, 'a new delivery must not reuse an older event');
+  assert.equal(compareHandMotionTiming(event, null, 7, 10000, 4900), null);
+  assert.equal(compareHandMotionTiming({ ...event, peakTimestamp: 10001 }, deliveryWindow, 7, 10000, 4900), null, 'future capture times must be rejected');
+  assert.equal(compareHandMotionTiming(event, deliveryWindow, 7, 11801, 6701), null, 'stale worker results must not be associated');
+  assert.equal(compareHandMotionTiming({ ...event, peakTimestamp: 9000 }, deliveryWindow, 7, 10000, 4900), null, 'movements before release must not be associated');
+  assert.equal(compareHandMotionTiming({ ...event, peakTimestamp: 10600 }, deliveryWindow, 7, 10700, 5700), null, 'movements well after contact must not be associated');
+});
+
+test('hand-motion intensity uses explicitly recorded ordered samples and stays bounded', () => {
+  const calibration = new HandMotionIntensity();
+  assert.equal(calibration.begin('strong'), false);
+  assert.equal(calibration.capture(4), 'not-armed');
+  assert.equal(calibration.relativeIntensity(4), null);
+  assert.equal(calibration.begin('gentle'), true);
+  assert.equal(calibration.capture(NaN), 'invalid');
+  assert.equal(calibration.hasGentle(), false);
+  assert.equal(calibration.begin('gentle'), true);
+  assert.equal(calibration.capture(3), 'gentle-saved');
+  assert.equal(calibration.begin('strong'), true);
+  assert.equal(calibration.capture(3.4), 'too-close');
+  assert.equal(calibration.isReady(), false);
+  assert.equal(calibration.begin('strong'), true);
+  assert.equal(calibration.capture(6), 'strong-saved');
+  assert.equal(calibration.relativeIntensity(4.5), .5);
+  assert.equal(calibration.relativeIntensity(1), 0);
+  assert.equal(calibration.relativeIntensity(10), 1);
+  assert.equal(calibration.relativeIntensity(Infinity), null);
+  assert.equal(calibration.begin('gentle'), true);
+  calibration.cancel();
+  assert.equal(calibration.isReady(), true, 'cancelling a replacement should keep prior samples');
+  assert.equal(calibration.begin('gentle'), true);
+  assert.equal(calibration.capture(4), 'gentle-saved');
+  assert.equal(calibration.isReady(), false, 'a new gentle sample requires a new strong sample');
+  calibration.reset();
+  assert.equal(calibration.hasGentle(), false);
+  assert.equal(calibration.getPending(), null);
+});
+
+test('pose retarget calibration responds to motion and rejects occlusion', () => {
+  const points = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, visibility: 1 }));
+  for (const [index, x, y] of [[11,.35,.25],[12,.65,.25],[13,.32,.4],[14,.68,.4],[15,.3,.55],[16,.7,.55],[23,.4,.55],[24,.6,.55],[25,.39,.7],[26,.61,.7],[27,.38,.9],[28,.62,.9]] as const) points[index] = { x, y, visibility: 1 };
+  const tracker = new PoseRetarget();
+  assert.equal(tracker.update(points, false), null);
+  assert.equal(tracker.calibrate(points, false), true);
+  assert.ok(Math.abs(tracker.update(points, false)!.leftShoulder!.z + 0.12) < 1e-9);
+  assert.ok(tracker.getDirections().leftShoulder!.y < -.9, 'a lowered arm should target a downward limb direction');
+  const mirrorDirections = new PoseRetarget();
+  assert.equal(mirrorDirections.calibrate(points, true), true);
+  const asymmetric = structuredClone(points);
+  asymmetric[14].x = .85; asymmetric[14].y = .25;
+  mirrorDirections.update(asymmetric, true);
+  assert.ok(mirrorDirections.getDirections().leftShoulder!.x < -.9, 'mirror mode should map the opposite raised arm across the image');
+  assert.ok(mirrorDirections.getDirections().rightShoulder!.y < -.9, 'the other mirrored arm should remain lowered');
+  const moved = structuredClone(points);
+  moved[13].x = .2;
+  assert.ok(Math.abs(tracker.update(moved, false)!.leftShoulder!.z + 0.12) > 0.05);
+  moved[15].visibility = 0.1;
+  assert.ok(tracker.update(moved, false), 'one occluded hand should not stop the rest of the body');
+  assert.equal(tracker.calibrate(moved, true), true);
+  moved[11].visibility = 0.1;
+  assert.equal(tracker.update(moved, true), null, 'missing torso should stop tracking');
+  assert.equal(tracker.calibrate(moved, true), false);
+  tracker.reset();
+  assert.equal(tracker.update(points, false), null);
+  assert.equal(tracker.calibrate(points, true), true);
+  assert.ok(tracker.update(points, true));
+  const depthTracker = new PoseRetarget();
+  const world = points.map(point => ({ ...point, z: 0 }));
+  const lateDepth = new PoseRetarget();
+  assert.equal(lateDepth.calibrate(points, true, []), true);
+  assert.equal(lateDepth.getFacing(), null);
+  lateDepth.update(points, true, world);
+  assert.ok(Math.abs(lateDepth.getFacing()!) < 1e-9, 'front-facing depth can recover after calibration');
+  assert.equal(depthTracker.calibrate(points, false, world), true);
+  assert.equal(depthTracker.getFacing(), 0, 'a front-facing person should face the bowler');
+  const turnedWorld = structuredClone(world);
+  turnedWorld[12].z = .2;
+  depthTracker.update(points, false, turnedWorld);
+  assert.ok(depthTracker.getFacing()! > 0, 'shoulder depth should turn the character');
+  const mirroredTracker = new PoseRetarget();
+  assert.equal(mirroredTracker.calibrate(points, true, turnedWorld), true);
+  assert.ok(mirroredTracker.getFacing()! < 0, 'mirror should reverse the turn');
+  const facingTracker = new PoseRetarget();
+  assert.equal(facingTracker.calibrate(points, false, world), true);
+  const turnedBack = structuredClone(world);
+  turnedBack[11].x = .65; turnedBack[12].x = .35;
+  for (let i = 0; i < 40; i++) facingTracker.update(points, false, turnedBack);
+  assert.ok(Math.abs(facingTracker.getFacing()!) > 2.8, 'turning away should not fold back to the front');
+  const bentBack = structuredClone(world);
+  bentBack[11].z = -.2; bentBack[12].z = -.2;
+  const bentPose = facingTracker.update(points, false, bentBack)!;
+  assert.ok(Math.abs(bentPose.spine!.x) > .05 && Math.abs(bentPose.chest!.x) > .05, 'back bend should affect both spine and chest');
+  depthTracker.update(points, false, []);
+  assert.equal(depthTracker.getFacing(), null, 'missing depth must not produce a turn');
+  world[13].z = .15;
+  assert.ok(Math.abs(depthTracker.update(points, false, world)!.leftShoulder!.x) > .05, 'depth movement should rotate the arm');
+  const shifted = structuredClone(points);
+  for (const index of [11,12,13,14,15,16,23,24,25,26,27,28]) { shifted[index].x += .08; shifted[index].y += .03; }
+  depthTracker.update(shifted, false, world);
+  assert.ok(depthTracker.getOffset().x > 0 && depthTracker.getOffset().y < 0, 'body shift and crouch should move the visual character');
+  depthTracker.reset();
+  assert.deepEqual(depthTracker.getOffset(), { x: 0, y: 0, z: 0 });
+  const depthMovement = new PoseRetarget();
+  assert.equal(depthMovement.calibrate(points, false, [], 1000), true);
+  const nearer = structuredClone(points);
+  nearer[11].y -= .1; nearer[12].y -= .1;
+  depthMovement.update(nearer, false, [], 1100);
+  assert.ok(depthMovement.getOffset().z < 0, 'larger apparent torso should move the visual character toward the camera');
+  const dropout = new PoseRetarget();
+  assert.equal(dropout.calibrate(points, false, [], 1000), true);
+  const bent = structuredClone(points);
+  bent[25].x = .24;
+  const beforeLoss = dropout.update(bent, false, [], 1100)!.leftHip!.z;
+  const directionBeforeLoss = dropout.getDirections().leftHip!.clone();
+  bent[25].visibility = 0;
+  const briefLoss = dropout.update(bent, false, [], 1200)!.leftHip!.z;
+  assert.equal(briefLoss, beforeLoss, 'brief landmark loss should hold the last pose');
+  assert.deepEqual(dropout.getDirections().leftHip!.asArray(), directionBeforeLoss.asArray(), 'brief loss should hold the tracked limb direction');
+  const longLoss = dropout.update(bent, false, [], 1500)!.leftHip!.z;
+  assert.ok(Math.abs(longLoss) < Math.abs(briefLoss), 'prolonged landmark loss should return toward neutral');
+  bent[25].visibility = 1;
+  assert.ok(Math.abs(dropout.update(bent, false, [], 1600)!.leftHip!.z) > Math.abs(longLoss), 'the leg should recover when visible again');
+  const segmentTracker = new PoseRetarget();
+  const spatial = points.map(point => ({ ...point, z: 0 }));
+  assert.equal(segmentTracker.calibrate(points, false, spatial, 2000), true);
+  spatial[13] = { ...spatial[13], x: .2, y: .3, z: -.1 };
+  for (let i = 0; i < 12; i++) segmentTracker.update(points, false, spatial, 2100 + i * 70);
+  const expected = new Vector3(-.15, -.05, .1).normalize();
+  assert.ok(Vector3.Dot(segmentTracker.getDirections().leftShoulder!, expected) > .99, 'limb targets should preserve 3D direction');
+});
+
+test('hand and foot directions hold briefly, then clear when landmarks are occluded', () => {
+  const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, z: 0, visibility: 0 }));
+  for (const [index, x, y] of [[0,.5,.1],[11,.35,.25],[12,.65,.25],[13,.32,.4],[14,.68,.4],[15,.3,.55],[16,.7,.55],[19,.25,.58],[20,.75,.58],[23,.4,.55],[24,.6,.55],[25,.39,.7],[26,.61,.7],[27,.38,.85],[28,.62,.85],[31,.32,.9],[32,.68,.9]] as const) points[index] = { x, y, z: 0, visibility: 1 };
+  const tracker = new PoseRetarget();
+  assert.equal(tracker.calibrate(points, false, [], 1000), true);
+  tracker.update(points, false, [], 1100);
+  assert.ok(tracker.getDirections().leftWrist!.x < -.5);
+  assert.ok(tracker.getDirections().rightAnkle!.x > .5);
+  assert.equal(tracker.getConfidence().leftIndex, true);
+  const obscured = structuredClone(points); obscured[19].visibility = 0; obscured[31].visibility = 0;
+  tracker.update(obscured, false, [], 1200);
+  assert.ok(tracker.getDirections().leftWrist, 'brief occlusion should hold hand direction');
+  assert.equal(tracker.getConfidence().leftIndex, false, 'X-ray confidence should immediately show uncertainty');
+  tracker.update(obscured, false, [], 1500);
+  assert.equal(tracker.getDirections().leftWrist, undefined);
+  assert.equal(tracker.getDirections().leftAnkle, undefined);
+  tracker.update(points, false, [], 1600);
+  assert.ok(tracker.getDirections().leftWrist, 'visible landmarks should resume tracking');
+  assert.equal(tracker.getConfidence().leftToe, true);
+  const mirrored = new PoseRetarget();
+  assert.equal(mirrored.calibrate(points, true, [], 2000), true);
+  mirrored.update(obscured, true, [], 2100);
+  assert.equal(mirrored.getConfidence().rightIndex, false, 'mirroring must swap source confidence');
+  assert.equal(mirrored.getConfidence().leftIndex, true);
+});
+
+test('head turning follows ear depth relative to the body, with mirror and occlusion handling', () => {
+  const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, z: 0, visibility: 0 }));
+  for (const [index, x, y] of [[0,.5,.1],[7,.44,.12],[8,.56,.12],[11,.35,.25],[12,.65,.25],[23,.4,.55],[24,.6,.55]] as const) points[index] = { x, y, z: 0, visibility: 1 };
+  const world = structuredClone(points);
+  const tracker = new PoseRetarget();
+  assert.equal(tracker.calibrate(points, false, world, 1000), true);
+  const headOnly = structuredClone(world); headOnly[8].z = .06;
+  const turned = tracker.update(points, false, headOnly, 1100)!;
+  assert.ok(turned.head!.y > .1, 'head turn should produce relative yaw');
+  const mirrored = new PoseRetarget();
+  assert.equal(mirrored.calibrate(points, true, world, 1000), true);
+  assert.ok(mirrored.update(points, true, headOnly, 1100)!.head!.y < -.1, 'mirror should reverse head yaw');
+  const together = new PoseRetarget();
+  assert.equal(together.calibrate(points, false, world, 1000), true);
+  const bodyAndHead = structuredClone(headOnly); bodyAndHead[12].z = .15;
+  assert.ok(Math.abs(together.update(points, false, bodyAndHead, 1100)!.head!.y) < .02, 'head should not turn twice when body and head turn together');
+  const hidden = structuredClone(points); hidden[8].visibility = 0;
+  const held = tracker.update(hidden, false, headOnly, 1200)!.head!.y;
+  assert.equal(held, turned.head!.y);
+  assert.equal(tracker.getConfidence().head, false);
+  assert.ok(Math.abs(tracker.update(hidden, false, headOnly, 1500)!.head!.y) < Math.abs(held));
+});
+
+test('swing strength preserves legacy behavior and scales both distance and ball velocity', () => {
+  const batter = getOrCreatePlayer();
+  const bowler = createBotPlayer('Hard');
+  const ball = delivery(0.5);
+  const shot = { direction: 2, type: 'power' as const, timing: 0.5, contactZone: 0.5 };
+  const distance = (strength?: number) => calculateDistance(batter, bowler, ball, { ...shot, strength }, 180).distance;
+  const incoming = { x: 2, y: -1, z: -25 };
+  const velocity = (strength?: number) => calculateShotTrajectory(0.8, 0.5, 0.5, 0, incoming, { x: 0, y: 0, z: 0 }, true, false, 'Medium', 'power', 50, strength);
+  assert.equal(swingStrengthFactor(undefined), 1);
+  assert.equal(swingStrengthFactor(NaN), 1);
+  assert.equal(swingStrengthFactor(-2), 0.4);
+  assert.equal(swingStrengthFactor(2), 1);
+  assert.equal(distance(), distance(1));
+  assert.deepEqual(velocity(), velocity(1));
+  assert.ok(distance(0) < distance(0.5) && distance(0.5) < distance(1));
+  const full = velocity(1);
+  const soft = velocity(0);
+  assert.ok(Math.abs(soft.x - full.x * 0.4) < 1e-9);
+  assert.ok(Math.abs(soft.y - full.y * 0.4) < 1e-9);
+  assert.ok(Math.abs(soft.z - full.z * 0.4) < 1e-9);
+  assert.deepEqual(velocity(NaN), full);
+  assert.deepEqual(velocity(2), full);
+  assert.deepEqual(velocity(-1), soft);
+  const carry = (strength: number) => {
+    const state: BallState = { position: { x: 0, y: 0.4, z: 0 }, velocity: velocity(strength), hasBounced: false, reachedBoundary: false, stopped: false };
+    for (let i = 0; i < 3600 && !state.stopped && !state.reachedBoundary; i++) stepBall(state, 1 / 120);
+    return Math.hypot(state.position.x, state.position.z);
+  };
+  assert.ok(carry(0) < carry(1));
+});
+
+test('recorded shots retain their swing strength', () => {
+  const game = new MatchController('Hard');
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  const shot = { direction: 0, type: 'power' as const, timing: 0.5, contactZone: 0.5, strength: 0.25 };
+  const result = game.recordBall(delivery(0.5), shot);
+  shot.strength = 1;
+  assert.equal(result.shot?.strength, 0.25);
+});
+
+test('articulated batter maintains joint hierarchy, bounded poses and handed bat attachment', () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const material = new StandardMaterial('rig-test', scene);
+    const rig = new BatterRig(scene, { blue: material, trousers: material, skin: material, helmet: material, pads: material, shoes: material, batWood: material, grip: material });
+    assert.equal(Object.keys(rig.joints).length, 17);
+    assert.equal(rig.joints.leftElbow.parent, rig.joints.leftShoulder);
+    assert.equal(rig.joints.leftWrist.parent, rig.joints.leftElbow);
+    assert.equal(rig.joints.rightKnee.parent, rig.joints.rightHip);
+    assert.equal(rig.joints.rightAnkle.parent, rig.joints.rightKnee);
+    assert.equal(rig.batPivot.parent, rig.joints.rightWrist);
+    const elbowOffset = rig.joints.leftElbow.position.clone();
+    assert.equal(rig.setJointRotation('leftShoulder', new Vector3(10, -10, 0.5)), true);
+    assert.deepEqual(rig.joints.leftShoulder.rotation.asArray(), [Math.PI / 2, -Math.PI / 2, 0.5]);
+    assert.deepEqual(rig.joints.leftElbow.position.asArray(), elbowOffset.asArray());
+    assert.equal(rig.setJointRotation('leftShoulder', new Vector3(NaN, 0, 0)), false);
+    assert.equal(rig.joints.leftShoulder.rotation.z, 0.5);
+    assert.equal(rig.applyPose({ leftShoulder: new Vector3(0.2, 0, 0), rightKnee: new Vector3(0.5, 0, 0) }), true);
+    assert.equal(rig.joints.rightKnee.rotation.x, 0.5);
+    assert.equal(rig.applyPose({ leftShoulder: new Vector3(0.6, 0, 0), rightKnee: new Vector3(NaN, 0, 0) }), false);
+    assert.equal(rig.joints.leftShoulder.rotation.x, 0.2);
+    assert.equal(rig.applyTrackingPose({ leftShoulder: Vector3.Zero() }, { leftShoulder: new Vector3(1, 0, 0) }), true);
+    scene.onBeforeRenderObservable.notifyObservers(scene);
+    rig.joints.leftShoulder.computeWorldMatrix(true); rig.joints.leftElbow.computeWorldMatrix(true);
+    const fallbackArm = rig.joints.leftElbow.getAbsolutePosition().subtract(rig.joints.leftShoulder.getAbsolutePosition()).normalize();
+    assert.ok(fallbackArm.x > .98, 'fallback rig should follow the tracked limb direction');
+    rig.setHandedness('LHB');
+    assert.equal(rig.joints.leftShoulder.rotationQuaternion, null, 'normal animation should regain control after tracking');
+    assert.equal(rig.batPivot.parent, rig.joints.leftWrist);
+    assert.equal(rig.joints.leftShoulder.rotation.z, -0.12);
+    rig.animateSwing(0, () => {});
+    rig.setHandedness('RHB');
+    assert.equal(rig.batPivot.parent, rig.joints.rightWrist);
+    assert.equal(rig.batPivot.rotation.z, -0.2);
+    const swings: number[] = [];
+    const originalAnimate = scene.beginDirectAnimation.bind(scene);
+    scene.beginDirectAnimation = ((target: unknown, animations: { name: string; getKeys: () => { value: number }[] }[], ...args: unknown[]) => {
+      if (animations[0]?.name === 'batSwing') swings.push(animations[0].getKeys()[2].value);
+      return (originalAnimate as (...parameters: any[]) => any)(target, animations, ...args);
+    }) as typeof scene.beginDirectAnimation;
+    rig.animateSwing(0, () => {}, 'defensive', 'front_foot');
+    rig.animateSwing(0, () => {}, 'lofted', 'back_foot');
+    rig.animateSwing(2, () => {}, 'lofted', 'back_foot');
+    assert.notEqual(swings[0], swings[1], 'shot type should change the swing');
+    assert.notEqual(swings[1], swings[2], 'direction should change the swing');
+  } finally {
+    scene.dispose();
+    engine.dispose();
+  }
+});
+
+test('standalone batting resolution leaves match state and inputs untouched and agrees with match scoring', () => {
+  const game = new MatchController('Hard');
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  const innings = game.getCurrentInnings();
+  const ball = { ...delivery(0.5), batterPosition: { x: 0, z: 0 } };
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
+  const input = { delivery: ball, shot, batter: innings.batter, bowler: innings.bowler, difficulty: 'Hard' as const, ballNumber: 1, isFreeHit: false };
+  const beforeState = structuredClone(game.state);
+  const beforeInput = structuredClone(input);
+  const isolated = resolveBattingDelivery(input);
+  assert.deepEqual(game.state, beforeState);
+  assert.deepEqual(input, beforeInput);
+  assert.deepEqual(game.recordBall(ball, shot), isolated.outcome);
+  ball.aimTarget.x = 1;
+  ball.batterPosition.x = 1;
+  shot.direction = 2;
+  assert.deepEqual(isolated.outcome.delivery.aimTarget, { x: 0, z: -3.5 });
+  assert.equal(isolated.outcome.delivery.batterPosition?.x, 0);
+  assert.equal(isolated.outcome.shot?.direction, 0);
+  const flight = resolveShotFlight(85, false, true);
+  assert.deepEqual(flight, { distance: 85, runs: 6 });
+  assert.equal(game.finalizeBallOutcome(85, false, true), flight.runs);
+});
+
+test('standalone resolution returns free-hit transitions and bounds flight distance', () => {
+  const batter = getOrCreatePlayer();
+  const bowler = createBotPlayer('Hard');
+  const base = { batter, bowler, difficulty: 'Hard' as const, ballNumber: 1, shot: null };
+  const noBall = resolveBattingDelivery({ ...base, delivery: { ...delivery(0.5), frontFootHeel: 0.01 }, isFreeHit: false });
+  assert.equal(noBall.outcome.extraType, 'noball');
+  assert.equal(noBall.nextFreeHit, true);
+  const wide = resolveBattingDelivery({ ...base, delivery: delivery(0.5, 1.4), isFreeHit: true });
+  assert.equal(wide.outcome.extraType, 'wide');
+  assert.equal(wide.nextFreeHit, true);
+  const legal = resolveBattingDelivery({ ...base, delivery: delivery(0.5), isFreeHit: true });
+  assert.equal(legal.outcome.isFreeHit, true);
+  assert.equal(legal.outcome.isWicket, false);
+  assert.equal(legal.nextFreeHit, false);
+  assert.equal(resolveShotFlight(Infinity, false).distance, 0);
+  assert.equal(resolveShotFlight(200, false).distance, 130);
 });
 
 test('a new match initializes even when a previous scene has a ball in play', () => {
@@ -124,6 +507,47 @@ test('rendered bowling paths use the same sampled trajectory as contact decision
     }
   } finally {
     globalAutoAssistConfig.bowlerArm = oldArm;
+  }
+});
+
+test('bot delivery resolves at the modeled contact point and triggers its swing first', () => {
+  const previousArm = globalAutoAssistConfig.bowlerArm;
+  try {
+    for (const type of ['fast', 'offspin', 'legspin'] as const) {
+      for (const frameMs of [1000 / 60, 50]) {
+        for (const crossBothThresholds of [false, true]) {
+          globalAutoAssistConfig.bowlerArm = 'Right';
+          const renderer = Object.create(GameScene.prototype) as any;
+          const ball = { position: new Vector3(), setEnabled: () => {} };
+          const events: string[] = [];
+          let observed: Vector3 | null = null;
+          let swingAt = 0;
+          Object.assign(renderer, {
+            ballMesh: ball, engine: { getDeltaTime: () => frameMs }, scene: { activeCamera: null },
+            isBotBatting: true, bowlerRoot: null, bounceMarker: null, timingRing: null, predictionPath: null,
+            clearBallTrail: () => {}, drawBallTrail: () => {}, setCameraMode: () => {},
+            botBattingTriggerCallback: () => { swingAt = renderer.ballAnimationTime / 60; events.push('swing'); }
+          });
+          const input: DeliveryChoice = { ...delivery(0.5, 0.35), type, aimTarget: { x: 0.35, z: -3.5 }, overTheWicket: false, bowlingArm: 'Right', pace: 0.8, turn: 0.7, swing: -0.4 };
+          renderer.animateDelivery(input.aimTarget, input.length, type, () => { events.push('arrive'); observed = ball.position.clone(); }, () => {}, false, undefined, false, 0, input.pace, input.turn, input.swing);
+          if (crossBothThresholds) renderer.ballAnimationTime = 60 * batterContactProgress(input) - 0.1;
+          for (let i = 0; i < 1000 && renderer.updateDeliveryAnimation; i++) renderer.updateDeliveryAnimation();
+          const expected = deliveryContactPoint(input);
+          assert.deepEqual(events, ['swing', 'arrive'], `${type} at ${frameMs} ms`);
+          if (!crossBothThresholds) {
+            const lead = (batterContactProgress(input) - swingAt) * deliveryDurationMs(type, input.pace);
+            assert.ok(lead <= 150 + 1e-6 && lead >= 150 - frameMs - 1e-6, `unexpected swing lead: ${lead} ms`);
+          }
+          assert.ok(observed);
+          const actual = observed as unknown as Vector3;
+          assert.ok(Math.abs(actual.x - expected.x) < 1e-9);
+          assert.ok(Math.abs(actual.y - expected.y - (0.075 - BALL_RADIUS_METERS)) < 1e-9);
+          assert.ok(Math.abs(actual.z - expected.z) < 1e-9);
+        }
+      }
+    }
+  } finally {
+    globalAutoAssistConfig.bowlerArm = previousArm;
   }
 });
 
@@ -341,17 +765,22 @@ test('pause freezes gameplay time and scheduled deliveries', () => {
   const tick = () => { const [id, fn] = queue.entries().next().value!; queue.delete(id); fn(); };
   try {
     let delivered = false;
+    const initialRevision = gameClockRevision();
     const start = gameNow();
     setGameTimeout(() => { delivered = true; }, 200);
     now += 100;
     tick();
     setGamePaused(true);
     assert.equal(isGamePaused(), true);
+    assert.equal(gameClockRevision(), initialRevision + 1);
+    setGamePaused(true);
+    assert.equal(gameClockRevision(), initialRevision + 1, 'repeated pause should not invalidate frames again');
     now += 10000;
     tick();
     assert.equal(gameNow() - start, 100);
     assert.equal(delivered, false);
     setGamePaused(false);
+    assert.equal(gameClockRevision(), initialRevision + 2);
     now += 100;
     tick();
     assert.equal(delivered, true);
@@ -545,6 +974,12 @@ test('a second finger can strike while the aiming finger remains held', () => {
   assert.equal(shots.length, 4);
   shotEvents.click({ detail: 0, preventDefault() {} });
   assert.deepEqual(shots[4], [6, 'lofted']);
+  controls.setDirection(2);
+  shotEvents.pointerdown({ pointerId: 8, preventDefault() {} });
+  assert.deepEqual(shots[5], [2, 'lofted'], 'menu aim must also apply to touch shots');
+  controls.setDirection(99);
+  shotEvents.pointerdown({ pointerId: 9, preventDefault() {} });
+  assert.deepEqual(shots[6], [2, 'lofted'], 'invalid direction must not overwrite aim');
 });
 
 test('shot guide follows the delivered line including movement', () => {
@@ -1156,7 +1591,7 @@ test('dismissals do not cut a regular innings short', () => {
   assert.equal(innings.ballsBowled, 6);
 });
 
-test('shot trajectory follows all four cardinal directions with finite speed', () => {
+test('shot trajectory follows all eight aim directions with finite speed', () => {
   const zero = { x: 0, y: 0, z: 0 };
   const trajectory = (direction: number) => calculateShotTrajectory(
     1, 0.5, 0.5, direction * Math.PI / 4 - Math.PI / 2, zero, zero
@@ -1166,6 +1601,13 @@ test('shot trajectory follows all four cardinal directions with finite speed', (
   assert.ok(right.x > 0 && Math.abs(right.z) < 1e-10);
   assert.ok(back.z < 0 && Math.abs(back.x) < 1e-10);
   assert.ok(left.x < 0 && Math.abs(left.z) < 1e-10);
+  for (let direction = 0; direction < 8; direction++) {
+    const velocity = trajectory(direction);
+    const angle = direction * Math.PI / 4;
+    const length = Math.hypot(velocity.x, velocity.z);
+    assert.ok(Math.abs(velocity.x / length - Math.sin(angle)) < 1e-9);
+    assert.ok(Math.abs(velocity.z / length - Math.cos(angle)) < 1e-9);
+  }
   for (const velocity of [straight, right, back, left]) {
     assert.ok(Object.values(velocity).every(Number.isFinite));
     assert.ok(Math.hypot(velocity.x, velocity.y, velocity.z) <= 38.000001);

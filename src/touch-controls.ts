@@ -24,7 +24,7 @@ export class TouchBattingControls {
   private locked = false;
   private readonly knob: HTMLElement;
 
-  constructor(private readonly stick: HTMLElement, buttons: NodeListOf<HTMLButtonElement>, private readonly onShot: (direction: number, type: ShotType) => void) {
+  constructor(private readonly stick: HTMLElement, buttons: NodeListOf<HTMLButtonElement>, private readonly onShot: (direction: number, type: ShotType) => void, private readonly onDirectionChange?: (direction: number) => void) {
     this.knob = stick.querySelector<HTMLElement>('.touch-stick-knob')!;
     stick.addEventListener('pointerdown', event => {
       if (this.locked || this.pointerId !== null) return;
@@ -71,6 +71,16 @@ export class TouchBattingControls {
     this.stick.setAttribute('data-suggestion', DIRECTION_LABELS[direction]);
   }
 
+  public setDirection(direction: number): void {
+    if (!Number.isInteger(direction) || direction < 0 || direction >= DIRECTION_LABELS.length) return;
+    this.direction = direction;
+    this.stick.style.setProperty('--selected-angle', `${direction * 45}deg`);
+    this.stick.setAttribute('aria-label', `Shot aim locked: ${DIRECTION_LABELS[direction]}. Drag to select another direction.`);
+    const radius = Math.min(this.stick.getBoundingClientRect().width, this.stick.getBoundingClientRect().height) / 2;
+    const angle = direction * Math.PI / 4;
+    this.knob.style.transform = `translate(calc(-50% + ${Math.sin(angle) * radius * 0.55}px), calc(-50% + ${-Math.cos(angle) * radius * 0.55}px))`;
+  }
+
   private update(event: PointerEvent): void {
     const rect = this.stick.getBoundingClientRect();
     const radius = Math.min(rect.width, rect.height) / 2;
@@ -85,5 +95,6 @@ export class TouchBattingControls {
     this.direction = direction;
     this.stick.style.setProperty('--selected-angle', `${direction * 45}deg`);
     this.stick.setAttribute('aria-label', `Shot aim locked: ${DIRECTION_LABELS[direction]}. Drag to select another direction.`);
+    this.onDirectionChange?.(direction);
   }
 }

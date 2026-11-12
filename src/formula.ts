@@ -361,9 +361,13 @@ export function evaluateWicket(
   };
 }
 
-/**
- * Computes hit carry distance in meters.
- */
+/** Scale calibrated swing strength while preserving legacy shots by default. */
+export function swingStrengthFactor(strength?: number): number {
+  const normalized = strength === undefined || !Number.isFinite(strength) ? 1 : Math.max(0, Math.min(1, strength));
+  return 0.4 + 0.6 * normalized;
+}
+
+/** Computes hit carry distance in meters. */
 export function calculateDistance(
   batter: Player,
   bowler: Player,
@@ -432,6 +436,8 @@ export function calculateDistance(
       distance = 25.0 + Math.random() * 30.0; // 25 to 55m
     }
   }
+
+  distance *= swingStrengthFactor(shot.strength);
   
   return {
     distance,
@@ -528,7 +534,8 @@ export function calculateShotTrajectory(
   _isHuman: boolean = false,
   _difficulty: string = 'Medium',
   shotType: string = 'power',
-  batterPower: number = 50
+  batterPower: number = 50,
+  swingStrength?: number
 ): { x: number, y: number, z: number } {
   let Vy = 0;
   let Vz = 0;
@@ -587,8 +594,8 @@ export function calculateShotTrajectory(
   // Poor contact carries more of the incoming ball's lateral movement.
   Vx += V_in.x * 0.12 * (1 - quality);
   Vz += V_in.z * 0.03 * (1 - quality);
-  
-  return { x: Vx, y: Vy, z: Vz };
+  const strengthFactor = swingStrengthFactor(swingStrength);
+  return { x: Vx * strengthFactor, y: Vy * strengthFactor, z: Vz * strengthFactor };
 }
 
 /**

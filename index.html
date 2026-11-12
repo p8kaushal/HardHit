@@ -90,6 +90,7 @@
             <button id="btn-start-toss" class="btn primary-btn size-large start-btn">
               <span class="btn-icon">🪙</span> Go to Toss
             </button>
+            <button id="btn-playzone" class="btn secondary-btn size-large" type="button">Cricket Playzone</button>
           </div>
         </div>
 
@@ -228,6 +229,111 @@
         </div>
       </div>
     </div>
+
+    <section id="screen-playzone" class="screen" aria-label="Cricket playzone">
+      <div class="rotate-hint" role="status" aria-live="polite"><strong>Turn your device sideways</strong><span>Practice resumes in landscape.</span></div>
+      <div id="playzone-canvas-slot"></div>
+      <header class="practice-header">
+        <div class="practice-brand"><span class="practice-kicker">HARDHIT / TRAINING</span><h1>Cricket playzone</h1></div>
+        <p id="playzone-score" aria-live="polite">Practice · 0 runs / 0 wickets · 0 balls</p>
+        <button id="playzone-exit" class="practice-exit" type="button">Exit practice <span aria-hidden="true">↗</span></button>
+      </header>
+      <aside class="playzone-panel practice-dock-left" aria-label="Session and delivery settings">
+        <div class="practice-panel-top"><span class="practice-section-label">SESSION</span><span id="playzone-phase" class="practice-live">● READY</span></div>
+        <label class="practice-field"><span>Practice mode</span><select id="playzone-mode"><option value="free">Free movement</option><option value="delivery">Batting practice</option><option value="bowling">Bowling practice</option></select></label>
+        <div id="playzone-delivery-options" hidden>
+          <div id="playzone-bowler-mode-control"><label class="practice-field"><span>Bowler</span><select id="playzone-bowler-mode"><option value="manual">Set delivery</option><option value="simulated">Simulated bowler</option></select></label></div>
+          <div id="playzone-simulated-options" hidden>
+            <label class="practice-field"><span>Difficulty</span><select id="playzone-difficulty"><option value="Rookie">Rookie</option><option value="Medium" selected>Medium</option><option value="Hard">Hard</option></select></label>
+            <p class="practice-bowler-hint">The bowler chooses the line and length for each ball.</p>
+          </div>
+          <div id="playzone-manual-options">
+          <div class="practice-divider"><span>DELIVERY SETUP</span></div>
+          <div id="playzone-manual-grid" class="practice-grid">
+            <label id="playzone-type-field" class="practice-field"><span>Delivery</span><select id="playzone-type"><option value="medium">Medium</option><option value="fast">Fast</option><option value="slow">Slow ball</option><option value="offspin">Off spin</option><option value="legspin">Leg spin</option></select></label>
+            <label id="playzone-line-field" class="practice-field"><span>Line</span><select id="playzone-line"><option value="middle">Middle</option><option value="off">Off</option><option value="leg">Leg</option></select></label>
+            <label id="playzone-length-field" class="practice-field"><span>Length</span><select id="playzone-length"><option value="good">Good</option><option value="full">Full</option><option value="yorker">Yorker</option><option value="short">Short</option><option value="bouncer">Bouncer</option></select></label>
+            <label id="playzone-pace-field" class="practice-field"><span>Pace</span><input id="playzone-pace" type="range" min="0" max="100" value="50"></label>
+          </div>
+          <div id="playzone-pitch-picker" hidden>
+            <div class="pitch-map-label">Drag to aim · or tap the pitch</div>
+            <div id="playzone-pitch-map" class="bowling-pitch-map" role="img" aria-label="Bowling target map: drag to choose line and length; use the line and length selectors for keyboard control"><span id="playzone-map-marker" class="bowling-map-marker"></span></div>
+          </div>
+          <div id="playzone-spin-control" hidden><label class="practice-field"><span>Spin <output id="playzone-spin-value">50%</output></span><input id="playzone-spin" type="range" min="0" max="100" value="50" aria-label="Spin strength"></label></div>
+          <div id="playzone-swing-control" hidden><label class="practice-field"><span>Swing <output id="playzone-swing-value">Straight</output></span><input id="playzone-swing-amount" type="range" min="-100" max="100" value="0" aria-label="Swing direction and amount"></label></div>
+          <div id="playzone-side-control" hidden><label class="practice-field"><span>Bowling side</span><select id="playzone-side"><option value="over">Over</option><option value="around">Around</option></select></label></div>
+          <div id="playzone-repeat-control" class="practice-delivery-actions"><label class="playzone-check"><input id="playzone-repeat" type="checkbox"> Repeat selected delivery</label></div>
+          </div>
+          <details id="playzone-display-settings" class="practice-settings" open><summary>Display</summary>
+          <div class="practice-display-options">
+            <label class="playzone-check"><input id="playzone-follow-ball" type="checkbox"> Follow ball after a shot</label>
+            <label class="playzone-check"><input id="playzone-show-outcome" type="checkbox" checked> Show delivery outcome</label>
+          </div>
+          </details>
+        </div>
+      </aside>
+      <aside class="playzone-panel practice-dock-right" aria-label="Batting controls">
+        <div id="playzone-batting-controls">
+        <div class="practice-panel-top"><span class="practice-section-label">YOUR SHOT</span></div>
+        <div class="practice-grid">
+          <label class="practice-field"><span>Shot type</span><select id="playzone-shot"><option value="grounded">Grounded</option><option value="defensive">Defensive</option><option value="lofted">Lofted</option><option value="power">Power</option></select></label>
+          <label class="practice-field"><span>Direction</span><select id="playzone-direction"><option value="0">Straight</option><option value="1">Forward right</option><option value="2">Right</option><option value="3">Back right</option><option value="4">Behind</option><option value="5">Back left</option><option value="6">Left</option><option value="7">Forward left</option></select></label>
+        </div>
+        <div class="practice-footwork" role="group" aria-label="Batting footwork"><button type="button" class="active" data-practice-footwork="front_foot" aria-pressed="true">Front foot <kbd>Q</kbd></button><button type="button" data-practice-footwork="back_foot" aria-pressed="false">Back foot <kbd>E</kbd></button></div>
+        <button id="playzone-swing" class="practice-swing" type="button"><span>Play shot</span><kbd>SPACE</kbd></button>
+        <details id="playzone-camera-settings" class="practice-settings">
+          <summary>Camera setup</summary>
+          <p class="practice-bowler-hint">Stand upright facing the camera with your full body visible, then calibrate. Your posture becomes the reference; camera movement does not play shots.</p>
+          <p class="practice-bowler-hint">Facing the camera points the character toward the bowler. Body turns are estimated, and the bat is hidden while tracking.</p>
+          <div class="practice-camera-frame"><video id="playzone-camera-preview" autoplay muted playsinline hidden aria-label="Local camera preview"></video><canvas id="playzone-pose-overlay" hidden aria-hidden="true"></canvas></div>
+          <button id="playzone-camera-size" class="practice-secondary" type="button" aria-pressed="false">Enlarge preview</button>
+          <p id="playzone-camera-status" role="status" aria-live="polite">Camera is off.</p>
+          <button id="playzone-camera-toggle" class="practice-secondary" type="button">Start camera</button>
+          <p id="playzone-pose-status" role="status" aria-live="polite">Pose tracking is off.</p>
+          <button id="playzone-pose-toggle" class="practice-secondary" type="button" disabled>Start pose tracking</button>
+          <label class="playzone-check"><input id="playzone-pose-mirror" type="checkbox" checked> Mirror character movement</label>
+          <label class="playzone-check"><input id="playzone-pose-xray" type="checkbox"> Show character joints (X-ray)</label>
+          <p class="practice-bowler-hint">X-ray: green means the corresponding camera landmark is visible; amber means uncertain or not currently tracked. Dots show model joints, not raw camera points.</p>
+          <label class="playzone-check"><input id="playzone-pose-depth" type="checkbox"> Approximate forward/back movement</label>
+          <p class="practice-bowler-hint">Distance is estimated from your apparent size and may drift when you turn or bend. It changes the character visually, not the ball or batting position.</p>
+          <p id="playzone-retarget-status" class="practice-bowler-hint" role="status">Start pose tracking, hold a comfortable stance, then calibrate.</p>
+          <button id="playzone-pose-calibrate" class="practice-secondary" type="button">Calibrate movement</button>
+          <label class="playzone-check"><input id="playzone-motion-preview" type="checkbox"> Preview two-hand movement</label>
+          <p id="playzone-motion-status" class="practice-bowler-hint" role="status">Hand-motion preview is off.</p>
+          <p id="playzone-motion-timing" class="practice-bowler-hint" role="status" hidden></p>
+          <p class="practice-bowler-hint">Keep both hands close together and visible. Direction is in the mirrored camera view, not the cricket field. Timing compares the hand-speed peak with modeled contact; it is not bat contact and does not play a shot.</p>
+          <div id="playzone-intensity-controls" class="practice-intensity" hidden>
+            <p class="practice-bowler-hint">Optional: record a gentler movement, then a stronger one. Each must be fast enough for the preview to detect. This compares hand motion, not bat or shot power.</p>
+            <div class="practice-grid"><button id="playzone-intensity-gentle" class="practice-secondary" type="button" disabled>Record gentler</button><button id="playzone-intensity-strong" class="practice-secondary" type="button" disabled>Record stronger</button></div>
+            <p id="playzone-intensity-status" class="practice-bowler-hint" role="status">Record a gentler movement to begin.</p>
+          </div>
+          <p class="practice-bowler-hint">Video stays on your device. MediaPipe may send performance metrics to Google. <a href="https://github.com/google-ai-edge/mediapipe/tree/master/mediapipe/tasks/web/vision#privacy-notice" target="_blank" rel="noopener noreferrer">Privacy details</a></p>
+        </details>
+        </div>
+        <div id="playzone-bowling-settings" hidden>
+          <div class="practice-panel-top"><span class="practice-section-label">YOUR DELIVERY</span></div>
+          <div id="playzone-bowling-grid" class="practice-grid"></div>
+          <div id="playzone-bowling-adjustments" class="practice-grid"></div>
+          <details id="playzone-bot-controls" class="practice-settings">
+          <summary>Bot batter</summary>
+          <label class="practice-field"><span>Shot style</span><select id="playzone-batter-style"><option value="auto">Simulated</option><option value="defensive">Defensive</option><option value="grounded">Grounded</option><option value="lofted">Lofted</option><option value="power">Power</option></select></label>
+          <label class="practice-field"><span>Difficulty</span><select id="playzone-batter-difficulty"><option value="Rookie">Rookie</option><option value="Medium" selected>Medium</option><option value="Hard">Hard</option></select></label>
+          <label class="practice-field"><span>Batting hand</span><select id="playzone-batter-hand"><option value="RHB">Right-handed</option><option value="LHB">Left-handed</option></select></label>
+          <p class="practice-bowler-hint">Hold and release the bowling button in the green zone.</p>
+          </details>
+          <div id="playzone-bowling-display"></div>
+        </div>
+      </aside>
+      <div class="practice-bottom">
+        <div id="practice-touch-controls" class="practice-touch" aria-label="Touch batting controls"><div id="practice-stick" class="touch-stick" role="img" aria-label="Drag to aim"><span class="touch-field-suggestion"></span><span class="touch-field-selected"></span><span class="touch-field-pitch"></span><span class="touch-stick-knob"></span><span class="field-label field-straight">STRAIGHT</span><span class="field-label field-left">LEFT</span><span class="field-label field-right">RIGHT</span><span class="field-label field-behind">BEHIND</span></div><div class="practice-shot-buttons" role="group" aria-label="Shot type"><button type="button" class="btn" data-practice-shot="lofted" aria-pressed="false">LOFT</button><button type="button" class="btn" data-practice-shot="grounded" aria-pressed="true">DRIVE</button><button type="button" class="btn" data-practice-shot="power" aria-pressed="false">POWER</button><button type="button" class="btn" data-practice-shot="defensive" aria-pressed="false">DEFEND</button></div></div>
+        <button id="playzone-bowl" class="practice-bowl" type="button" hidden>Next ball</button>
+        <button id="playzone-bowl-action" class="practice-bowl" type="button" hidden>Hold &amp; release to bowl</button>
+        <div id="playzone-meter-wrap" class="bowling-practice-meter" hidden><span>RELEASE TIMING</span><div id="playzone-release-meter" class="release-meter" role="progressbar" aria-label="Bowling release timing" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="release-meter-target"></span><span id="playzone-release-marker" class="release-meter-marker"></span></div></div>
+        <div class="practice-status"><span class="practice-status-dot"></span><p id="playzone-feedback" role="status" aria-live="polite">Choose a shot to preview it.</p></div>
+        <div id="practice-movement-controls" class="practice-movement" role="group" aria-label="Move batter"><span>MOVE BATTER <kbd>I J K L</kbd></span><div><button data-practice-move="left" type="button" aria-label="Move left">←</button><button data-practice-move="forward" type="button" aria-label="Move forward">↑</button><button data-practice-move="back" type="button" aria-label="Move back">↓</button><button data-practice-move="right" type="button" aria-label="Move right">→</button></div></div>
+        <p id="playzone-help" class="playzone-help">Aim W A S D · Shots 1–4 · Footwork Q / E</p>
+      </div>
+    </section>
 
     <!-- Gameplay Screen -->
     <div id="screen-gameplay" class="screen">

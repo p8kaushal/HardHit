@@ -1,6 +1,7 @@
-// Gameplay time stops while play is obscured or the device is in portrait.
+// Gameplay time stops while play is obscured or a touch-primary device is in portrait.
 let pausedAt: number | null = null;
 let pausedDuration = 0;
+let revision = 0;
 
 export function shouldPauseGameplay(playing: boolean, portrait: boolean, hidden: boolean): boolean {
   return playing && (portrait || hidden);
@@ -14,11 +15,15 @@ export function isGamePaused(): boolean {
   return pausedAt !== null;
 }
 
+/** Changes whenever a pause boundary invalidates mappings from wall time to game time. */
+export function gameClockRevision(): number { return revision; }
+
 export function setGamePaused(paused: boolean): void {
-  if (paused && pausedAt === null) pausedAt = performance.now();
+  if (paused && pausedAt === null) { pausedAt = performance.now(); revision++; }
   else if (!paused && pausedAt !== null) {
     pausedDuration += performance.now() - pausedAt;
     pausedAt = null;
+    revision++;
   }
 }
 
