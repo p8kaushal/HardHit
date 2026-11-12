@@ -78,6 +78,10 @@ Downloaded and inspected a second Pexels clip locally: 1080×1920, 120 fps, 5.15
 
 A publicly linked cricket bat corner repository and its notebook were inspected as data. Its training code uses DETR object detection and its linked dataset declares only a cricket-bat class; named endpoints are not established. Its linked checkpoint was not executed and repository license was not found. A separate indexed bat-toe dataset could not be inspected because the service returned HTTP 403; label semantics and rights remain unknown. No model was selected. Details and source links are in `CAMERA_BATTING.md`.
 
+## Evaluated: cropped bat keypoint prototype
+
+Trained a spatial heatmap prototype on annotated bat-box crops in frames 0–99, excluded 100–119, and evaluated frames 120–183. With oracle boxes, median/p90 worst-point error was 108.5/321.7 pixels and 0/64 frames had all four within 50 pixels. EfficientDet supplied boxes for 12/64; those had 0/12 within 50 pixels and 11 target points outside their expanded crops. The missing 52 are end-to-end failures. This single-clip prototype is not suitable for integration; model, images and results stay outside the repo. Details are in `CAMERA_BATTING.md`.
+
 ## Evaluated: spatial heatmap bat keypoint prototype
 
 Fine-tuned a spatial heatmap head and the last pretrained MobileNetV3-Small blocks on frames 0–99, excluded 100–119, and evaluated 120–183. Median/p90 worst-point error was 418.5/489.4 pixels and 0/64 frames placed all points within 50 pixels. This improves on the constant baseline but remains unusable on the holdout. The single stroke cannot validate generalization, browser performance, confidence or gameplay readiness. Model and frame outputs remain outside the repo; configuration and limits are in `CAMERA_BATTING.md`.
