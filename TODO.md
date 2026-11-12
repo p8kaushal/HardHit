@@ -75,6 +75,11 @@
 - [x] Verify preprocessing and labels, benchmark actual annotated bat frames with box overlap and positive controls, and assess browser feasibility.
 - [x] Document evidence and any implementation limits, commit the increment, and continue unblocked camera work without treating live tests as approval gates. Positive control passed; 15/23 bat detections and 2/23 IoU ≥0.5 matches are insufficient for runtime selection.
 
+## Pretrained feature keypoint feasibility
+
+- [x] Evaluate a frozen pretrained image backbone with a simple four-point regression head and a gapped temporal holdout. It performed worse than the training-mean baseline on this one stroke; no runtime model was selected.
+- [ ] Obtain varied independently labeled actual-bat footage and evaluate a stronger endpoint model before gameplay integration.
+
 ## Oracle-box segmentation feasibility
 
 - [x] Evaluate generic GrabCut segmentation against sampled annotated bat endpoints with human boxes and oracle point ordering. Six of 23 frames produced no usable segment; none of the remaining frames placed both endpoints within 50 pixels. This does not evaluate learned segmentation.
