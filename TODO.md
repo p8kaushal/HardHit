@@ -19,6 +19,12 @@
 - [x] Test malformed references, real pixel/aspect errors, missing/uncertain results, coverage and actual browser operation, then commit. 126 tests and build passed; synthetic browser smoke passed and a strict-tolerance browser fixture failed as expected.
 - [ ] Run independent human annotations; synthetic smoke references and prior overlaid recordings do not establish accuracy.
 
+## Real-bat detector candidate investigation
+
+- [x] Inspect public bat-keypoint annotations and source video for usable local evidence, licensing and alignment.
+- [x] Evaluate a local browser-compatible detector candidate on sampled actual-bat frames, record coverage/overlap and limits, then commit findings. EfficientDet-Lite0 int8 found zero bats in 23 sampled frames at confidence ≥0.2; person positive control was detected on all 23. Candidate rejected; no runtime model added.
+- [ ] Select an endpoint-capable bat-tracking implementation only with sufficient evidence; keep hand-only estimates out of physical-bat claims.
+
 ## Next: live movement review
 
 - [ ] Have the user refresh and use **Calibrate in 5 seconds** while upright, facing the camera with the whole body visible; review the character's neutral posture and bowler-facing alignment.

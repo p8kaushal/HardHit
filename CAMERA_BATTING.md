@@ -21,6 +21,29 @@ The installed pose model estimates 33 human body landmarks; it does not supply b
 
 Before selecting or training a bat-specific model, evaluate appropriately licensed candidates against representative local cricket-bat footage and record the model licence, size, runtime cost, missed detections and false positives. Do not silently introduce a paid service, upload user recordings or require physical markers. No bat-specific model has been selected or validated. Live posture feedback and full-body footage with an actual bat are pending.
 
+### Candidate evaluation — November 12, 2026
+
+The public [Train Matricx cricket-bat keypoint dataset](https://huggingface.co/datasets/trainmatricx/cricket-bat-keypoint-detection) supplies 177 human-labeled frames from one stroke, with handle-top, splice, blade-middle and toe annotations. Its source is Gokuldham Nar's [Pexels cricket practice clip](https://www.pexels.com/video/dynamic-cricket-practice-session-outdoors-32928952/). Annotations/code are declared MIT by their publisher; video use is governed separately by the [Pexels licence](https://www.pexels.com/license/). The clip, annotations and model were downloaded only to `/private/tmp` for local investigation, without adding them to the game or repository. The first-frame image and annotation positions were inspected for rough alignment; all 177 annotations contain four points, all declared visible and inside the image. This is not a complete annotation-quality audit.
+
+Tested Google's EfficientDet-Lite0 int8 object detector against every eighth annotated image (23 frames), seeking by the source's `30000/1001` fps frame index and using the original 1080×1920 image. The installed MediaPipe 1.2.2 runtime ran CPU inference in local headless Chromium. The model's official [label map](https://storage.googleapis.com/mediapipe-tasks/object_detector/labelmap.txt) includes `baseball bat`, without a separate cricket-bat category. Generalization to a cricket bat was an experiment, not assumed support.
+
+| Measure | Local experimental result |
+| --- | --- |
+| Person positive control at confidence ≥0.2 | 23/23 sampled frames |
+| Bat detection at confidence ≥0.2 | 0/23 |
+| Bat detection at confidence ≥0.5 | 0/23 |
+| Bat box match at intersection-over-union ≥0.5 | 0/23 |
+| Median synchronous detector call | Approximately 51 ms |
+| Maximum detector call, including startup effects | Approximately 305 ms |
+
+The initial category-filtered run also found zero bats; the unfiltered run above established that inference was functioning by detecting the person in every sample. These timings are for this local desktop/headless experiment, exclude capture and rendering, and are not mobile performance measurements. The candidate is rejected for integration based on this fixture. No bat endpoints, face orientation or swing accuracy were demonstrated, and zero emitted bat boxes provides no meaningful estimate of false-positive behavior on other scenes.
+
+Reproducibility identifiers: model [EfficientDet-Lite0 int8](https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/latest/efficientdet_lite0.tflite), SHA-256 `0720bf247bd76e6594ea28fa9c6f7c5242be774818997dbbeffc4da460c723bb`; source video SHA-256 `5bd6ddce3a13375918e0827ad96f3172a1b2cd24bbb9075f323271b45945151b`; annotation JSON SHA-256 `7d3ac6d62aa39fa46caa4efb036f40c4780e0ed9a06c2135a81698808c08c292`. The disposable evaluation script and detailed local results are `/private/tmp/hardhit-evaluate-bat.mjs` and `/private/tmp/hardhit-bat-candidate-results.json`; they may disappear with temporary-file cleanup.
+
+The [Kushal Dev cricket detector repository](https://github.com/kushaldev75/Bat-Ball-Tracking-System) is another lead: its public file tree contains a roughly 14.4 MB `results/best.pt` checkpoint and its training configuration names `yolov5s.pt`, despite the README describing a larger model. It predicts bat/ball boxes rather than endpoint keypoints. This checkpoint has not been executed, converted, benchmarked or approved as a runtime dependency; a repository licence alone is not treated here as verification of every underlying asset's licence. The other indexed webcam-analysis repository inspected returned 404, so search snippets were not accepted as usable implementation evidence.
+
+Next evidence needed remains representative full-body/actual-bat footage and live review of the corrected posture. The public single-stroke sample can support later bat experiments but does not close those gates. Physical-bat inference and camera scoring remain unimplemented.
+
 ## Independent image-point validation
 
 `npm run test:pose-reference` accepts a local unmirrored, pre-cropped WebM and its local JSON reference. It seeks to annotated times, runs the real pose worker sequentially and compares image points in source pixels. It does not run the rig or verify 3D accuracy, dynamic latency, bat detection or shot classification. Browser seeking selects the decoded frame at the requested media time; timestamps are not independent exposure measurements. Annotate the same decoded source frames.
