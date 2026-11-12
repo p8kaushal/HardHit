@@ -18,6 +18,10 @@ Add an explicit local-only annotated-frame check, separate from the moving rig r
 
 Added a strict manual bat reference validator and pixel scorer for four ordered endpoints, with confidence and missing-point coverage failures. Behavior tests cover schemas, aspect-aware pixel error, exact tolerance, low confidence and absent predictions. Integrated into `npm test`; all 129 tests pass. This defines evaluation for future detectors and does not supply detector output.
 
+## Verified: bound bat annotation at clip end
+
+Clamp the frame index itself when stepping beyond the clip, so the exported frame and time match the bounded request. A browser run on the local cricket clip stepped past the end, annotated four points and verified the exported frame/time were within the clip, with no browser errors. This does not establish exact decoded-frame timing on variable-frame-rate sources.
+
 ## Verified tooling: local bat keypoint annotation
 
 Added a local browser page to annotate handle top, splice, blade middle and toe on sampled frames, with an explicit nominal FPS and JSON export. Verified frame-zero load, four-point entry, saving and exported dimensions/rate/names using the local cricket clip; no browser errors. Click coordinates in this smoke were synthetic, so this verifies tool operation only. Variable-frame-rate timing still needs careful reference preparation, and no detector is evaluated by this tool yet.
