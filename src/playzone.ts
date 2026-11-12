@@ -73,10 +73,10 @@ export class Playzone {
       if (state !== 'tracking' && this.poseTrackingActive) { this.handMotionIntensity.reset(); this.intensityNotice = null; }
       this.poseTrackingActive = state === 'tracking';
       this.renderIntensityControls();
-    }, (landmarks, world, timestamp, multiplePeople) => {
+    }, (landmarks, world, timestamp, multiplePeople, frameSubmittedAt) => {
       if (multiplePeople) this.resetPoseMovement('Multiple people detected. Keep only the player in view, then calibrate again.');
       this.updateHandMotion(landmarks, timestamp);
-      this.updatePoseMovement(landmarks, world);
+      this.updatePoseMovement(landmarks, world, frameSubmittedAt);
     }, stats => {
       const output = get<HTMLElement>('playzone-pose-performance');
       output.hidden = stats === null;
@@ -471,10 +471,11 @@ export class Playzone {
       const point = this.poseLandmarks[index];
       return point && Number.isFinite(point.x) && Number.isFinite(point.y) && (point.visibility ?? 0) >= .45 && point.x > .02 && point.x < .98 && point.y > .02 && point.y < .98;
     });
-    const fresh = performance.now() - this.poseLandmarksAt <= 500;
-    this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && (!requireFullBody || (fullBody && fresh)) && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks);
-    get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? 'Calibrated! Your current stance is the reference. Move to control the character.' : requireFullBody ? 'Could not calibrate. Stand upright facing the camera with your head and feet visible, then try again.' : 'Could not calibrate. Start pose tracking and show both shoulders and hips to the camera, then try again.';
-    if (this.poseCalibrated) this.updatePoseMovement(this.poseLandmarks, this.poseWorldLandmarks);
+    const age = performance.now() - this.poseLandmarksAt;
+    const fresh = age >= 0 && age <= 500;
+    this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && fresh && (!requireFullBody || fullBody) && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks);
+    get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? 'Calibrated! Your current stance is the reference. Move to control the character.' : !fresh ? 'Could not calibrate. Wait for a fresh tracked pose, then try again.' : requireFullBody ? 'Could not calibrate. Stand upright facing the camera with your head and feet visible, then try again.' : 'Could not calibrate. Start pose tracking and show both shoulders and hips to the camera, then try again.';
+    if (this.poseCalibrated) this.updatePoseMovement(this.poseLandmarks, this.poseWorldLandmarks, this.poseLandmarksAt);
   }
 
   private startDelayedCalibration(): void {
@@ -575,12 +576,12 @@ export class Playzone {
     }
   }
 
-  private updatePoseMovement(landmarks: PoseLandmark[], world: PoseLandmark[]): void {
+  private updatePoseMovement(landmarks: PoseLandmark[], world: PoseLandmark[], frameSubmittedAt = performance.now()): void {
     if (this.poseWatchdog !== null) window.clearTimeout(this.poseWatchdog);
     this.poseWatchdog = null;
     this.poseLandmarks = landmarks;
     this.poseWorldLandmarks = world;
-    this.poseLandmarksAt = landmarks.length ? performance.now() : -Infinity;
+    this.poseLandmarksAt = landmarks.length && Number.isFinite(frameSubmittedAt) ? frameSubmittedAt : -Infinity;
     if (!this.poseCalibrated) return;
     this.poseWatchdog = window.setTimeout(() => {
       this.poseWatchdog = null;

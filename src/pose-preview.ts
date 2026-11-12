@@ -21,7 +21,7 @@ export class PosePreview {
   private readonly performanceStats = new PosePerformance();
   private lastStatsAt = -Infinity;
 
-  constructor(private readonly video: HTMLVideoElement, private readonly canvas: HTMLCanvasElement, private readonly render: (state: PoseState, message: string) => void, private readonly onLandmarks: (landmarks: Landmark[], worldLandmarks: Landmark[], timestamp: number, multiplePeople?: boolean) => void = () => {}, private readonly onPerformance: (snapshot: PosePerformanceSnapshot | null) => void = () => {}) {
+  constructor(private readonly video: HTMLVideoElement, private readonly canvas: HTMLCanvasElement, private readonly render: (state: PoseState, message: string) => void, private readonly onLandmarks: (landmarks: Landmark[], worldLandmarks: Landmark[], timestamp: number, multiplePeople?: boolean, frameSubmittedAt?: number) => void = () => {}, private readonly onPerformance: (snapshot: PosePerformanceSnapshot | null) => void = () => {}) {
     this.show('idle', 'Pose tracking is off.');
   }
 
@@ -91,7 +91,7 @@ export class PosePreview {
           this.show('tracking', 'Multiple people detected. Keep only the player in view, then calibrate again.');
           return;
         }
-        this.onLandmarks(event.data.landmarks, event.data.worldLandmarks ?? [], event.data.timestamp);
+        this.onLandmarks(event.data.landmarks, event.data.worldLandmarks ?? [], event.data.timestamp, false, this.lastFrameAt);
         this.draw(event.data.landmarks);
       };
       worker.postMessage({ type: 'init', modelUrl: new URL('models/pose/pose_landmarker_lite.task', document.baseURI).href });

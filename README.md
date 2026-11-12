@@ -68,6 +68,8 @@ The character also moves visually when you move sideways or crouch relative to y
 
 To calibrate without leaning over the computer, select **Calibrate in 5 seconds**, step back, and stand upright facing the camera. At the end of the countdown the camera must have a recent view of your head, shoulders, hips, ankles and feet. Select the button again to cancel. This helps capture the intended reference but does not guarantee posture accuracy.
 
+Both calibration controls need a recent tracked frame. If tracking stalls, wait until fresh tracking resumes before calibrating; an old pose cannot be reused as a new reference merely because its result arrived recently.
+
 While tracking, camera setup shows accepted pose results per second and average worker round-trip time over the last five seconds, plus session counts for delayed and interrupted results. A result without a detected person still counts as processed. Round-trip time runs from frame submission through image preparation and worker response; it excludes camera exposure and display delay, so it is not end-to-end input latency. Results over 500 ms old are rejected. Measurements stay in memory and reset when tracking stops.
 
 Keep other people outside the camera view. The tracker now checks for up to two poses; when it detects more than one person it clears the landmarks, resets character movement and cancels pending calibration or hand-motion samples. Return to a single-person view and calibrate again. This checks detected ambiguity, not identity: it can miss another person or fail to recognize a person replacing the player. Processing a second pose can increase inference cost; real-device performance remains unmeasured.

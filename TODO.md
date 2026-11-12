@@ -19,6 +19,12 @@
 - [x] Test malformed references, real pixel/aspect errors, missing/uncertain results, coverage and actual browser operation, then commit. 126 tests and build passed; synthetic browser smoke passed and a strict-tolerance browser fixture failed as expected.
 - [ ] Run independent human annotations; synthetic smoke references and prior overlaid recordings do not establish accuracy.
 
+## Reject stale immediate calibration
+
+- [ ] Run the new freshness regression against the previous implementation as a negative control.
+- [x] Require recent accepted landmarks in both calibration paths and show actionable freshness feedback.
+- [x] Verify fresh-frame recovery and existing lifecycle with unit/build/development/production browser checks and document results.
+
 ## Reject ambiguous multi-person tracking
 
 - [x] Request up to two poses and reject detected multi-person results without selecting the first person.

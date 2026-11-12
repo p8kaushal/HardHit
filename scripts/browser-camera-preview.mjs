@@ -37,16 +37,17 @@ try {
       set onmessage(handler) {
         super.onmessage = event => {
           if (event.data?.type !== 'result' || !window.__poseOverride) return handler(event);
-          if (window.__holdPoseResult) {
-            window.__releasePoseFrame = () => handler(event);
-            return;
-          }
-          const frame = window.__motionSequence.shift();
-          if (frame) window.__lastMotionFrame = frame;
-          const controlled = frame ?? (window.__holdMotionFrame ? window.__lastMotionFrame : null);
-          const result = handler({ data: { type: 'result', landmarks: controlled?.points ?? window.__poseOverride, worldLandmarks: window.__poseWorldOverride ?? [], timestamp: controlled?.time ?? event.data.timestamp, poseCount: window.__poseCountOverride } });
-          window.__poseResultSerial++;
-          return result;
+          const deliver = () => {
+            window.__lastSubmittedPoseTime = event.data.timestamp;
+            const frame = window.__motionSequence.shift();
+            if (frame) window.__lastMotionFrame = frame;
+            const controlled = frame ?? (window.__holdMotionFrame ? window.__lastMotionFrame : null);
+            const result = handler({ data: { type: 'result', landmarks: controlled?.points ?? window.__poseOverride, worldLandmarks: window.__poseWorldOverride ?? [], timestamp: controlled?.time ?? event.data.timestamp, poseCount: window.__poseCountOverride } });
+            window.__poseResultSerial++;
+            return result;
+          };
+          if (window.__holdPoseResult) { window.__releasePoseFrame = deliver; return; }
+          return deliver();
         };
       }
       postMessage(message, ...rest) {
@@ -117,6 +118,12 @@ try {
   assert.equal(await page.$eval('#playzone-pose-overlay', element => element.hidden), false);
   await page.waitForFunction(() => /Tracking: [\d.]+ results\/s · worker round trip \d+ ms/.test(document.querySelector('#playzone-pose-performance').textContent));
   assert.equal(await page.$eval('#playzone-pose-performance', element => element.hidden), false);
+  const calibrateFresh = async () => page.waitForFunction(() => {
+    const status = document.querySelector('#playzone-pose-status').textContent;
+    if (!/Body landmarks visible|Move back/.test(status) || !Number.isFinite(window.__lastSubmittedPoseTime) || performance.now() - window.__lastSubmittedPoseTime > 350) return false;
+    document.querySelector('#playzone-pose-calibrate').click();
+    return document.querySelector('#playzone-retarget-status').textContent.includes('Calibrated!');
+  }, { timeout: 10000 });
   if (!production && fixture) {
     const counts = await page.evaluate(async fixture => {
       const { default: PoseWorker } = await import('/src/pose-worker.ts?worker');
@@ -410,10 +417,28 @@ try {
   assert.match(staleFrame.status, /Tracking stopped or no person/, 'a worker result captured before a pause must be discarded');
   assert.match(await page.$eval('#playzone-pose-performance', element => element.textContent), /[1-9]\d* interrupted/, 'pause-crossing results should be counted');
   await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, staleFrame.serial);
+  await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Body landmarks visible'));
   await page.evaluate(() => { window.__holdPoseResult = true; window.__releasePoseFrame = null; });
   await page.waitForFunction(() => typeof window.__releasePoseFrame === 'function');
+  await page.evaluate(async () => {
+    await new Promise(resolve => setTimeout(resolve, 250));
+    const release = window.__releasePoseFrame;
+    window.__releasePoseFrame = null;
+    release();
+  });
+  assert.match(await page.$eval('#playzone-pose-status', element => element.textContent), /Body landmarks visible/, 'a delayed but still-current result should first be accepted');
+  await page.waitForFunction(() => typeof window.__releasePoseFrame === 'function');
+  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 350)));
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Could not calibrate.*fresh tracked pose/, 'calibration freshness must use submission time, not recent result arrival');
+  await page.evaluate(() => { window.__holdPoseResult = false; window.__releasePoseFrame(); });
+  await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Body landmarks visible'));
+  await page.evaluate(() => { window.__holdPoseResult = true; window.__releasePoseFrame = null; });
+  await page.waitForFunction(() => typeof window.__releasePoseFrame === 'function');
+  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 650)));
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Could not calibrate/, 'immediate calibration must reject an old pose while tracking is stalled');
   const delayedFrame = await page.evaluate(async () => {
-    await new Promise(resolve => setTimeout(resolve, 650));
     window.__holdPoseResult = false;
     window.__releasePoseFrame();
     return { status: document.querySelector('#playzone-pose-status').textContent, serial: window.__poseResultSerial };
@@ -421,6 +446,8 @@ try {
   assert.match(delayedFrame.status, /tracking is delayed/i, 'an old worker result must not drive the pose');
   assert.match(await page.$eval('#playzone-pose-performance', element => element.textContent), /[1-9]\d* delayed/, 'slow results should be counted');
   await page.waitForFunction(serial => window.__poseResultSerial > serial && !document.querySelector('#playzone-pose-status').textContent.includes('delayed'), {}, delayedFrame.serial);
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Calibrated!/, 'fresh tracking must allow calibration again');
   await page.click('#playzone-pose-calibrate-delay');
   await page.click('#playzone-pose-toggle');
   assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /cancelled/i, 'stopping tracking must cancel a pending calibration');
@@ -447,7 +474,7 @@ try {
   assert.equal(await page.$eval('#playzone-intensity-controls', element => element.hidden), true, 'turning off the preview clears and hides personal comparison');
   await page.select('#playzone-mode', 'delivery');
   await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Body landmarks visible'));
-  await page.click('#playzone-pose-calibrate');
+  await calibrateFresh();
   assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Calibrated!/);
   assert.match(await page.$eval('#playzone-score', element => element.textContent), /0 balls/, 'camera movement must not record a shot');
   await page.click('#playzone-motion-preview');
