@@ -87,7 +87,7 @@
 
 ## Second public bat clip
 
-- [x] Inspect a second differently framed 120 fps cricket clip and run a six-frame detector smoke locally. No bat boxes were emitted; this is unannotated and not accuracy evidence.
+- [x] Inspect a second differently framed 120 fps cricket clip and run a six-frame detector smoke locally. Neither EfficientDet nor the cricket-specific YOLO checkpoint emitted a bat box on the six samples; this is unannotated and not accuracy evidence.
 - [ ] Obtain independent bat endpoint labels across this and more varied clips, including negative/occluded frames, before model evaluation.
 
 ## Bat-corner and toe model leads

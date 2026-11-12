@@ -68,7 +68,7 @@ The user resumed the full goal and asked to continue technical work without wait
 
 ## Evaluated: second public cricket clip smoke
 
-Downloaded and inspected a second Pexels clip locally: 1080×1920, 120 fps, 5.15 seconds, different player and rear/side angle with netting, other people and bat occlusion. EfficientDet-Lite0 emitted zero baseball-bat boxes in six source-indexed one-second samples at confidence ≥0.2, while emitting person boxes in each. Without independent labels this is a cross-scene smoke check, not accuracy or false-positive evidence; source, checksum and limits are in `CAMERA_BATTING.md`. The clip remains outside the repo and user-camera validation remains open.
+Downloaded and inspected a second Pexels clip locally: 1080×1920, 120 fps, 5.15 seconds, different player and rear/side angle with netting, other people and bat occlusion. EfficientDet-Lite0 emitted zero baseball-bat boxes in six source-indexed one-second samples at confidence ≥0.2, while emitting person boxes in each. The cricket-specific YOLOv5 checkpoint also emitted zero bat boxes on these six samples; its separate training-image positive control was previously successful, and its custom inference parity remains unverified. Without independent labels this is a cross-scene smoke check, not accuracy or false-positive evidence; source, checksum and limits are in `CAMERA_BATTING.md`. The clip remains outside the repo and user-camera validation remains open.
 
 ## Inspected: bat-corner model lead
 
