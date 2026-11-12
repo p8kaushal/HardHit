@@ -233,8 +233,10 @@ export class PoseRetarget {
         smooth[axis] += difference * blend(Math.abs(difference) > .2 ? .55 : .35);
       }
       if (joint === 'chest') {
-        pose.spine = new BABYLON.Vector3(smooth.x * .5, 0, smooth.z * .5);
-        pose.chest = new BABYLON.Vector3(smooth.x * .5, this.facing !== null ? 0 : smooth.y, smooth.z * .5);
+        // MediaPipe depth increases away from the camera; the rig's camera-space
+        // pitch uses the opposite sign for the shoulder-to-hip vector.
+        pose.spine = new BABYLON.Vector3(-smooth.x * .5, 0, smooth.z * .5);
+        pose.chest = new BABYLON.Vector3(-smooth.x * .5, this.facing !== null ? 0 : smooth.y, smooth.z * .5);
       } else pose[joint] = new BABYLON.Vector3(smooth.x, joint === 'head' ? this.headYaw : smooth.y, smooth.z + (joint === 'leftShoulder' ? -0.12 : joint === 'rightShoulder' ? 0.12 : 0));
     });
     this.lastPose = pose;

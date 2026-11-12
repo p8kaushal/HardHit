@@ -304,6 +304,13 @@ try {
     chest.computeWorldMatrix(true); hips.computeWorldMatrix(true);
     return chest.getAbsolutePosition().subtract(hips.getAbsolutePosition()).asArray();
   });
+  const torsoTowardCameraBefore = await page.evaluate(() => {
+    const scene = window.__poseScene.scene, chest = scene.getTransformNodeByName('Spine2'), hips = scene.getTransformNodeByName('Hips');
+    chest.computeWorldMatrix(true); hips.computeWorldMatrix(true);
+    const hip = hips.getAbsolutePosition(), towardCamera = scene.activeCamera.globalPosition.subtract(hip).normalize();
+    const torso = chest.getAbsolutePosition().subtract(hip);
+    return torso.x * towardCamera.x + torso.y * towardCamera.y + torso.z * towardCamera.z;
+  });
   await page.evaluate(() => { window.__poseWorldOverride[12].z = 0; window.__poseWorldOverride[11].z = -.2; window.__poseWorldOverride[12].z = -.2; });
   await page.waitForFunction(() => Math.abs(window.__lastPose.spine?.x ?? 0) > .05 && Math.abs(window.__lastPose.chest?.x ?? 0) > .05);
   await page.waitForFunction(before => {
@@ -312,6 +319,12 @@ try {
     const torso = chest.getAbsolutePosition().subtract(hips.getAbsolutePosition());
     return Math.hypot(torso.x - before[0], torso.y - before[1], torso.z - before[2]) > .02;
   }, {}, torsoBefore);
+  await page.waitForFunction(before => {
+    const scene = window.__poseScene.scene, chest = scene.getTransformNodeByName('Spine2'), hips = scene.getTransformNodeByName('Hips');
+    chest.computeWorldMatrix(true); hips.computeWorldMatrix(true);
+    const hip = hips.getAbsolutePosition(), torso = chest.getAbsolutePosition().subtract(hip), toward = scene.activeCamera.globalPosition.subtract(hip).normalize();
+    return torso.x * toward.x + torso.y * toward.y + torso.z * toward.z > before + .02;
+  }, { timeout: 5000 }, torsoTowardCameraBefore);
   await page.waitForFunction(() => {
     const scene = window.__poseScene.scene, marker = scene.getMeshByName('poseXray_chest'), joint = scene.getTransformNodeByName('Spine2');
     joint.computeWorldMatrix(true);
