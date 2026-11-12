@@ -75,6 +75,11 @@
 - [x] Verify preprocessing and labels, benchmark actual annotated bat frames with box overlap and positive controls, and assess browser feasibility.
 - [x] Document evidence and any implementation limits, commit the increment, and continue unblocked camera work without treating live tests as approval gates. Positive control passed; 15/23 bat detections and 2/23 IoU ≥0.5 matches are insufficient for runtime selection.
 
+## Optical-flow bat endpoint experiment
+
+- [x] Evaluate forward/backward-gated pyramidal optical flow from the first annotated bat frame without later oracle input. Both points stayed active for 22/176 labeled frames; the handle still drifted substantially. No gameplay integration follows.
+- [ ] Investigate detector-assisted reacquisition and evaluate on independent varied clips.
+
 ## Bat endpoint tracking feasibility
 
 - [x] Evaluate a simple image template tracker initialized from an annotated real bat frame without feeding later annotations back. It retained both endpoints within 50 pixels in 27/176 later frames; no runtime integration follows.

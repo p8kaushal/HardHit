@@ -56,6 +56,12 @@ A local experiment initialized handle-top and toe from the first human annotatio
 
 This experiment used a human oracle only for initialization, a single side-on stroke, and no recovery or confidence gate. The labels omit some source frames, so search steps may span gaps. It demonstrates severe drift for this particular simple template method, not a bound on optical flow or trained trackers. It cannot supply a reliable runtime bat direction and is not integrated. Disposable script and per-frame errors: `/private/tmp/hardhit-template-bat.py` and `/private/tmp/hardhit-template-bat-results.json`; footage remains local.
 
+### Optical-flow endpoint tracking experiment
+
+A second local experiment initialized handle top and toe from the first human-labeled frame and tracked all subsequent video frames with half-resolution pyramidal Lucas–Kanade flow (21-pixel window, three pyramid levels). It marked a point lost permanently when forward/backward inconsistency exceeded three source pixels or either flow failed; no later annotations or recovery were used. Of 176 subsequent labeled frames, both points remained active for 22. The toe was marked lost at source frame 23; its 22 active labels had median/p90 errors of 13.4/18.6 source pixels. The handle remained active on 104 labels before being marked lost at frame 106; its median/p90 errors were 55.9/289.7 pixels, with 50/104 within 50 pixels. A forward/backward check therefore did not prevent large handle drift. Processing took 5.6 seconds locally including image loading; this is not camera-to-display or mobile latency.
+
+This is one side-on stroke initialized with oracle points and has no reacquisition, bat-face estimate, identity check or independently varied evaluation. It is not a runtime candidate. OpenCV 5.0.0 was installed under `/private/tmp/hardhit-cv2`, outside the project; the disposable script and aggregate results are `/private/tmp/hardhit-lk-bat.py` and `/private/tmp/hardhit-lk-bat-results.json`.
+
 ### Full-frame EfficientDet-Lite0 follow-up
 
 To check whether every-eighth-frame sampling missed detections, ran the same local MediaPipe EfficientDet-Lite0 int8 runtime on all 177 annotation frames. FFmpeg extracted the video frames by index; the browser loaded each PNG directly, avoiding seek timing. Input remained 1080×1920 RGB, threshold 0.2, max 20 results, CPU delegate. Compared emitted `baseball bat` boxes with human bat boxes using intersection-over-union.
