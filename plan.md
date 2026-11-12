@@ -22,6 +22,10 @@ Ran the actual association function against 23 public-stroke frames with human h
 
 Added a pure image-plane association check for independently detected handle endpoints and both wrists. It requires finite in-frame points, explicit confidence, aspect, torso scale and caller-supplied thresholds, and rejects uncertain, distant or degenerate observations. Synthetic unit checks cover mirroring, aspect, low confidence, occlusion and false associations; 131 tests and production build passed. It is not connected to the hand preview or gameplay, and is not bat detection, calibrated thresholds, identity or real-device validation.
 
+## Verified increment: represent occluded bat landmarks
+
+The annotator can mark occluded points without coordinates; the scorer counts confident outputs on them as false, requires visible point coverage and cannot pass an all-occluded reference. Existing visible annotations remain valid. Schema, correct abstention, false outputs and zero-visible behavior passed in 132 unit tests; a browser check exported an occluded point without coordinates. This supports evaluation only and does not implement bat detection.
+
 ## Verified increment: score bat detector output from local files
 
 The local scoring command validates dimensions, exact frame indices/times and ordered point names before comparing endpoints, counting missing points as failures. All 130 unit tests passed, including frame mismatch, order and missing-point cases. A synthetic annotation-export-to-command smoke passed; this evaluates supplied predictions, not a detector or accuracy.

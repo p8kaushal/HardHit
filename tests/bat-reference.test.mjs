@@ -54,3 +54,20 @@ test('prediction files must match reference frame identity, dimensions and keypo
   const missing = structuredClone(output); missing.frames[0].points[0] = null;
   assert.equal(scoreBatPredictionFile(ref, missing, 5).missingPoints, 1);
 });
+
+test('occluded points require abstention and never invent reference coordinates', () => {
+  const ref = reference();
+  ref.frames[0].points[0] = { name: BAT_KEYPOINTS[0], visibility: 'occluded' };
+  const abstain = predictions(); abstain[0] = null;
+  const summary = scoreBatReference(ref, [abstain], 5);
+  assert.equal(summary.passed, true);
+  assert.equal(summary.expectedPoints, 3);
+  assert.equal(summary.occludedPoints, 1);
+  assert.equal(summary.occludedEmitted, 0);
+  assert.equal(scoreBatReference(ref, [predictions()], 5).occludedEmitted, 1);
+  assert.equal(scoreBatReference(ref, [predictions()], 5).passed, false);
+  const invented = structuredClone(ref); invented.frames[0].points[0].x = .5;
+  assert.throws(() => validateBatReference(invented), /invent coordinates/);
+  for (const point of ref.frames[0].points) { point.visibility = 'occluded'; delete point.x; delete point.y; }
+  assert.equal(scoreBatReference(ref, [[null, null, null, null]], 5).passed, false, 'zero visible targets must not pass');
+});

@@ -85,6 +85,12 @@
 - [x] Verify preprocessing and labels, benchmark actual annotated bat frames with box overlap and positive controls, and assess browser feasibility.
 - [x] Document evidence and any implementation limits, commit the increment, and continue unblocked camera work without treating live tests as approval gates. Positive control passed; 15/23 bat detections and 2/23 IoU ≥0.5 matches are insufficient for runtime selection.
 
+## Occluded bat landmark references
+
+- [x] Allow annotating an occluded bat point without inventing coordinates, and verify browser export.
+- [x] Score correct abstention and confident false outputs for occluded points; reject all-occluded references as passing. 132 tests pass.
+- [ ] Produce independently reviewed visible/occluded reference labels on varied real footage and evaluate an endpoint model.
+
 ## Second public bat clip
 
 - [x] Inspect a second differently framed 120 fps cricket clip and run a six-frame detector smoke locally. Neither EfficientDet nor the cricket-specific YOLO checkpoint emitted a bat box on the six samples; this is unannotated and not accuracy evidence.

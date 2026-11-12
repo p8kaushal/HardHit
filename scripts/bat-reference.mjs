@@ -17,7 +17,9 @@ export function validateBatReference(reference) {
     assert.ok(Array.isArray(frame.points) && frame.points.length === 4, 'Every frame must annotate all four bat points.');
     for (const [index, point] of frame.points.entries()) {
       assert.ok(point.name === BAT_KEYPOINTS[index], 'Bat point names must match canonical order.');
-      assert.ok([point.x, point.y].every(value => Number.isFinite(value) && value >= 0 && value <= 1), 'Bat points must be normalized finite image coordinates.');
+      assert.ok(point.visibility === undefined || point.visibility === 'visible' || point.visibility === 'occluded', 'Point visibility must be visible or occluded.');
+      if (point.visibility === 'occluded') assert.ok(point.x === undefined && point.y === undefined, 'Occluded points must not invent coordinates.');
+      else assert.ok([point.x, point.y].every(value => Number.isFinite(value) && value >= 0 && value <= 1), 'Bat points must be normalized finite image coordinates.');
     }
   }
   return reference;
@@ -27,21 +29,24 @@ export function scoreBatReference(reference, predictions, maxErrorPixels) {
   validateBatReference(reference);
   assert.ok(Number.isFinite(maxErrorPixels) && maxErrorPixels > 0, 'Set an explicit positive pixel tolerance.');
   assert.ok(Array.isArray(predictions) && predictions.length === reference.frames.length, 'Every annotated frame needs a prediction.');
-  const summary = { frames: predictions.length, expectedPoints: predictions.length * 4, comparedPoints: 0, missingPoints: 0, outsideTolerance: 0, tolerancePixels: maxErrorPixels, meanErrorPixels: null, maxErrorPixels: null, passed: false };
+  const summary = { frames: predictions.length, expectedPoints: 0, occludedPoints: 0, occludedEmitted: 0, comparedPoints: 0, missingPoints: 0, outsideTolerance: 0, tolerancePixels: maxErrorPixels, meanErrorPixels: null, maxErrorPixels: null, passed: false };
   let sum = 0;
   for (let f = 0; f < predictions.length; f++) {
     const points = predictions[f];
     for (let k = 0; k < 4; k++) {
       const target = reference.frames[f].points[k];
       const actual = points?.[k];
-      if (!actual || ![actual.x, actual.y, actual.confidence].every(Number.isFinite) || actual.confidence < .5 || actual.x < 0 || actual.x > 1 || actual.y < 0 || actual.y > 1) { summary.missingPoints++; continue; }
+      const usable = actual && [actual.x, actual.y, actual.confidence].every(Number.isFinite) && actual.confidence >= .5 && actual.confidence <= 1 && actual.x >= 0 && actual.x <= 1 && actual.y >= 0 && actual.y <= 1;
+      if (target.visibility === 'occluded') { summary.occludedPoints++; if (usable) summary.occludedEmitted++; continue; }
+      summary.expectedPoints++;
+      if (!usable) { summary.missingPoints++; continue; }
       const error = Math.hypot((actual.x - target.x) * reference.width, (actual.y - target.y) * reference.height);
       summary.comparedPoints++; sum += error; summary.maxErrorPixels = Math.max(summary.maxErrorPixels ?? 0, error);
       if (error - maxErrorPixels > 1e-9) summary.outsideTolerance++;
     }
   }
   if (summary.comparedPoints) summary.meanErrorPixels = sum / summary.comparedPoints;
-  summary.passed = summary.missingPoints === 0 && summary.outsideTolerance === 0;
+  summary.passed = summary.expectedPoints > 0 && summary.missingPoints === 0 && summary.outsideTolerance === 0 && summary.occludedEmitted === 0;
   return summary;
 }
 
