@@ -3276,7 +3276,9 @@ body { min-height: 100dvh; }
 .practice-display-options { display: grid; gap: 8px; }
 .practice-settings { border-top: 1px solid rgba(255,255,255,.13); }
 .practice-settings summary { padding: 8px 0; color: #cab677; font-size: .68rem; font-weight: 800; cursor: pointer; }
-.practice-camera-frame { position: relative; width: 100%; transform: scaleX(-1); }
+.practice-camera-frame { position: absolute; top: 92px; left: 20px; z-index: 10; width: min(300px, 24vw); transform: scaleX(-1); }
+.practice-camera-frame.camera-enlarged { width: min(480px, 35vw); }
+.practice-camera-frame:has(video[hidden]) { display: none; }
 #playzone-camera-preview { display: block; width: 100%; height: auto; background: #06130e; border-radius: 5px; }
 #playzone-camera-preview[hidden] { display: none; }
 #playzone-pose-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
@@ -3290,7 +3292,6 @@ body { min-height: 100dvh; }
 .practice-intensity button { min-width: 0; padding: 7px; font-size: .68rem; }
 .practice-intensity button:disabled { opacity: .5; cursor: default; }
 #playzone-pose-calibrate:disabled { opacity: .5; }
-#screen-playzone .practice-dock-right.camera-enlarged { width: min(640px, calc(100vw - 30px)); }
 #playzone-camera-settings a { color: #efd28b; }
 #screen-playzone .practice-settings summary:focus-visible { outline: 3px solid #fff0a8; outline-offset: 2px; }
 #screen-playzone #playzone-bowling-settings[hidden] { display: none; }

@@ -91,12 +91,17 @@ try {
   assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Could not calibrate/);
   await page.click('#playzone-camera-size');
   assert.equal(await page.$eval('#playzone-camera-size', button => button.getAttribute('aria-pressed')), 'true');
-  assert.equal(await page.$eval('.practice-dock-right', element => element.classList.contains('camera-enlarged')), true);
+  assert.equal(await page.$eval('#playzone-camera-frame', element => element.classList.contains('camera-enlarged')), true);
   await page.click('#playzone-camera-size');
   assert.equal(await page.evaluate(() => window.__cameraCalls), 0, 'opening settings must not start the camera');
   await page.click('#playzone-camera-toggle');
   await page.waitForFunction(() => document.querySelector('#playzone-camera-toggle').textContent === 'Stop camera');
   await page.waitForFunction(() => document.querySelector('#playzone-camera-preview').videoWidth > 0, { timeout: 5000 });
+  const previewBeforeScroll = await page.$eval('#playzone-camera-frame', element => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width }; });
+  await page.$eval('.practice-dock-right', element => { element.scrollTop = element.scrollHeight; });
+  const previewAfterScroll = await page.$eval('#playzone-camera-frame', element => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width }; });
+  assert.deepEqual(previewAfterScroll, previewBeforeScroll, 'camera preview must remain visible while settings scroll');
+  assert.ok(previewBeforeScroll.x < 100 && previewBeforeScroll.width > 0, 'camera preview appears at the left');
   await page.evaluate(() => { window.__holdPoseInit = true; });
   await page.click('#playzone-pose-toggle');
   assert.equal(await page.$eval('#playzone-pose-toggle', element => element.textContent), 'Cancel pose tracking');
@@ -188,6 +193,8 @@ try {
   assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /cancelled/i);
   await page.evaluate(() => { window.__poseOverride[27].visibility = 0; });
   await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Move back'));
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /head and feet visible/);
   await page.click('#playzone-pose-calibrate-delay');
   await page.waitForFunction(() => document.querySelector('#playzone-retarget-status').textContent.includes('Could not calibrate'), { timeout: 8000 });
   await page.evaluate(() => { window.__poseOverride[27].visibility = 1; });

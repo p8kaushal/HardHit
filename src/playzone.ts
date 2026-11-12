@@ -97,7 +97,7 @@ export class Playzone {
     });
     get<HTMLButtonElement>('playzone-camera-size').addEventListener('click', event => {
       const button = event.currentTarget as HTMLButtonElement;
-      const enlarged = document.querySelector<HTMLElement>('.practice-dock-right')!.classList.toggle('camera-enlarged');
+      const enlarged = get<HTMLElement>('playzone-camera-frame').classList.toggle('camera-enlarged');
       button.setAttribute('aria-pressed', String(enlarged));
       button.textContent = enlarged ? 'Reduce preview' : 'Enlarge preview';
     });
@@ -111,7 +111,7 @@ export class Playzone {
     for (const sample of ['gentle', 'strong'] as const) {
       get<HTMLButtonElement>(`playzone-intensity-${sample}`).addEventListener('click', () => this.startIntensitySample(sample));
     }
-    get<HTMLButtonElement>('playzone-pose-calibrate').addEventListener('click', () => this.calibratePose(false));
+    get<HTMLButtonElement>('playzone-pose-calibrate').addEventListener('click', () => this.calibratePose());
     get<HTMLButtonElement>('playzone-pose-calibrate-delay').addEventListener('click', () => this.startDelayedCalibration());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.cameraPreview.stop('Camera stopped while the page was hidden.'); });
     window.addEventListener('pagehide', () => this.cameraPreview.stop());
@@ -465,7 +465,7 @@ export class Playzone {
     get<HTMLElement>('playzone-retarget-status').textContent = message;
   }
 
-  private calibratePose(requireFullBody: boolean): void {
+  private calibratePose(): void {
     const mirror = get<HTMLInputElement>('playzone-pose-mirror').checked;
     this.resetPoseMovement('Calibrating movement.');
     const fullBody = [0, 11, 12, 23, 24, 27, 28, 31, 32].every(index => {
@@ -474,8 +474,8 @@ export class Playzone {
     });
     const age = performance.now() - this.poseLandmarksAt;
     const fresh = age >= 0 && age <= 500 && !isGamePaused() && this.poseLandmarksRevision === gameClockRevision();
-    this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && fresh && (!requireFullBody || fullBody) && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks);
-    get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? 'Calibrated! Your current stance is the reference. Move to control the character.' : !fresh ? 'Could not calibrate. Wait for a fresh tracked pose, then try again.' : requireFullBody ? 'Could not calibrate. Stand upright facing the camera with your head and feet visible, then try again.' : 'Could not calibrate. Start pose tracking and show both shoulders and hips to the camera, then try again.';
+    this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && fresh && fullBody && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks);
+    get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? 'Calibrated! Your current stance is the reference. Move to control the character.' : !fresh ? 'Could not calibrate. Wait for a fresh tracked pose, then try again.' : 'Could not calibrate. Stand upright facing the camera with your head and feet visible, then try again.';
     if (this.poseCalibrated) this.updatePoseMovement(this.poseLandmarks, this.poseWorldLandmarks, this.poseLandmarksAt);
   }
 
@@ -487,7 +487,7 @@ export class Playzone {
     let seconds = 5;
     this.calibrationTimer = window.setInterval(() => {
       seconds--;
-      if (seconds === 0) this.calibratePose(true);
+      if (seconds === 0) this.calibratePose();
       else get<HTMLElement>('playzone-retarget-status').textContent = `Stand upright facing the camera with your whole body visible. Calibrating in ${seconds} seconds.`;
     }, 1000);
   }

@@ -1,5 +1,15 @@
 # HardHit project plan index
 
+## Active recording review — November 12, 2026
+
+The user requested analysis of their 3:25 camera recording, fixes for inaccurate body replication, and a camera preview that remains at the top left while scrolling. Review the complete recording and distinguish model inference errors, calibration, rig retargeting and camera perspective before selecting changes. Preserve the recording outside the repository. Move the live preview out of the scrollable settings panel, maintain camera/overlay lifecycle and usable small-screen layout, and verify scrolling and stop behavior in browser. Establish regression evidence for each pose fix using the recording where feasible; do not claim physical accuracy from agreement with model targets alone. Continue the camera-batting plan with live physical acceptance still open.
+
+The preview has been moved outside the scrolling settings panel and the browser regression checks that it stays in place during scrolling. The recording shows a severely folded model while the player is upright around 2:32–3:00; a calibration near 2:28 appears to occur while the player is leaning close to the camera, so calibration capture and retargeting both need further investigation. Unit tests (132), build, and the camera browser regression passed; one earlier concurrent run timed out during delayed calibration and the isolated rerun passed. The recording remains outside the repo. Pose fidelity is not yet fixed or verified.
+
+Next increment: prevent immediate calibration from accepting a torso-only pose while the player is too close to the camera; require the same visible head and feet as delayed calibration, provide an actionable message, and regress rejection and subsequent full-body recovery. Full-body visibility alone cannot prove that the reference is upright, so continue investigating the torso transformation separately.
+
+Immediate calibration now also requires a fresh full-body view; the browser regression rejected a missing foot and then successfully calibrated a full-body pose. All 132 unit tests, the build and the camera regression passed. The recording does not conclusively establish which calibration path or reference produced the observed bend, and this safeguard does not establish pose fidelity.
+
 ## Active camera-batting goal — November 12, 2026
 
 The user explicitly authorized autonomous implementation of the whole camera-batting feature with no personal approval between stages or phases. This supersedes historical stage-review stop instructions below. Keep working on `feature/camera-batting`, preserve unrelated changes, record scope and acceptance before code changes, and commit each verified increment. Merge and public deployment still require separate authorization. Stop only for necessary user input, physical validation or external access; keep independent work moving while those are pending.

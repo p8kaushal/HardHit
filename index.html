@@ -272,6 +272,7 @@
           </details>
         </div>
       </aside>
+      <div class="practice-camera-frame" id="playzone-camera-frame"><video id="playzone-camera-preview" autoplay muted playsinline hidden aria-label="Local camera preview"></video><canvas id="playzone-pose-overlay" hidden aria-hidden="true"></canvas></div>
       <aside class="playzone-panel practice-dock-right" aria-label="Batting controls">
         <div id="playzone-batting-controls">
         <div class="practice-panel-top"><span class="practice-section-label">YOUR SHOT</span></div>
@@ -286,7 +287,6 @@
           <p class="practice-bowler-hint">Stand upright facing the camera with your full body visible, then calibrate. Your posture becomes the reference; camera movement does not play shots.</p>
           <p class="practice-bowler-hint">Facing the camera points the character toward the bowler. Body turns are estimated, and the bat is hidden while tracking.</p>
           <p class="practice-bowler-hint">Keep other people out of view. Detecting multiple people resets movement; calibrate again once only you are visible.</p>
-          <div class="practice-camera-frame"><video id="playzone-camera-preview" autoplay muted playsinline hidden aria-label="Local camera preview"></video><canvas id="playzone-pose-overlay" hidden aria-hidden="true"></canvas></div>
           <button id="playzone-camera-size" class="practice-secondary" type="button" aria-pressed="false">Enlarge preview</button>
           <p id="playzone-camera-status" role="status" aria-live="polite">Camera is off.</p>
           <button id="playzone-camera-toggle" class="practice-secondary" type="button">Start camera</button>
