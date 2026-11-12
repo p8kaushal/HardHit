@@ -19,6 +19,13 @@
 - [x] Test malformed references, real pixel/aspect errors, missing/uncertain results, coverage and actual browser operation, then commit. 126 tests and build passed; synthetic browser smoke passed and a strict-tolerance browser fixture failed as expected.
 - [ ] Run independent human annotations; synthetic smoke references and prior overlaid recordings do not establish accuracy.
 
+## Bat endpoint reference scorer
+
+- [x] Validate the four named normalized bat points, source metadata and frame ordering.
+- [x] Score endpoint predictions in source pixels; count low-confidence and missing endpoints as coverage failures.
+- [x] Test schema, tolerance boundaries and incomplete predictions; integrate with `npm test` (129 passing).
+- [ ] Connect a real endpoint-capable detector and evaluate on independently annotated varied footage.
+
 ## Local bat keypoint annotation
 
 - [x] Add an offline browser tool for four named bat points and sampled-frame JSON export with explicit nominal FPS.

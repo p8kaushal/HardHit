@@ -73,6 +73,10 @@ Local files: `/private/tmp/hardhit-evaluate-cricket.py`, `/private/tmp/hardhit-c
 
 Next evidence needed remains representative full-body/actual-bat footage and live review of the corrected posture. The public single-stroke sample can support later bat experiments but does not close those gates. Physical-bat inference and camera scoring remain unimplemented.
 
+## Bat reference scoring contract
+
+`scripts/bat-reference.mjs` validates the annotator's version 1 JSON: manual label source, image dimensions, declared frame rate, canonical point order, strictly increasing frame times and four normalized named coordinates per frame. `scoreBatReference(reference, predictions, maxErrorPixels)` compares an ordered four-point prediction array per annotated frame. Predictions carry normalized x/y and confidence; confidence below 0.5, invalid/out-of-frame coordinates, or absent points count as missing. It reports point coverage and pixel error using source width and height independently, and passes only when all points are present and within the explicit caller tolerance. This supplies the evaluation contract for future endpoint detectors; no detector output is currently connected. Three behavior tests cover valid scores/tolerance boundary, malformed schemas, and missing/low-confidence endpoints. `npm test` passes 129 tests.
+
 ## Local bat keypoint annotation tool
 
 `scripts/bat-annotator.html` opens as a local static page. Select a clip, enter its nominal frame rate, set a frame stride, and click the bat points in order: handle top, splice, blade middle, toe. Press Enter to save the frame; A/D or arrow keys move by the selected stride. Export produces a JSON file with source dimensions, declared frame rate, frame index/time, and named normalized points. Video remains in the browser tab and is not uploaded. The exporter was exercised in headless Chromium with the local Pexels clip: frame-zero load, four clicks, save, and downloaded JSON checks passed at 1080×1920/30 fps with all four names and no browser errors. This verifies tool operation only; the clicks were synthetic and do not constitute human bat labels.
