@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine, Scene, StandardMaterial, Vector3 } from 'babylonjs';
 import { BatterRig } from '../src/batter-rig';
 import { PoseRetarget } from '../src/pose-retarget';
+import { associateBatHands, type ObservedPoint } from '../src/bat-hand-association';
 import { describeHandDirection, HandMotionPreview } from '../src/hand-motion';
 import { compareHandMotionTiming } from '../src/hand-motion-timing';
 import { HandMotionIntensity } from '../src/hand-motion-intensity';
@@ -2556,4 +2557,22 @@ test('reset invalidates a pending innings transition and removes its overlay', (
   } finally {
     Object.assign(globalThis, { document: originalDocument, window: originalWindow, performance: originalPerformance });
   }
+});
+
+
+test('bat-hand association requires observed bat and both hands near the handle segment', () => {
+  const point = (x: number, y: number, confidence = 1): ObservedPoint => ({ x, y, confidence });
+  const top = point(.4, .4), splice = point(.6, .4), left = point(.45, .42), right = point(.55, .38);
+  const check = (a: ObservedPoint | null, b: ObservedPoint | null, l: ObservedPoint | null, r: ObservedPoint | null, aspect = 2) => associateBatHands(a, b, l, r, aspect, .2, .6, .15, .01);
+  const result = check(top, splice, left, right);
+  assert.equal(result.accepted, true);
+  if (result.accepted) assert.ok(Math.abs(result.distancesInTorsoLengths[0] - .1) < 1e-9);
+  const flip = (p: ObservedPoint): ObservedPoint => ({ ...p, x: 1 - p.x });
+  assert.equal(check(flip(top), flip(splice), flip(left), flip(right)).accepted, true);
+  assert.deepEqual(check(null, splice, left, right), { accepted: false, reason: 'bat-unavailable' });
+  assert.deepEqual(check(top, splice, left, point(.55, .38, .59)), { accepted: false, reason: 'hands-unavailable' });
+  assert.deepEqual(check(top, top, left, right), { accepted: false, reason: 'degenerate-handle' });
+  assert.deepEqual(check(top, splice, left, point(.9, .4)), { accepted: false, reason: 'hands-too-far' });
+  assert.deepEqual(check(top, splice, left, right, NaN), { accepted: false, reason: 'invalid-configuration' });
+  assert.deepEqual(check(top, splice, point(NaN, .4), right), { accepted: false, reason: 'hands-unavailable' });
 });

@@ -24,6 +24,11 @@
 - [x] Validate dimensions, exact reference frame index/time and ordered point names before scoring a prediction file.
 - [x] Verify mismatch/coverage behavior in unit tests and synthetic local CLI smoke; 130 tests pass. No detector accuracy is implied.
 
+## Bat-to-hand association foundation
+
+- [x] Add a pure aspect-corrected association check requiring independently observed handle points, both wrists and caller-supplied thresholds; verify geometry and uncertainty rejection.
+- [ ] Calibrate thresholds on varied independently annotated actual-bat footage, validate identity/occlusion and integrate only with a verified physical-bat detector.
+
 ## Bat endpoint reference scorer
 
 - [x] Validate the four named normalized bat points, source metadata and frame ordering.

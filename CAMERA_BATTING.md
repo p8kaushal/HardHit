@@ -15,6 +15,10 @@ The user authorized autonomous stage/phase transitions on November 12, 2026. Fol
 
 These are acceptance requirements, not claims of implemented behavior. The existing hand-motion preview has no gameplay effect.
 
+## Bat-to-hand association foundation
+
+`src/bat-hand-association.ts` supplies a pure image-plane check for independently observed handle-top/splice points and both wrists. It rejects missing, non-finite, out-of-frame, low-confidence or degenerate observations and compares each wrist's aspect-corrected distance to the handle segment in torso-length units. Callers must supply explicit confidence, minimum handle length and distance thresholds; no real-camera thresholds are calibrated. The function is not connected to the hand-motion preview, rig or gameplay, and cannot detect the bat, determine depth, establish grip or identity, or compensate for occlusion. Synthetic mirror, geometry, confidence, missing-point and rejection checks passed with 131 unit tests and a production build.
+
 ## Bat-tracking dependency
 
 The installed pose model estimates 33 human body landmarks; it does not supply bat endpoints. See Google's [Pose Landmarker guide](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker). Google's separate [Object Detector guide](https://developers.google.com/edge/mediapipe/solutions/vision/object_detector) describes category bounding boxes. A detected rectangle alone does not identify bat grip, tip, face orientation or contact. That is an implementation inference from the documented outputs, not a tested bat solution.
