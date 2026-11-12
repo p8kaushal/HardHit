@@ -50,6 +50,12 @@ For each frame, measured the image-plane distance from each pose wrist to the hu
 
 The first source clip is a single side-on stroke with gloves and pads. Keep the video, 184 extracted PNGs, annotations and frame measurements outside the repository. The local disposable evaluator was `/private/tmp/hardhit-bat-grip-eval.mjs`; it is not a maintained project command. This is preliminary feasibility evidence, not an application implementation or bat-tracking accuracy result.
 
+### Bat-corner repository inspection
+
+The public [cricket bat corner detection repository](https://github.com/saurabhharak/cricket-bat-corner-detection) advertises a DETR model and links a checkpoint. Its notebook instead constructs `DetrForObjectDetection` with COCO object-detection annotations and class labels; its referenced [dataset page](https://universe.roboflow.com/cricketbatcornerdetection/cricket-bat-corner-detection) declares a single `cricket_bat` detection class. Thus the title alone is not evidence of named handle/toe keypoints. The linked checkpoint archive was not downloaded or executed, and the GitHub repository displayed no license; the dataset page's license must not be assumed to license the checkpoint. The notebook was inspected as JSON without executing its cells; SHA-256 `71c8c7f7c86aac6a193464facc6bf5ed1eb11fac165d76f7144c37fa0076c374`. No runtime candidate was selected.
+
+A search also surfaced a small dataset indexed as `bat_toe_detection`, but the direct dataset details and weight access could not be verified because the service returned HTTP 403. Its actual annotation semantics, source rights, class definitions, access requirements and ability to identify both endpoints remain unknown. Investigate only when its public metadata can be inspected; do not upload personal footage or use a hosted model without explicit authorization.
+
 ### Endpoint template-tracking feasibility
 
 A local experiment initialized handle-top and toe from the first human annotation, then tracked the two image points without using subsequent labels or reinitializing. It used fixed 15×15 grayscale normalized cross-correlation templates on quarter-resolution frames with an ±18-pixel search radius per annotated step. Against the next 176 labeled frames, both endpoints were within 50 source pixels in 27 frames. Median errors were 192.7 pixels for handle top and 135.5 pixels for toe; 90th-percentile errors were 592.9 and 1175.9 pixels respectively. Processing the sequence took 5.4 seconds locally, including image loading; this is not a camera-to-display measurement.
