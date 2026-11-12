@@ -75,6 +75,11 @@
 - [x] Verify preprocessing and labels, benchmark actual annotated bat frames with box overlap and positive controls, and assess browser feasibility.
 - [x] Document evidence and any implementation limits, commit the increment, and continue unblocked camera work without treating live tests as approval gates. Positive control passed; 15/23 bat detections and 2/23 IoU ≥0.5 matches are insufficient for runtime selection.
 
+## Detector box endpoint feasibility
+
+- [x] Measure an optimistic oracle-selected box-corner estimate against human-labeled bat endpoints. Only 3/35 detected frames placed both endpoints within 50 pixels, despite selecting the best corner orientation; this box-only method is insufficient.
+- [ ] Evaluate endpoint-capable models or image methods against independently varied footage.
+
 ## Optical-flow bat endpoint experiment
 
 - [x] Evaluate forward/backward-gated pyramidal optical flow from the first annotated bat frame without later oracle input. Both points stayed active for 22/176 labeled frames; the handle still drifted substantially. No gameplay integration follows.
