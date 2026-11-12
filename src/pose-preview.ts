@@ -73,6 +73,8 @@ export class PosePreview {
           this.performanceStats.record(this.lastFrameAt, receivedAt, 'interrupted');
           this.reportPerformance(receivedAt, true);
           this.onLandmarks([], [], NaN);
+          this.draw([]);
+          this.show('tracking', 'Pose tracking was interrupted. Waiting for a fresh frame.');
           return;
         }
         if (receivedAt - this.lastFrameAt > 500) {

@@ -422,8 +422,12 @@ try {
     clock.setGamePaused(true); clock.setGamePaused(false);
     window.__holdPoseResult = false;
     window.__releasePoseFrame();
-    return { status: document.querySelector('#playzone-motion-status').textContent, serial: window.__poseResultSerial };
+    const canvas = document.querySelector('#playzone-pose-overlay');
+    const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    return { status: document.querySelector('#playzone-motion-status').textContent, poseStatus: document.querySelector('#playzone-pose-status').textContent, hasOverlay: pixels.some((value, index) => index % 4 === 3 && value !== 0), serial: window.__poseResultSerial };
   });
+  assert.match(staleFrame.poseStatus, /interrupted/i, 'interrupted results should explain why the overlay was cleared');
+  assert.equal(staleFrame.hasOverlay, false, 'an interrupted result must clear the previous pose overlay');
   assert.match(staleFrame.status, /Tracking stopped or no person/, 'a worker result captured before a pause must be discarded');
   assert.match(await page.$eval('#playzone-pose-performance', element => element.textContent), /[1-9]\d* interrupted/, 'pause-crossing results should be counted');
   await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, staleFrame.serial);
