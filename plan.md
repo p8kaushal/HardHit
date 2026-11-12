@@ -1,5 +1,9 @@
 # HardHit project plan index
 
+## Recorded-motion limb alignment checks
+
+The local replay now compares rendered arm, leg, hand and foot segment directions against the pose model's current targets only when both endpoint landmarks are visible. It also counts coverage and checks finite rig output, X-ray placement, cleanup and practice isolation. Two runs using the user's cropped screen recording passed; the second made 4,479 confident pose-target comparisons with none exceeding the 10-degree test tolerance. Both feet were visible in zero frames, so this does not validate the foot segments. The comparisons establish that the rig followed the model's own targets in this fixture; they do not establish that those targets accurately represented the person. The recording contains preview overlays and remains outside the repository.
+
 ## Local recorded camera-motion replay
 
 Added `scripts/browser-pose-replay.mjs`, which accepts an explicitly supplied pre-cropped camera-view WebM and optional seek time. It feeds changing frames through the real pose worker and calibrated character, checks finite poses and rendered X-ray joint positions, verifies that movement occurs without scoring or changing saved progression, and confirms camera and X-ray cleanup on exit. It prints aggregate counts only; recordings and extracted clips remain outside the repository.

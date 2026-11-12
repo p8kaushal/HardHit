@@ -1,5 +1,11 @@
 # Gameplay to-do
 
+## Recorded-motion limb alignment checks
+
+- [x] Measure rendered limb directions against confident pose-model targets throughout the local replay, including hand and foot endpoints when visible.
+- [x] Verify repeated playback, non-finite handling, cleanup and practice isolation; report coverage without treating pose-model output as ground truth.
+- [ ] Repeat with independently annotated full-body footage; the current recorded preview contains no usable foot frames.
+
 ## Camera movement: hands, feet and X-ray confidence
 
 - [x] Extend the skinned character's movement replication to approximate hand and foot direction using visible pose landmarks; hold briefly and safely fall back when those landmarks are missing.

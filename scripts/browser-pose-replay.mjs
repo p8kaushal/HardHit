@@ -22,13 +22,14 @@ try {
   await page.evaluate(async ({ encoded, seek }) => {
     const { GameScene } = await import('/src/scene.ts');
     const original = GameScene.prototype.applyTrackedBatterPose;
-    window.__replayStats = { frames: 0, personFrames: 0, wristFrames: 0, indexFrames: 0, earFrames: 0, footFrames: 0, applied: 0, nonfinite: 0, maxFacing: 0, rigSamples: 0, badRig: 0, maxJointError: 0, maxArmShift: 0 };
+    window.__replayStats = { frames: 0, personFrames: 0, wristFrames: 0, indexFrames: 0, earFrames: 0, footFrames: 0, applied: 0, nonfinite: 0, maxFacing: 0, rigSamples: 0, badRig: 0, maxJointError: 0, maxArmShift: 0, directionChecks: 0, directionMismatches: 0, maxDirectionErrorDeg: 0 };
     GameScene.prototype.applyTrackedBatterPose = function (pose, offset, facing, directions, confidence) {
       const values = Object.values(pose).flatMap(v => [v.x, v.y, v.z]).concat([offset.x, offset.y, offset.z], facing === null ? [] : [facing], ...Object.values(directions).map(v => [v.x, v.y, v.z]));
       if (values.some(value => !Number.isFinite(value))) window.__replayStats.nonfinite++;
       if (facing !== null && Number.isFinite(facing)) window.__replayStats.maxFacing = Math.max(window.__replayStats.maxFacing, Math.abs(facing));
       window.__replayStats.applied++;
       window.__replayScene = this;
+      window.__replayTargets = { directions, confidence };
       if (!window.__replayRigObserver) {
         let initialArm = null;
         window.__replayRigObserver = this.scene.onAfterRenderObservable.add(() => {
@@ -41,6 +42,29 @@ try {
             const point = node.getAbsolutePosition();
             if (![point.x,point.y,point.z,marker.position.x,marker.position.y,marker.position.z].every(Number.isFinite)) stats.badRig++;
             else stats.maxJointError = Math.max(stats.maxJointError, marker.position.subtract(point).length());
+          }
+          const limbs = [
+            ['leftShoulder','leftElbow','LeftArm','LeftForeArm'], ['leftElbow','leftWrist','LeftForeArm','LeftHand'],
+            ['rightShoulder','rightElbow','RightArm','RightForeArm'], ['rightElbow','rightWrist','RightForeArm','RightHand'],
+            ['leftHip','leftKnee','LeftUpLeg','LeftLeg'], ['leftKnee','leftAnkle','LeftLeg','LeftFoot'],
+            ['rightHip','rightKnee','RightUpLeg','RightLeg'], ['rightKnee','rightAnkle','RightLeg','RightFoot'],
+            ['leftWrist','leftIndex','LeftHand','LeftHandIndex3'], ['rightWrist','rightIndex','RightHand','RightHandIndex3'],
+            ['leftAnkle','leftToe','LeftFoot','LeftToeBase'], ['rightAnkle','rightToe','RightFoot','RightToeBase']
+          ];
+          const targets = window.__replayTargets;
+          for (const [joint, end, parentName, childName] of limbs) {
+            const target = targets?.directions[joint], a = scene.getTransformNodeByName(parentName), b = scene.getTransformNodeByName(childName);
+            if (!target || !targets.confidence[joint] || !targets.confidence[end] || !a || !b) continue;
+            a.computeWorldMatrix(true); b.computeWorldMatrix(true);
+            const vector = b.getAbsolutePosition().subtract(a.getAbsolutePosition());
+            if (vector.lengthSquared() < .000001) { stats.badRig++; continue; }
+            const actual = vector.normalize();
+            const dot = Math.max(-1, Math.min(1, actual.x * target.x + actual.y * target.y + actual.z * target.z));
+            const degrees = Math.acos(dot) * 180 / Math.PI;
+            if (!Number.isFinite(degrees)) { stats.badRig++; continue; }
+            stats.directionChecks++;
+            stats.maxDirectionErrorDeg = Math.max(stats.maxDirectionErrorDeg, degrees);
+            if (degrees > 10) stats.directionMismatches++;
           }
           const arm = scene.getTransformNodeByName('LeftArm'), hand = scene.getTransformNodeByName('LeftHand');
           if (arm && hand) {
@@ -113,6 +137,8 @@ try {
   assert.ok(stats.rigSamples >= 5 && stats.badRig === 0, `rendered joints must remain finite: ${JSON.stringify(stats)}`);
   assert.ok(stats.maxJointError < .05, `X-ray markers must follow rendered joints: ${JSON.stringify(stats)}`);
   assert.ok(stats.maxArmShift > .03, `the replay should exercise visible arm movement: ${JSON.stringify(stats)}`);
+  assert.ok(stats.directionChecks >= 20, `the replay must include confident tracked limb directions: ${JSON.stringify(stats)}`);
+  assert.equal(stats.directionMismatches, 0, `rendered limbs must follow their tracked targets within 10 degrees: ${JSON.stringify(stats)}`);
   assert.match(stats.score, /0 runs \/ 0 wickets · 0 balls/, 'replay must not score a practice ball');
   assert.deepEqual(await page.evaluate(() => ({ player: localStorage.getItem('six_hitting_contest_player'), board: localStorage.getItem('six_hitting_contest_leaderboard') })), before);
   await page.click('#playzone-exit');
