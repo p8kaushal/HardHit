@@ -156,7 +156,7 @@ test('pose retarget calibration responds to motion and rejects occlusion', () =>
   assert.ok(tracker.update(moved, false), 'one occluded hand should not stop the rest of the body');
   assert.equal(tracker.calibrate(moved, true), true);
   moved[11].visibility = 0.1;
-  assert.equal(tracker.update(moved, true), null, 'missing torso should stop tracking');
+  assert.equal(tracker.update(moved, true), null, 'missing torso immediately after recalibration has no previous pose to hold');
   assert.equal(tracker.calibrate(moved, true), false);
   tracker.reset();
   assert.equal(tracker.update(points, false), null);
@@ -225,6 +225,25 @@ test('pose retarget calibration responds to motion and rejects occlusion', () =>
   for (let i = 0; i < 12; i++) segmentTracker.update(points, false, spatial, 2100 + i * 70);
   const expected = new Vector3(-.15, -.05, .1).normalize();
   assert.ok(Vector3.Dot(segmentTracker.getDirections().leftShoulder!, expected) > .99, 'limb targets should preserve 3D direction');
+});
+
+test('brief torso loss holds uncertain pose and recovers, while prolonged loss stops tracking', () => {
+  const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
+  for (const [index, x, y] of [[0,.5,.1],[11,.35,.25],[12,.65,.25],[13,.32,.4],[14,.68,.4],[15,.3,.55],[16,.7,.55],[23,.4,.55],[24,.6,.55],[25,.39,.7],[26,.61,.7],[27,.38,.9],[28,.62,.9]] as const) points[index] = { x, y, visibility: 1 };
+  const tracker = new PoseRetarget();
+  assert.equal(tracker.calibrate(points, false, [], 1000), true);
+  const pose = tracker.update(points, false, [], 1100)!;
+  const obscured = structuredClone(points); obscured[11].visibility = 0;
+  assert.equal(tracker.update(obscured, false, [], 1400), pose);
+  assert.equal(tracker.isHoldingPose(), true);
+  assert.deepEqual(tracker.getConfidence(), {}, 'held joints must not appear confidently tracked');
+  assert.ok(tracker.update(points, false, [], 1500));
+  assert.equal(tracker.isHoldingPose(), false);
+  assert.equal(tracker.getConfidence().leftShoulder, true);
+  assert.equal(tracker.update(obscured, false, [], 2001), null);
+  assert.equal(tracker.isHoldingPose(), false);
+  tracker.reset();
+  assert.equal(tracker.update(points, false, [], 2100), null);
 });
 
 test('partial world landmarks never mix screen and world coordinates in an angle', () => {

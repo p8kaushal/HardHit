@@ -403,6 +403,13 @@ try {
   await page.waitForFunction(() => window.__poseScene.batterRig.trackingPose === true, { timeout: 5000 });
   await page.waitForFunction(() => /2 balls/.test(document.querySelector('#playzone-score').textContent), { timeout: 30000 });
   assert.equal(await page.$eval('#playzone-camera-toggle', button => button.textContent), 'Stop camera', 'camera should remain active through a manual shot');
+  await page.click('#playzone-pose-xray');
+  await page.evaluate(() => { window.__poseOverride[11].visibility = 0; });
+  await page.waitForFunction(() => document.querySelector('#playzone-retarget-status').textContent.includes('Holding your last pose'), { polling: 20 });
+  await page.waitForFunction(() => window.__poseScene.scene.getMeshByName('poseXray_leftShoulder')?.material?.name === 'poseXrayUncertain', { polling: 20 });
+  await page.evaluate(() => { window.__poseOverride[11].visibility = 1; });
+  await page.waitForFunction(() => document.querySelector('#playzone-retarget-status').textContent.includes('Calibrated'), { polling: 20 });
+  await page.click('#playzone-pose-xray');
   await page.evaluate(() => { window.__poseOverride[11].visibility = 0; });
   await page.waitForFunction(() => document.querySelector('#playzone-retarget-status').textContent.includes('Tracking was lost'));
   assert.deepEqual(await page.evaluate(() => window.__poseScene.scene.getTransformNodeByName('batterModelFacing').position.asArray()), [0, 0, 0], 'visual offset must reset after tracking loss');

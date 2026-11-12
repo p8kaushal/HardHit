@@ -563,7 +563,9 @@ export class Playzone {
       const point = landmarks[index];
       return point && Number.isFinite(point.x) && Number.isFinite(point.y) && (point.visibility ?? 0) >= .45 && point.x > 0 && point.x < 1 && point.y > 0 && point.y < 1;
     });
-    get<HTMLElement>('playzone-retarget-status').textContent = !legsVisible
+    get<HTMLElement>('playzone-retarget-status').textContent = this.poseRetarget.isHoldingPose()
+      ? 'Tracking briefly interrupted. Holding your last pose; return fully into view.'
+      : !legsVisible
       ? 'Calibrated. Move back so your hips, knees and feet are visible for leg tracking.'
       : this.poseRetarget.getFacing() === null
         ? 'Calibrated! Face the camera with both shoulders visible to establish turning direction.'

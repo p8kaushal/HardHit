@@ -35,11 +35,15 @@ export class PoseRetarget {
   private headAxisSign: number | null = null;
   private headYaw = 0;
   private headLastSeen = -Infinity;
-  reset(): void { this.baseline = null; this.origin = null; this.facing = null; this.directions = {}; this.distalLastSeen = {}; this.confidence = {}; this.frontAxisSign = null; this.headAxisSign = null; this.headYaw = 0; this.headLastSeen = -Infinity; this.offset = { x: 0, y: 0, z: 0 }; this.lastVisible.fill(0); this.smoothed.forEach(v => { v.x = v.y = v.z = 0; }); }
+  private lastPose: BatterPose | null = null;
+  private torsoLastSeen = -Infinity;
+  private holdingPose = false;
+  reset(): void { this.baseline = null; this.origin = null; this.facing = null; this.directions = {}; this.distalLastSeen = {}; this.confidence = {}; this.frontAxisSign = null; this.headAxisSign = null; this.headYaw = 0; this.headLastSeen = -Infinity; this.lastPose = null; this.torsoLastSeen = -Infinity; this.holdingPose = false; this.offset = { x: 0, y: 0, z: 0 }; this.lastVisible.fill(0); this.smoothed.forEach(v => { v.x = v.y = v.z = 0; }); }
   getOffset(): { x: number; y: number; z: number } { return { ...this.offset }; }
   getFacing(): number | null { return this.facing; }
   getDirections(): TrackedDirections { return this.directions; }
   getConfidence(): TrackedConfidence { return this.confidence; }
+  isHoldingPose(): boolean { return this.holdingPose; }
   private estimateFacing(points: PoseLandmark[], world: PoseLandmark[], mirror: boolean): number | null {
     const left = points[11], right = points[12], a = world[11], b = world[12];
     if (!left || !right || !a || !b || (left.visibility ?? 0) < .55 || (right.visibility ?? 0) < .55 || ![left.x, left.y, right.x, right.y, a.x, a.z, b.x, b.z].every(Number.isFinite) || [left, right].some(p => p.x <= 0 || p.x >= 1 || p.y <= 0 || p.y >= 1)) return null;
@@ -108,6 +112,9 @@ export class PoseRetarget {
     this.headAxisSign = null;
     this.headYaw = 0;
     this.headLastSeen = -Infinity;
+    this.lastPose = null;
+    this.torsoLastSeen = now;
+    this.holdingPose = false;
     if (this.estimateHeadFacing(points, world, mirror) !== null) this.headLastSeen = now;
     this.directions = {};
     this.distalLastSeen = {};
@@ -121,7 +128,13 @@ export class PoseRetarget {
     if (!this.baseline) return null;
     const angles = this.angles(points, mirror, world);
     const center = this.center(points);
-    if (!angles[segments.length] || !center || !this.origin) return null;
+    if (!angles[segments.length] || !center || !this.origin) {
+      this.confidence = {};
+      this.holdingPose = !!this.lastPose && now - this.torsoLastSeen <= 500 && now >= this.torsoLastSeen;
+      return this.holdingPose ? this.lastPose : null;
+    }
+    this.torsoLastSeen = now;
+    this.holdingPose = false;
     if (this.frontAxisSign === null) {
       const a = world[11], b = world[12];
       const dx = b?.x - a?.x, dz = (b?.z ?? NaN) - (a?.z ?? NaN);
@@ -216,6 +229,7 @@ export class PoseRetarget {
         pose.chest = new BABYLON.Vector3(smooth.x * .5, this.facing !== null ? 0 : smooth.y, smooth.z * .5);
       } else pose[joint] = new BABYLON.Vector3(smooth.x, joint === 'head' ? this.headYaw : smooth.y, smooth.z + (joint === 'leftShoulder' ? -0.12 : joint === 'rightShoulder' ? 0.12 : 0));
     });
+    this.lastPose = pose;
     return pose;
   }
 }

@@ -1,5 +1,12 @@
 # Gameplay to-do
 
+## Recover from brief torso occlusion
+
+- [x] Hold the last calibrated pose briefly when a required torso landmark disappears, and visibly mark tracking as uncertain.
+- [x] Resume automatically when tracking returns; reset safely after prolonged loss or other interruptions.
+- [x] Verify loss, recovery, X-ray confidence, lifecycle and practice isolation, then commit the stage.
+- [ ] Validate the hold duration and recovery feel with a live camera.
+
 ## Consistent landmark coordinates during partial tracking
 
 - [x] Calculate each body angle in one coordinate space when 3D landmarks are incomplete or invalid.
