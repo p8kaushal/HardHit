@@ -1,5 +1,11 @@
 # Gameplay to-do
 
+## Movement smoothing across frame rates
+
+- [x] Adjust pose smoothing for elapsed time when pose frames arrive more slowly, while bounding recovery after long gaps.
+- [x] Verify comparable response at different frame intervals, mirror behavior and practice lifecycle before committing.
+- [ ] Evaluate responsiveness and jitter on live cameras and slower devices.
+
 ## Reject delayed pose frames
 
 - [x] Prevent old inference results from driving the character after a slow or stalled frame, and explain the delay.

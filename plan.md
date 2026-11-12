@@ -1,5 +1,9 @@
 # HardHit project plan index
 
+## Movement smoothing across frame rates
+
+Pose smoothing scales up when frames arrive more slowly than the 15 fps worker cap, with catch-up bounded to three nominal frames. This applies to facing, head, offsets, limb directions and joint-angle smoothing; actual performance and jitter still require camera testing. Verified with 119 unit tests (including synthetic response at different frame intervals and mirrored input), production build, camera browser regression and the user's recorded-motion replay. The replay made 4,000 confident pose-target comparisons with no mismatches; lower legs and feet were not visible, and model-target agreement is not real-world accuracy.
+
 ## Reject delayed pose frames
 
 Inference results arriving more than 500 ms after frame submission are discarded, their overlay is cleared and the preview reports a delay. Fresh frames can resume tracking; continued delay eventually resets calibrated movement through the existing loss handling. This prevents stale poses being applied but can make tracking unavailable on slow devices; the threshold is not yet validated on real hardware. Verified with 118 unit tests, a production build and the camera browser regression, including an intentionally held result and fresh-frame recovery.

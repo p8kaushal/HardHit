@@ -38,7 +38,8 @@ export class PoseRetarget {
   private lastPose: BatterPose | null = null;
   private torsoLastSeen = -Infinity;
   private holdingPose = false;
-  reset(): void { this.baseline = null; this.origin = null; this.facing = null; this.directions = {}; this.distalLastSeen = {}; this.confidence = {}; this.frontAxisSign = null; this.headAxisSign = null; this.headYaw = 0; this.headLastSeen = -Infinity; this.lastPose = null; this.torsoLastSeen = -Infinity; this.holdingPose = false; this.offset = { x: 0, y: 0, z: 0 }; this.lastVisible.fill(0); this.smoothed.forEach(v => { v.x = v.y = v.z = 0; }); }
+  private lastUpdateAt = 0;
+  reset(): void { this.baseline = null; this.origin = null; this.facing = null; this.directions = {}; this.distalLastSeen = {}; this.confidence = {}; this.frontAxisSign = null; this.headAxisSign = null; this.headYaw = 0; this.headLastSeen = -Infinity; this.lastPose = null; this.torsoLastSeen = -Infinity; this.holdingPose = false; this.lastUpdateAt = 0; this.offset = { x: 0, y: 0, z: 0 }; this.lastVisible.fill(0); this.smoothed.forEach(v => { v.x = v.y = v.z = 0; }); }
   getOffset(): { x: number; y: number; z: number } { return { ...this.offset }; }
   getFacing(): number | null { return this.facing; }
   getDirections(): TrackedDirections { return this.directions; }
@@ -115,6 +116,7 @@ export class PoseRetarget {
     this.lastPose = null;
     this.torsoLastSeen = now;
     this.holdingPose = false;
+    this.lastUpdateAt = now - 1000 / 15;
     if (this.estimateHeadFacing(points, world, mirror) !== null) this.headLastSeen = now;
     this.directions = {};
     this.distalLastSeen = {};
@@ -126,6 +128,10 @@ export class PoseRetarget {
   }
   update(points: PoseLandmark[], mirror: boolean, world: PoseLandmark[] = [], now = performance.now()): BatterPose | null {
     if (!this.baseline) return null;
+    // The worker is capped at 15 fps. Compensate for slower frames without a large jump after a long stall.
+    const steps = Math.max(1, Math.min(3, (now - this.lastUpdateAt) / (1000 / 15)));
+    this.lastUpdateAt = now;
+    const blend = (perFrame: number) => 1 - Math.pow(1 - perFrame, steps);
     const angles = this.angles(points, mirror, world);
     const center = this.center(points);
     if (!angles[segments.length] || !center || !this.origin) {
@@ -142,20 +148,20 @@ export class PoseRetarget {
     }
     const facing = this.estimateFacing(points, world, mirror);
     if (facing === null) this.facing = null;
-    else this.facing = this.facing === null ? facing : this.facing + wrap(facing - this.facing) * .3;
+    else this.facing = this.facing === null ? facing : this.facing + wrap(facing - this.facing) * blend(.3);
     const headFacing = this.estimateHeadFacing(points, world, mirror);
     if (headFacing !== null && facing !== null) {
       const relativeYaw = Math.max(-1, Math.min(1, wrap(headFacing - facing)));
-      this.headYaw += wrap(relativeYaw - this.headYaw) * .35;
+      this.headYaw += wrap(relativeYaw - this.headYaw) * blend(.35);
       this.headLastSeen = now;
-    } else if (now - this.headLastSeen > 300) this.headYaw *= .7;
+    } else if (now - this.headLastSeen > 300) this.headYaw *= 1 - blend(.3);
     const targetX = Math.max(-.65, Math.min(.65, (center.x - this.origin.x) / this.origin.scale * .45 * (mirror ? -1 : 1)));
     const targetY = Math.max(-.45, Math.min(.35, (this.origin.y - center.y) / this.origin.scale * .45));
     // Apparent torso size is only a rough proxy for distance; keep it optional and bounded.
     const targetZ = Math.max(-.5, Math.min(.5, .8 * (this.origin.scale / center.scale - 1)));
-    this.offset.x += (targetX - this.offset.x) * .35;
-    this.offset.y += (targetY - this.offset.y) * .35;
-    this.offset.z += (targetZ - this.offset.z) * .2;
+    this.offset.x += (targetX - this.offset.x) * blend(.35);
+    this.offset.y += (targetY - this.offset.y) * blend(.35);
+    this.offset.z += (targetZ - this.offset.z) * blend(.2);
     const mappedIndex = (value: number) => mirror && ((value >= 11 && value <= 32) || value === 7 || value === 8) ? (value % 2 ? value + 1 : value - 1) : value;
     const isVisible = (value: number) => {
       const p = points[mappedIndex(value)];
@@ -184,7 +190,7 @@ export class PoseRetarget {
       if (!target && now - this.lastVisible[i] <= 300 && this.directions[segment.joint]) continue;
       target ??= new BABYLON.Vector3(0, -1, 0);
       const previous = this.directions[segment.joint];
-      const blended = previous ? BABYLON.Vector3.Lerp(previous, target, .55) : target;
+      const blended = previous ? BABYLON.Vector3.Lerp(previous, target, blend(.55)) : target;
       this.directions[segment.joint] = blended.lengthSquared() > .0001 ? blended.normalize() : target;
     }
     for (const segment of distalSegments) {
@@ -204,7 +210,7 @@ export class PoseRetarget {
       }
       this.distalLastSeen[joint] = now;
       const previous = this.directions[joint];
-      const blended = previous ? BABYLON.Vector3.Lerp(previous, target, .45) : target;
+      const blended = previous ? BABYLON.Vector3.Lerp(previous, target, blend(.45)) : target;
       this.directions[joint] = blended.lengthSquared() > .0001 ? blended.normalize() : target;
     }
     const pose: BatterPose = {};
@@ -212,7 +218,7 @@ export class PoseRetarget {
       const joint = i < segments.length ? segments[i].joint : i === segments.length ? 'chest' : 'head';
       if (!value) {
         const smooth = this.smoothed[i];
-        if (now - this.lastVisible[i] > 300) { smooth.x *= 0.7; smooth.y *= 0.7; smooth.z *= 0.7; }
+        if (now - this.lastVisible[i] > 300) { const decay = 1 - blend(.3); smooth.x *= decay; smooth.y *= decay; smooth.z *= decay; }
         pose[joint] = new BABYLON.Vector3(smooth.x, smooth.y, smooth.z + (joint === 'leftShoulder' ? -0.12 : joint === 'rightShoulder' ? 0.12 : 0));
         return;
       }
@@ -222,7 +228,7 @@ export class PoseRetarget {
       const smooth = this.smoothed[i];
       for (const axis of ['x', 'y', 'z'] as const) {
         const difference = limit(wrap(value[axis] - base[axis])) - smooth[axis];
-        smooth[axis] += difference * (Math.abs(difference) > .2 ? .55 : .35);
+        smooth[axis] += difference * blend(Math.abs(difference) > .2 ? .55 : .35);
       }
       if (joint === 'chest') {
         pose.spine = new BABYLON.Vector3(smooth.x * .5, 0, smooth.z * .5);
