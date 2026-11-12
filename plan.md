@@ -1,5 +1,9 @@
 # HardHit project plan index
 
+## Limb directions with invalid depth
+
+Rendered limb direction calculations now fall back to a complete screen-coordinate pair when either world landmark is missing or non-finite, rather than treating a visible limb as lost. The 2D and 3D estimates can still differ. Verified with 120 unit tests including mirrored arm and foot cases and recovery, production build and camera browser regression. Actual foot fidelity remains unverified on full-body camera footage.
+
 ## Movement smoothing across frame rates
 
 Pose smoothing scales up when frames arrive more slowly than the 15 fps worker cap, with catch-up bounded to three nominal frames. This applies to facing, head, offsets, limb directions and joint-angle smoothing; actual performance and jitter still require camera testing. Verified with 119 unit tests (including synthetic response at different frame intervals and mirrored input), production build, camera browser regression and the user's recorded-motion replay. The replay made 4,000 confident pose-target comparisons with no mismatches; lower legs and feet were not visible, and model-target agreement is not real-world accuracy.

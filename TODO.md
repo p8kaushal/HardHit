@@ -1,5 +1,11 @@
 # Gameplay to-do
 
+## Limb directions with invalid depth
+
+- [x] Fall back to a complete screen-coordinate pair when either world landmark for a limb direction is invalid.
+- [x] Verify normal and mirrored arms and feet, loss and recovery, and commit the verified fix.
+- [ ] Review 2D/3D transitions and foot fidelity with full-body live footage.
+
 ## Movement smoothing across frame rates
 
 - [x] Adjust pose smoothing for elapsed time when pose frames arrive more slowly, while bounding recovery after long gaps.

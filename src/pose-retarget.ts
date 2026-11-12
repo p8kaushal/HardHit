@@ -174,12 +174,14 @@ export class PoseRetarget {
       leftIndex: [19], rightIndex: [20], leftToe: [31], rightToe: [32]
     };
     this.confidence = Object.fromEntries(Object.entries(confidenceMap).map(([joint, indices]) => [joint, indices.every(isVisible)])) as TrackedConfidence;
+    const finitePoint = (p: PoseLandmark | undefined) => !!p && [p.x, p.y, p.z ?? 0].every(Number.isFinite);
+    const directionSource = (a: number, b: number) => finitePoint(world[a]) && finitePoint(world[b]) ? world : points;
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i];
       const index = (value: number) => mirror ? (value % 2 ? value + 1 : value - 1) : value;
       const a = index(segment.from), b = index(segment.to);
       const visible = [points[a], points[b]].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y) && (p.visibility ?? 0) >= .45 && p.x > 0 && p.x < 1 && p.y > 0 && p.y < 1);
-      const source = world[a] && world[b] ? world : points;
+      const source = directionSource(a, b);
       const from = source[a], to = source[b];
       let target: BABYLON.Vector3 | null = null;
       if (visible && from && to && [from.x, from.y, to.x, to.y, from.z ?? 0, to.z ?? 0].every(Number.isFinite)) {
@@ -195,7 +197,7 @@ export class PoseRetarget {
     }
     for (const segment of distalSegments) {
       const a = mappedIndex(segment.from), b = mappedIndex(segment.to);
-      const source = world[a] && world[b] ? world : points;
+      const source = directionSource(a, b);
       const from = source[a], to = source[b];
       let target: BABYLON.Vector3 | null = null;
       if (isVisible(segment.from) && isVisible(segment.to) && from && to && [from.x, from.y, to.x, to.y, from.z ?? 0, to.z ?? 0].every(Number.isFinite)) {

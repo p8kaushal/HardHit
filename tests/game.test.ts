@@ -283,6 +283,24 @@ test('partial world landmarks never mix screen and world coordinates in an angle
   }
 });
 
+test('visible arm and foot directions fall back together when world coordinates are invalid', () => {
+  const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, z: 0, visibility: 1 }));
+  for (const [index, x, y] of [[0,.5,.1],[11,.35,.25],[12,.65,.25],[13,.25,.35],[14,.75,.35],[15,.2,.5],[16,.8,.5],[23,.4,.55],[24,.6,.55],[25,.35,.7],[26,.65,.7],[27,.3,.85],[28,.7,.85],[31,.2,.88],[32,.8,.88]] as const) points[index] = { x, y, z: 0, visibility: 1 };
+  for (const mirror of [false, true]) {
+    const tracker = new PoseRetarget();
+    assert.equal(tracker.calibrate(points, mirror, points, 1000), true);
+    const invalid = structuredClone(points); invalid[13].z = NaN; invalid[31].x = Infinity;
+    tracker.update(points, mirror, invalid, 1100);
+    const shoulder = tracker.getDirections()[mirror ? 'rightShoulder' : 'leftShoulder']!;
+    const ankle = tracker.getDirections()[mirror ? 'rightAnkle' : 'leftAnkle']!;
+    assert.ok(shoulder.x * (mirror ? 1 : -1) > .5, 'visible upper arm should use screen direction');
+    assert.ok(ankle.x * (mirror ? 1 : -1) > .9, 'visible foot should use screen direction');
+    assert.ok(Object.values(tracker.getDirections()).every(v => [v.x, v.y, v.z].every(Number.isFinite)));
+    tracker.update(points, mirror, points, 1200);
+    assert.ok(tracker.getDirections()[mirror ? 'rightAnkle' : 'leftAnkle']);
+  }
+});
+
 test('hand and foot directions hold briefly, then clear when landmarks are occluded', () => {
   const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, z: 0, visibility: 0 }));
   for (const [index, x, y] of [[0,.5,.1],[11,.35,.25],[12,.65,.25],[13,.32,.4],[14,.68,.4],[15,.3,.55],[16,.7,.55],[19,.25,.58],[20,.75,.58],[23,.4,.55],[24,.6,.55],[25,.39,.7],[26,.61,.7],[27,.38,.85],[28,.62,.85],[31,.32,.9],[32,.68,.9]] as const) points[index] = { x, y, z: 0, visibility: 1 };
