@@ -166,7 +166,7 @@ try {
     const { GameScene } = await import('/src/scene.ts');
     const original = GameScene.prototype.applyTrackedBatterPose;
     window.__appliedPoses = [];
-    GameScene.prototype.applyTrackedBatterPose = function (pose, ...rest) { window.__poseScene = this; window.__lastPose = pose; window.__poseOffset = rest[0]; window.__poseFacing = rest[1]; window.__poseDirections = rest[2]; window.__appliedPoses.push(pose.leftShoulder?.z); return original.call(this, pose, ...rest); };
+    GameScene.prototype.applyTrackedBatterPose = function (pose, ...rest) { window.__poseScene = this; window.__lastPose = pose; window.__poseOffset = rest[0]; window.__poseFacing = rest[1]; window.__rawPoseDirections = rest[2]; window.__poseDirections = Object.fromEntries(Object.entries(rest[2]).map(([name, direction]) => [name, this.scene.activeCamera.getDirection(direction).normalize()])); window.__appliedPoses.push(pose.leftShoulder?.z); return original.call(this, pose, ...rest); };
     const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
     for (const [index, x, y] of [[0,.5,.1],[7,.44,.12],[8,.56,.12],[11,.35,.25],[12,.65,.25],[13,.32,.4],[14,.68,.4],[15,.3,.55],[16,.7,.55],[19,.28,.58],[20,.72,.58],[23,.4,.55],[24,.6,.55],[25,.39,.7],[26,.61,.7],[27,.38,.9],[28,.62,.9],[31,.38,.92],[32,.62,.92]]) points[index] = { x, y, visibility: 1 };
     window.__poseOverride = points;
@@ -270,8 +270,26 @@ try {
     const scene = window.__poseScene.scene, upper = scene.getTransformNodeByName('LeftArm'), lower = scene.getTransformNodeByName('LeftForeArm');
     upper.computeWorldMatrix(true); lower.computeWorldMatrix(true);
     const actual = lower.getAbsolutePosition().subtract(upper.getAbsolutePosition()).normalize(), target = window.__poseDirections.leftShoulder;
-    return target && target.x < -.8 && actual.x * target.x + actual.y * target.y + actual.z * target.z > .96;
+    return target && window.__rawPoseDirections.leftShoulder.x < -.8 && actual.x * target.x + actual.y * target.y + actual.z * target.z > .96;
   });
+  await page.evaluate(() => { window.__poseScene.scene.activeCamera.alpha += .8; });
+  await page.waitForFunction(() => {
+    const scene = window.__poseScene.scene, upper = scene.getTransformNodeByName('LeftArm'), lower = scene.getTransformNodeByName('LeftForeArm');
+    upper.computeWorldMatrix(true); lower.computeWorldMatrix(true);
+    const actual = lower.getAbsolutePosition().subtract(upper.getAbsolutePosition()).normalize();
+    const camera = scene.activeCamera, right = camera.getDirection(new (actual.constructor)(1, 0, 0)).normalize();
+    return -(actual.x * right.x + actual.y * right.y + actual.z * right.z) > .9;
+  }, { timeout: 5000 });
+  await page.evaluate(() => { window.__poseScene.scene.activeCamera.alpha -= .8; });
+  await page.evaluate(() => { window.__poseWorldOverride[13].z = -.2; });
+  await page.waitForFunction(() => {
+    const scene = window.__poseScene.scene, upper = scene.getTransformNodeByName('LeftArm'), lower = scene.getTransformNodeByName('LeftForeArm');
+    upper.computeWorldMatrix(true); lower.computeWorldMatrix(true);
+    const actual = lower.getAbsolutePosition().subtract(upper.getAbsolutePosition()).normalize();
+    const forward = scene.activeCamera.getDirection(new (actual.constructor)(0, 0, 1)).normalize();
+    return -(actual.x * forward.x + actual.y * forward.y + actual.z * forward.z) > .4;
+  }, { timeout: 5000 });
+  await page.evaluate(() => { window.__poseWorldOverride[13].z = 0; });
   await page.waitForFunction(limbsFollowTargets);
   await page.evaluate(() => { window.__poseWorldOverride[13].x = .32; window.__poseWorldOverride[13].y = .4; });
   await page.evaluate(() => { window.__poseWorldOverride[12].z = .2; });
@@ -598,6 +616,8 @@ try {
     window.__poseOverride = points; window.__poseWorldOverride = []; window.__poseCountOverride = 1;
     return { score: document.querySelector('#playzone-score').textContent, player: localStorage.getItem('six_hitting_contest_player'), board: localStorage.getItem('six_hitting_contest_leaderboard') };
   });
+  const ambiguityStartSerial = await page.evaluate(() => window.__poseResultSerial);
+  await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, ambiguityStartSerial);
   await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Body landmarks visible'));
   await page.click('#playzone-pose-calibrate');
   assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Calibrated!/);

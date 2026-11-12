@@ -373,7 +373,12 @@ export class GameScene {
     const localOffset = BABYLON.Vector3.TransformNormal(worldOffset, BABYLON.Matrix.Invert(this.batterRoot.computeWorldMatrix(true)));
     this.batterRig.setTrackingOffset(localOffset);
     this.batterRig.setTrackingFacing(facing);
-    return this.batterRig.applyTrackingPose(pose, directions, confidence);
+    // Landmark directions are camera-relative, while the rig aligns world-space joints.
+    const worldDirections: TrackedDirections = {};
+    for (const [joint, direction] of Object.entries(directions) as [keyof BatterPose, BABYLON.Vector3][]) {
+      worldDirections[joint] = this.primaryCamera.getDirection(direction).normalize();
+    }
+    return this.batterRig.applyTrackingPose(pose, worldDirections, confidence);
   }
 
   public setTrackingBatVisible(visible: boolean): void { this.batterRig?.setBatVisible(visible); }

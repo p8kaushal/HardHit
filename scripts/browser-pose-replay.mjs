@@ -38,7 +38,8 @@ try {
       if (facing !== null && Number.isFinite(facing)) window.__replayStats.maxFacing = Math.max(window.__replayStats.maxFacing, Math.abs(facing));
       window.__replayStats.applied++;
       window.__replayScene = this;
-      window.__replayTargets = { directions, confidence };
+      const worldDirections = Object.fromEntries(Object.entries(directions).map(([joint, direction]) => [joint, this.scene.activeCamera.getDirection(direction).normalize()]));
+      window.__replayTargets = { directions: worldDirections, confidence };
       if (!window.__replayRigObserver) {
         let initialArm = null;
         window.__replayRigObserver = this.scene.onAfterRenderObservable.add(() => {
