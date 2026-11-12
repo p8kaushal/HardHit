@@ -1,5 +1,12 @@
 # Gameplay to-do
 
+## Next: live movement review
+
+- [ ] Have the user refresh and use **Calibrate in 5 seconds** while upright, facing the camera with the whole body visible; review the character's neutral posture and bowler-facing alignment.
+- [ ] Review left/right body and head turns, back bending, arms, knees, feet, mirror setting, responsiveness and X-ray confidence; investigate any mismatch using the user's recording or feedback.
+- [ ] Check brief occlusion recovery and the delayed-frame warning on the user's real camera, then refine and commit each verified feature or fix.
+- [ ] Keep physical bat tracking, automatic shot inference and match camera control as future work; they are not implemented.
+
 ## Investigate torso straightening pivot
 
 - [x] Check whether the skinned rig's upright correction uses the actual spine pivot, and verify the rendered torso after calibration.
