@@ -70,6 +70,11 @@
 - [x] Verify preprocessing and labels, benchmark actual annotated bat frames with box overlap and positive controls, and assess browser feasibility.
 - [x] Document evidence and any implementation limits, commit the increment, and continue unblocked camera work without treating live tests as approval gates. Positive control passed; 15/23 bat detections and 2/23 IoU ≥0.5 matches are insufficient for runtime selection.
 
+## Bat endpoint tracking feasibility
+
+- [x] Evaluate a simple image template tracker initialized from an annotated real bat frame without feeding later annotations back. It retained both endpoints within 50 pixels in 27/176 later frames; no runtime integration follows.
+- [ ] Evaluate a stronger endpoint-capable detector or tracker on varied annotated clips, with explicit recovery and false-association measurements.
+
 ## Full-frame cricket checkpoint evaluation
 
 - [x] Evaluate the previously inspected cricket-specific box checkpoint over all 177 annotated frames in the existing isolated environment. It produced boxes on 121 frames and IoU ≥0.5 on 28; no endpoint output or generalization evidence follows.

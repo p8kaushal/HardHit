@@ -50,6 +50,12 @@ For each frame, measured the image-plane distance from each pose wrist to the hu
 
 The first source clip is a single side-on stroke with gloves and pads. Keep the video, 184 extracted PNGs, annotations and frame measurements outside the repository. The local disposable evaluator was `/private/tmp/hardhit-bat-grip-eval.mjs`; it is not a maintained project command. This is preliminary feasibility evidence, not an application implementation or bat-tracking accuracy result.
 
+### Endpoint template-tracking feasibility
+
+A local experiment initialized handle-top and toe from the first human annotation, then tracked the two image points without using subsequent labels or reinitializing. It used fixed 15×15 grayscale normalized cross-correlation templates on quarter-resolution frames with an ±18-pixel search radius per annotated step. Against the next 176 labeled frames, both endpoints were within 50 source pixels in 27 frames. Median errors were 192.7 pixels for handle top and 135.5 pixels for toe; 90th-percentile errors were 592.9 and 1175.9 pixels respectively. Processing the sequence took 5.4 seconds locally, including image loading; this is not a camera-to-display measurement.
+
+This experiment used a human oracle only for initialization, a single side-on stroke, and no recovery or confidence gate. The labels omit some source frames, so search steps may span gaps. It demonstrates severe drift for this particular simple template method, not a bound on optical flow or trained trackers. It cannot supply a reliable runtime bat direction and is not integrated. Disposable script and per-frame errors: `/private/tmp/hardhit-template-bat.py` and `/private/tmp/hardhit-template-bat-results.json`; footage remains local.
+
 ### Full-frame EfficientDet-Lite0 follow-up
 
 To check whether every-eighth-frame sampling missed detections, ran the same local MediaPipe EfficientDet-Lite0 int8 runtime on all 177 annotation frames. FFmpeg extracted the video frames by index; the browser loaded each PNG directly, avoiding seek timing. Input remained 1080×1920 RGB, threshold 0.2, max 20 results, CPU delegate. Compared emitted `baseball bat` boxes with human bat boxes using intersection-over-union.
