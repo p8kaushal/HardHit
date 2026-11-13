@@ -112,6 +112,7 @@ export interface MatchProgression {
     statName: string;
     increase: number;
     newValue: number;
+    reason: string;
   };
 }
 

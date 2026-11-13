@@ -733,31 +733,45 @@ export class MatchController {
     else if (player.xp >= 300) player.rank = 'Gold';
     else if (player.xp >= 100) player.rank = 'Silver';
 
-    // Increment stats slightly on win or match play
+    // Attribute gains follow the strongest measurable batting/bowling result.
     const statInc = playerWon ? 2 : 1;
     const stats = player.stats;
-    
-    const upgradeOptions: { name: string; apply: () => number }[] = [
-      { name: 'Power', apply: () => stats.batting.power = Math.min(100, stats.batting.power + statInc) },
-      { name: 'Timing', apply: () => stats.batting.timing = Math.min(100, stats.batting.timing + statInc) },
-      { name: 'Technique', apply: () => stats.batting.technique = Math.min(100, stats.batting.technique + statInc) },
-      { name: 'Accuracy', apply: () => stats.bowling.accuracy = Math.min(100, stats.bowling.accuracy + statInc) },
-      { name: 'Variation', apply: () => stats.bowling.variation = Math.min(100, stats.bowling.variation + statInc) }
+    const bowlingEvents = this.state.events.filter(event => event.bowlerId === player.id);
+    const boundaries = playerInnings.reduce((sum, innings) => sum + innings.balls.filter(ball => ball.runs === 4 || ball.runs === 6).length, 0);
+    const scoringShots = playerInnings.reduce((sum, innings) => sum + innings.balls.filter(ball => !!ball.shot && (ball.runs ?? 0) > 0).length, 0);
+    const successfulContacts = playerInnings.reduce((sum, innings) => sum + innings.balls.filter(ball => !!ball.shot && !ball.missed && !ball.isWicket).length, 0);
+    const bowlingWickets = this.state.innings.filter(innings => innings.bowler.id === player.id).reduce((sum, innings) => sum + innings.wicketsLost, 0);
+    const deliveryVariety = new Set(bowlingEvents.map(event => event.delivery.type)).size;
+    const choices = [
+      { name: 'Power', score: boundaries * 2, reason: `${boundaries} boundary hit${boundaries === 1 ? '' : 's'}`, apply: () => stats.batting.power = Math.min(100, stats.batting.power + statInc) },
+      { name: 'Timing', score: scoringShots, reason: `${scoringShots} scoring shot${scoringShots === 1 ? '' : 's'}`, apply: () => stats.batting.timing = Math.min(100, stats.batting.timing + statInc) },
+      { name: 'Technique', score: successfulContacts, reason: `${successfulContacts} successful contact${successfulContacts === 1 ? '' : 's'}`, apply: () => stats.batting.technique = Math.min(100, stats.batting.technique + statInc) },
+      { name: 'Accuracy', score: bowlingWickets * 3, reason: `${bowlingWickets} wicket${bowlingWickets === 1 ? '' : 's'} while bowling`, apply: () => stats.bowling.accuracy = Math.min(100, stats.bowling.accuracy + statInc) },
+      { name: 'Variation', score: deliveryVariety, reason: `${deliveryVariety} delivery type${deliveryVariety === 1 ? '' : 's'} used`, apply: () => stats.bowling.variation = Math.min(100, stats.bowling.variation + statInc) }
     ];
-    
-    const choice = upgradeOptions[Math.floor(this.random() * upgradeOptions.length)];
-    const newVal = choice.apply();
+    const eligible = choices.filter(choice => {
+      if (choice.score <= 0) return false;
+      if (choice.name === 'Power') return stats.batting.power < 100;
+      if (choice.name === 'Timing') return stats.batting.timing < 100;
+      if (choice.name === 'Technique') return stats.batting.technique < 100;
+      if (choice.name === 'Accuracy') return stats.bowling.accuracy < 100;
+      return stats.bowling.variation < 100;
+    });
+    eligible.sort((a, b) => b.score - a.score);
+    const choice = eligible[0];
+    const newVal = choice?.apply();
 
     this.state.progression = {
       xpGained: totalXPGained,
       baseXP,
       sixBonusXP,
       sixesCount: sixesHit,
-      statUpgraded: {
+      ...(choice && newVal !== undefined ? { statUpgraded: {
         statName: choice.name,
         increase: statInc,
-        newValue: newVal
-      }
+        newValue: newVal,
+        reason: choice.reason
+      } } : {})
     };
 
     savePlayer(player);

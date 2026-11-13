@@ -21,7 +21,7 @@ import { battingTimingFeedback } from '../src/batting-timing';
 import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryBounceProgress, deliveryContactPoint, deliveryHitsPad, deliveryProgressAtZ, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
-import type { BallOutcome, DeliveryChoice, ShotType } from '../src/types';
+import type { BallOutcome, DeliveryChoice, Player, ShotType } from '../src/types';
 
 const storage = new Map<string, string>();
 Object.assign(globalThis, { localStorage: {
@@ -2058,20 +2058,55 @@ test('provisional carry estimate does not consume unseeded randomness', () => {
   }
 });
 
-test('seeded match progression uses only the controller random stream', () => {
+test('progression maps match performance to a capped and explained stat gain', () => {
   const storageBefore = new Map(storage);
   const originalRandom = Math.random;
   const game = new MatchController('Medium', 0x51a7);
   const originalPlayer = structuredClone(game.state.player);
-  const upgrades: unknown[] = [];
+  const outcome = (runs: number, isWicket = false) => ({
+    ballNumber: 1, delivery: delivery(0.5), shot: { direction: 0, type: 'lofted' as const, timing: 0.5, contactZone: 0.5 },
+    distance: 0, runs, isWicket, wicketReason: '', isFreeHit: false, isExtra: false, extraType: null,
+  });
+  const baseInnings = (batter: Player, bowler: Player, balls: ReturnType<typeof outcome>[], wicketsLost = 0) => ({
+    batter, bowler, balls, ballsBowled: balls.length, wicketsLost, maxWickets: 1,
+    biggestSix: 0, score: balls.reduce((sum, ball) => sum + ball.runs, 0), isNextFreeHit: false, finished: true,
+  });
+  const results: Array<{ statName?: string; reason?: string }> = [];
   try {
     Math.random = () => { throw new Error('seeded progression must not use global randomness'); };
-    for (let run = 0; run < 2; run++) {
-      game.state.player = structuredClone(originalPlayer);
-      (game as any).applyProgression(false);
-      upgrades.push(game.state.progression?.statUpgraded);
-    }
-    assert.deepEqual(upgrades[0], upgrades[1]);
+    const player = game.state.player;
+    const bot = game.state.bot;
+    game.state.innings = [baseInnings(player, bot, [outcome(6)])];
+    (game as any).applyProgression(false);
+    results.push({ statName: game.state.progression?.statUpgraded?.statName, reason: game.state.progression?.statUpgraded?.reason });
+    assert.equal(results[0].statName, 'Power');
+    assert.match(results[0].reason!, /boundary hit/);
+
+    game.state.player = structuredClone(originalPlayer);
+    game.state.player.stats.batting.power = 100;
+    game.state.innings = [baseInnings(game.state.player, bot, [outcome(6)])];
+    (game as any).applyProgression(false);
+    assert.equal(game.state.progression?.statUpgraded?.statName, 'Timing', 'capped Power falls through to the next tied eligible performance');
+
+    game.state.player = structuredClone(originalPlayer);
+    const bowler = game.state.player;
+    game.state.innings = [baseInnings(bot, bowler, [], 1)];
+    game.state.events = ['fast', 'slow'].map((type, sequence) => ({
+      sequence, type: 'delivery' as const, inningsIndex: 0, ballNumber: sequence + 1,
+      batterId: bot.id, bowlerId: bowler.id, delivery: { ...delivery(0.5), type: type as DeliveryChoice['type'] },
+      shot: null, missed: true, isWicket: sequence === 0, wicketReason: '', isFreeHit: false,
+      isExtra: false, extraType: null, distance: 0, resolved: true,
+    }));
+    (game as any).applyProgression(false);
+    results.push({ statName: game.state.progression?.statUpgraded?.statName, reason: game.state.progression?.statUpgraded?.reason });
+    assert.equal(results[1].statName, 'Accuracy');
+    assert.match(results[1].reason!, /1 wicket while bowling/);
+
+    game.state.player = structuredClone(originalPlayer);
+    game.state.innings = [];
+    game.state.events = [];
+    (game as any).applyProgression(false);
+    assert.equal(game.state.progression?.statUpgraded, undefined);
   } finally {
     Math.random = originalRandom;
     Object.assign(game.state.player, originalPlayer);

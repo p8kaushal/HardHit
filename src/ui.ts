@@ -1200,9 +1200,9 @@ export class UIManager {
     const progStatEl = document.getElementById('summary-progression-stat');
     if (progStatEl) {
       if (prog.statUpgraded) {
-        progStatEl.innerText = `${prog.statUpgraded.statName} +${prog.statUpgraded.increase} (Now ${prog.statUpgraded.newValue})`;
+        progStatEl.innerText = `${prog.statUpgraded.statName} +${prog.statUpgraded.increase} (Now ${prog.statUpgraded.newValue}) · ${prog.statUpgraded.reason}`;
       } else {
-        progStatEl.innerText = 'Attributes Maxed';
+        progStatEl.innerText = 'No performance upgrade this match';
       }
     }
 
