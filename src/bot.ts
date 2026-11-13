@@ -19,8 +19,16 @@ function clamp(val: number, min: number, max: number): number {
  * Bot generates its 3D delivery parameters.
  */
 export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium' | 'Hard' = 'Medium', batterHand: 'RHB' | 'LHB' = 'RHB'): DeliveryChoice {
-  const pace = bowler.stats.bowling.pace;
-  const deliveryType: import('./types').DeliveryType = pace > 70 ? 'fast' : (pace > 40 ? 'medium' : 'slow');
+  const bowling = bowler.stats.bowling;
+  const pace = bowling.pace;
+  const spinShare = bowling.spin / Math.max(1, bowling.spin + pace);
+  const spinChance = clamp(0.12 + spinShare * 0.48, 0.12, 0.5);
+  const swingChance = clamp(0.08 + bowling.swing / 250, 0.08, 0.42);
+  const usesSpin = Math.random() < spinChance;
+  const usesSwing = !usesSpin && Math.random() < swingChance;
+  const deliveryType: import('./types').DeliveryType = usesSpin
+    ? (Math.random() < 0.5 ? 'offspin' : 'legspin')
+    : pace > 70 ? 'fast' : (pace > 40 ? 'medium' : 'slow');
 
   const lines: import('./types').LineType[] = ['off', 'middle', 'leg'];
   const lengths: import('./types').LengthType[] = ['bouncer', 'short', 'good', 'full', 'yorker'];
@@ -58,7 +66,10 @@ export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium
     length,
     type: deliveryType,
     releaseTiming,
-    frontFootHeel: sampleFrontFootLanding(bowler.stats.bowling.accuracy, 0.5, Math.random()),
+    pace: usesSpin ? 0.55 + Math.random() * 0.25 : pace / 100,
+    turn: usesSpin ? clamp((bowling.spin / 100) * (0.55 + Math.random() * 0.45), 0, 1) : 0,
+    swing: usesSwing ? (Math.random() < 0.5 ? -1 : 1) * clamp((bowling.swing / 100) * (0.5 + Math.random() * 0.5), 0, 1) : 0,
+    frontFootHeel: sampleFrontFootLanding(bowling.accuracy, usesSpin ? 0.65 : 0.5, Math.random()),
     bowlingArm: bowler.bowlingArm || 'Right',
     overTheWicket: Math.random() > 0.3
   };

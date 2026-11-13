@@ -104,7 +104,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [ ] Consolidate authored delivery, contact, shot flight and wicket projection around shared coordinates, time, units and sampled inputs; eliminate competing legacy distance paths where safe.
 - [ ] Build traceable calibration fixtures for pace, bounce, swing, spin, contact speed, launch angle and six carry, including symmetry and frame-rate checks; document assumptions and confidence.
 - [ ] Model landing/obstructions or label estimated unobstructed carry, and review hard distance caps and boundary geometry.
-- [ ] Improve bot delivery variety to include spin and swing, use reproducible seeded inputs, and measure legal-ball, shot, wicket and scoring distributions by difficulty.
+- [x] Add rating-weighted, bounded pace/spin/swing selection to bot deliveries; a seeded 1,000-ball test verifies both spin types, both swing directions and bounded parameters. **Still open:** inject match-level randomness instead of `Math.random`, and measure legal-ball, shot, wicket and scoring distributions by difficulty before calling bots calibrated or fair.
 
 ## Controls, performance and release
 
