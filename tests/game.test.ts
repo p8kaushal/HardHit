@@ -5,6 +5,7 @@ import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchContro
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
+import { findEarliestInterception } from '../src/fielding';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
@@ -1031,6 +1032,31 @@ test('bot distribution simulation is reproducible, bounded and reports the right
     assert.ok(Math.abs(Object.values(tier.deliveryShares).reduce((sum, share) => sum + share, 0) - 1) < 1e-9);
     assert.ok(tier.incompleteOvers < tier.overs);
   }
+});
+
+test('fielding reachability respects reaction time, speed and earliest trajectory sample', () => {
+  const trajectory = [
+    { timeSeconds: 0.5, position: { x: 2, y: 0.2, z: 0 } },
+    { timeSeconds: 1, position: { x: 2, y: 0.8, z: 0 } },
+    { timeSeconds: 1.5, position: { x: 2, y: 1.2, z: 0 } },
+  ];
+  const fielder = { position: { x: 0, z: 0 }, reactionSeconds: 1, speedMetersPerSecond: 2, reachRadiusMeters: 0.5 };
+  assert.equal(findEarliestInterception(trajectory, fielder), null);
+  const fastFielder = { ...fielder, speedMetersPerSecond: 3.1 };
+  const interception = findEarliestInterception(trajectory, fastFielder);
+  assert.equal(interception?.sampleIndex, 2);
+  assert.equal(interception?.timeSeconds, 1.5);
+  assert.ok(interception!.distanceMeters <= interception!.movementMeters + fastFielder.reachRadiusMeters);
+});
+
+test('fielding reachability rejects invalid profiles and unsorted trajectories', () => {
+  const sample = { timeSeconds: 1, position: { x: 0, y: 0, z: 0 } };
+  assert.throws(() => findEarliestInterception([sample], {
+    position: { x: 0, z: 0 }, reactionSeconds: -1, speedMetersPerSecond: 1, reachRadiusMeters: 0.5,
+  }), /Invalid fielder reach profile/);
+  assert.throws(() => findEarliestInterception([sample, { ...sample, timeSeconds: 0 }], {
+    position: { x: 0, z: 0 }, reactionSeconds: 0, speedMetersPerSecond: 1, reachRadiusMeters: 0.5,
+  }), /Invalid trajectory sample/);
 });
 
 test('seeded random snapshots reproduce subsequent bot inputs', () => {
