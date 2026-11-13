@@ -102,6 +102,11 @@ try {
   const previewAfterScroll = await page.$eval('#playzone-camera-frame', element => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width }; });
   assert.deepEqual(previewAfterScroll, previewBeforeScroll, 'camera preview must remain visible while settings scroll');
   assert.ok(previewBeforeScroll.x < 100 && previewBeforeScroll.width > 0, 'camera preview appears at the left');
+  await page.waitForFunction(() => {
+    const widget = document.querySelector('#playzone-camera-widget').getBoundingClientRect();
+    const selector = document.querySelector('#playzone-mode').getBoundingClientRect();
+    return selector.top >= widget.bottom && document.elementFromPoint(selector.x + selector.width / 2, selector.y + selector.height / 2) === document.querySelector('#playzone-mode');
+  });
   await page.evaluate(() => { window.__holdPoseInit = true; });
   await page.click('#playzone-pose-toggle');
   assert.equal(await page.$eval('#playzone-pose-toggle', element => element.textContent), 'Cancel pose tracking');
@@ -193,10 +198,12 @@ try {
   assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /cancelled/i);
   await page.evaluate(() => { window.__poseOverride[27].visibility = 0; });
   await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Move back'));
+  const partialSerial = await page.evaluate(() => window.__poseResultSerial);
+  await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, partialSerial);
   await page.click('#playzone-pose-calibrate');
-  assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /head and feet visible/);
+  assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Calibrated.*feet/);
   await page.click('#playzone-pose-calibrate-delay');
-  await page.waitForFunction(() => document.querySelector('#playzone-retarget-status').textContent.includes('Could not calibrate'), { timeout: 8000 });
+  await page.waitForFunction(() => /Calibrated.*feet/.test(document.querySelector('#playzone-retarget-status').textContent), { timeout: 8000 });
   await page.evaluate(() => { window.__poseOverride[27].visibility = 1; });
   await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Body landmarks visible'));
   await page.click('#playzone-pose-calibrate-delay');
@@ -705,6 +712,7 @@ try {
   assert.equal(await page.evaluate(() => window.__cameraStreams.at(-1).getTracks()[0].readyState), 'ended');
   assert.deepEqual(errors, []);
   const mobile = await browser.newPage();
+  await mobile.bringToFront();
   await mobile.setViewport({ width: 667, height: 300, isMobile: true, hasTouch: true });
   await mobile.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { waitUntil: 'networkidle0' });
   await mobile.tap('#btn-playzone');
@@ -715,6 +723,19 @@ try {
     return document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) === element;
   });
   assert.ok(reachable, 'camera control must be reachable in landscape touch layout');
+  await mobile.evaluate(() => {
+    navigator.mediaDevices.getUserMedia = async () => {
+      const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360; canvas.getContext('2d').fillRect(0, 0, 640, 360);
+      return canvas.captureStream(5);
+    };
+  });
+  await mobile.tap('#playzone-camera-toggle');
+  await mobile.waitForFunction(() => document.querySelector('#playzone-camera-preview').videoWidth > 0);
+  await mobile.waitForFunction(() => {
+    const widget = document.querySelector('#playzone-camera-widget').getBoundingClientRect();
+    const mode = document.querySelector('#playzone-mode').getBoundingClientRect();
+    return mode.top >= widget.bottom && mode.bottom <= innerHeight && document.elementFromPoint(mode.x + mode.width / 2, mode.y + mode.height / 2) === document.querySelector('#playzone-mode');
+  }, { timeout: 5000 }).catch(async error => { console.error('Mobile layout:', await mobile.evaluate(() => { const w = document.querySelector('#playzone-camera-widget').getBoundingClientRect(), m = document.querySelector('#playzone-mode').getBoundingClientRect(); return { widget: w.toJSON(), mode: m.toJSON(), viewport: innerHeight, hit: document.elementFromPoint(m.x + m.width / 2, m.y + m.height / 2)?.outerHTML }; })); throw error; });
   await mobile.close();
   console.log('Camera preview passed: opt-in, mode changes, errors, cancellation, hidden-page and exit cleanup.');
 } finally {

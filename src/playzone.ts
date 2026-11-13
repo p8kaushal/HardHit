@@ -101,6 +101,10 @@ export class Playzone {
       button.setAttribute('aria-pressed', String(enlarged));
       button.textContent = enlarged ? 'Reduce preview' : 'Enlarge preview';
     });
+    const previewFrame = get<HTMLElement>('playzone-camera-widget');
+    new ResizeObserver(() => {
+      get<HTMLElement>('screen-playzone').style.setProperty('--camera-preview-height', `${previewFrame.offsetHeight}px`);
+    }).observe(previewFrame);
     get<HTMLInputElement>('playzone-pose-mirror').addEventListener('change', () => this.resetPoseMovement('Mirror setting changed. Calibrate again.'));
     get<HTMLInputElement>('playzone-pose-xray').addEventListener('change', event => this.scene.setBatterXrayVisible((event.currentTarget as HTMLInputElement).checked));
     get<HTMLInputElement>('playzone-motion-preview').addEventListener('change', () => {
@@ -474,8 +478,8 @@ export class Playzone {
     });
     const age = performance.now() - this.poseLandmarksAt;
     const fresh = age >= 0 && age <= 500 && !isGamePaused() && this.poseLandmarksRevision === gameClockRevision();
-    this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && fresh && fullBody && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks);
-    get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? 'Calibrated! Your current stance is the reference. Move to control the character.' : !fresh ? 'Could not calibrate. Wait for a fresh tracked pose, then try again.' : 'Could not calibrate. Stand upright facing the camera with your head and feet visible, then try again.';
+    this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && fresh && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks);
+    get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? fullBody ? 'Calibrated! Your current stance is the reference. Move to control the character.' : 'Calibrated with a partial view. Show your whole body for leg tracking.' : !fresh ? 'Could not calibrate. Wait for a fresh tracked pose, then try again.' : 'Could not calibrate. Face the camera with both shoulders and hips visible, then try again.';
     if (this.poseCalibrated) this.updatePoseMovement(this.poseLandmarks, this.poseWorldLandmarks, this.poseLandmarksAt);
   }
 

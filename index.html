@@ -272,7 +272,10 @@
           </details>
         </div>
       </aside>
-      <div class="practice-camera-frame" id="playzone-camera-frame"><video id="playzone-camera-preview" autoplay muted playsinline hidden aria-label="Local camera preview"></video><canvas id="playzone-pose-overlay" hidden aria-hidden="true"></canvas></div>
+      <div id="playzone-camera-widget" class="practice-camera-widget">
+        <div class="practice-camera-frame" id="playzone-camera-frame"><video id="playzone-camera-preview" autoplay muted playsinline hidden aria-label="Local camera preview"></video><canvas id="playzone-pose-overlay" hidden aria-hidden="true"></canvas></div>
+        <p id="playzone-retarget-status" role="status" aria-live="polite">Start pose tracking, then calibrate.</p>
+      </div>
       <aside class="playzone-panel practice-dock-right" aria-label="Batting controls">
         <div id="playzone-batting-controls">
         <div class="practice-panel-top"><span class="practice-section-label">YOUR SHOT</span></div>
@@ -299,7 +302,6 @@
           <p class="practice-bowler-hint">X-ray: green means the corresponding camera landmark is visible; amber means uncertain or not currently tracked. Dots show model joints, not raw camera points.</p>
           <label class="playzone-check"><input id="playzone-pose-depth" type="checkbox"> Approximate forward/back movement</label>
           <p class="practice-bowler-hint">Distance is estimated from your apparent size and may drift when you turn or bend. It changes the character visually, not the ball or batting position.</p>
-          <p id="playzone-retarget-status" class="practice-bowler-hint" role="status">Start pose tracking, hold a comfortable stance, then calibrate.</p>
           <button id="playzone-pose-calibrate" class="practice-secondary" type="button">Calibrate movement</button>
           <button id="playzone-pose-calibrate-delay" class="practice-secondary" type="button">Calibrate in 5 seconds</button>
           <label class="playzone-check"><input id="playzone-motion-preview" type="checkbox"> Preview two-hand movement</label>

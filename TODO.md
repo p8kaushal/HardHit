@@ -1,10 +1,23 @@
 # Gameplay to-do
 
-## Active goal: complete camera batting
+## Current status — November 12, 2026
 
-- User authorization (November 12): advance stages/phases autonomously; historical personal stage-approval gates are superseded. Preserve unrelated work and commit every verified increment. Merge/deployment authorization remains separate.
-- [ ] Finish and validate full-body movement, physical bat tracking/two-hand constraints, calibrated swing/shot inference, practice camera input, then match camera input.
-- [ ] Obtain live posture feedback and footage with an actual bat for independent validation; continue unrelated implementation while pending.
+- Persistent camera-batting goal is paused at the user's request. Read the current section at the top of `handoff.md` before resuming.
+- Latest camera task: the 6:39 PM recording showed calibration rejected when feet were outside the frame. Partial torso calibration and larger guidance beside the preview are implemented and passed the camera browser regression, including short landscape control access. Live-camera fidelity remains to be reviewed.
+- Earlier fixes committed: top-left pinned camera preview (`126aaa8`), torso bend direction (`b7711eb`), camera-to-world limb directions (`2569cfe`), repeated bat annotation replacement (`1cab672`). Automated evidence is in `plan.md`; none establishes live-camera accuracy.
+- The earlier codebase audit and test guide is complete and recorded in `AUDIT_AND_TESTING.md`. No product source was changed for that audit.
+- Camera batting remains unfinished. Existing pose preview and hand-motion diagnostics do not track a physical bat or control shots.
+- [x] Fix the reproduced duplicate-frame export defect in `scripts/bat-annotator.html`; browser verification replaced a prior annotation and validated the ordered export. Variable-frame-rate timing remains open.
+- [ ] When real camera testing is available, review neutral posture, facing, limbs, occlusion recovery, mirror behavior and responsiveness on representative devices; record limitations and evidence.
+- [ ] Obtain diverse independently annotated footage with an actual bat before selecting/integrating bat endpoints, two-hand constraints or camera-driven shot inference.
+- [ ] Make the lofted browser match reliably produce and assert a six if that behavior remains an acceptance requirement; the strict `--require-six` run currently fails with zero sixes.
+- [ ] Re-run the audit commands after any fixes. Current baseline and reproduction steps are in `AUDIT_AND_TESTING.md`.
+
+Preserve the pre-existing `.gitignore` change. Do not merge or deploy without separate authorization. `handoff.md` is locally ignored; keep it out of commits unless the user specifically asks otherwise.
+
+## Prior camera-batting work checklist
+
+The sections below retain the implementation history and outstanding technical investigations. Historical statements that call camera batting an “active goal” describe earlier sessions and are superseded by the current status above.
 
 ## Camera performance feedback
 

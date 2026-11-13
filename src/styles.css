@@ -3276,14 +3276,23 @@ body { min-height: 100dvh; }
 .practice-display-options { display: grid; gap: 8px; }
 .practice-settings { border-top: 1px solid rgba(255,255,255,.13); }
 .practice-settings summary { padding: 8px 0; color: #cab677; font-size: .68rem; font-weight: 800; cursor: pointer; }
-.practice-camera-frame { position: absolute; top: 92px; left: 20px; z-index: 10; width: min(300px, 24vw); transform: scaleX(-1); }
-.practice-camera-frame.camera-enlarged { width: min(480px, 35vw); }
-.practice-camera-frame:has(video[hidden]) { display: none; }
-#playzone-camera-preview { display: block; width: 100%; height: auto; background: #06130e; border-radius: 5px; }
+.practice-camera-widget { position: absolute; top: 92px; left: 20px; z-index: 10; width: max-content; max-width: min(300px, 24vw); }
+.practice-camera-widget:has(.camera-enlarged) { max-width: min(480px, 35vw); }
+.practice-camera-widget:has(video[hidden]) { display: none; }
+.practice-camera-frame { position: relative; width: max-content; max-width: 100%; transform: scaleX(-1); }
+#playzone-camera-preview { display: block; width: auto; height: auto; max-width: 100%; max-height: 35dvh; background: #06130e; border-radius: 5px; }
+#playzone-retarget-status { margin: 4px 0 0; padding: 8px 10px; color: #fff; background: #142d25; border: 1px solid #a7c7a5; border-radius: 6px; font-size: .9rem; line-height: 1.35; overflow-wrap: anywhere; }
+#screen-playzone:has(#playzone-camera-preview:not([hidden])) .practice-dock-left { top: calc(102px + var(--camera-preview-height, 0px)); max-height: max(60px, calc(100dvh - 112px - var(--camera-preview-height, 0px))); }
+#screen-playzone:has(#playzone-camera-preview:not([hidden])) .practice-dock-left { z-index: 11; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .practice-camera-widget { top: 48px; left: 6px; }
+  #playzone-camera-preview { max-height: 22dvh; }
+  #screen-playzone:has(#playzone-camera-preview:not([hidden])) .practice-dock-left { top: calc(54px + var(--camera-preview-height, 0px)); max-height: max(60px, calc(100dvh - 60px - var(--camera-preview-height, 0px))); }
+}
 #playzone-camera-preview[hidden] { display: none; }
 #playzone-pose-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 #playzone-pose-overlay[hidden] { display: none; }
-#playzone-camera-status, #playzone-pose-status { margin: 7px 0; color: #dce8da; font-size: .68rem; line-height: 1.35; }
+#playzone-camera-status, #playzone-pose-status { margin: 7px 0; color: #edf8ed; font-size: .85rem; line-height: 1.4; }
 #playzone-camera-toggle, #playzone-pose-toggle { width: 100%; padding: 7px; font-size: .7rem; }
 #playzone-pose-toggle:disabled { opacity: .5; }
 #playzone-camera-size, #playzone-pose-calibrate { width: 100%; padding: 7px; font-size: .7rem; margin-top: 5px; }
@@ -3403,7 +3412,7 @@ body { min-height: 100dvh; }
   box-shadow: 0 0 0 2px rgba(223, 196, 119, .3), 0 4px 12px rgba(0, 0, 0, .25);
 }
 #screen-playzone .practice-shot-buttons [data-practice-shot]:active { transform: scale(.96); }
-.practice-bowler-hint { margin: 4px 0 8px; color: #c5d7c8; font-size: .68rem; line-height: 1.35; }
+.practice-bowler-hint { margin: 4px 0 8px; color: #dcebdd; font-size: .85rem; line-height: 1.4; }
 #playzone-spin-value { float: right; color: #efd28b; font-variant-numeric: tabular-nums; }
 #screen-playzone .practice-touch-hidden, #screen-playzone .practice-movement[hidden] { display: none !important; }
 #playzone-release-meter { width: 100%; margin: 12px 0 8px; }
