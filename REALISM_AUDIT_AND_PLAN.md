@@ -54,19 +54,20 @@ HardHit's main mode remains the six-hitting contest: six legal deliveries per si
 | P1 | Accessibility and controls | Headless viewport tests do not establish actual touch behavior, motor accessibility, readable feedback, sound intelligibility, screen-reader usability or iOS/Android browser behavior. | Browser tests use emulation; user/device review is needed. Provide keyboard, touch, focus, non-color cues and level-dependent on/off assistance without changing physical outcomes invisibly. |
 | P2 | Progression and persistence | Profile and leaderboard are local, random stat increases affect performance, and local storage can be reset or edited. No authoritative competitive state. | `src/game.ts`, `src/leaderboard.ts`. Fine for an offline prototype; plan migrations, reproducible balance and a server only if online competition is desired. |
 | P2 | Reproducibility and QA tools | Bot delivery and shot decisions now accept seeded randomness, and the simulation uses per-tier seeded streams with explicit legal/extra/wicket/type-share denominators. Captured match events replay through controller adjudication. Live rendered-input timing is still not deterministic; the simulator is not a full-match balance study. | `src/bot.ts`, `src/random.ts`, `src/simulate.ts`, `src/match-replay.ts`. Multiple seeds, outcome distributions and predeclared fairness targets remain open. |
-| P2 | Deployment and maintenance | Production build reports large chunks. On this audit `npm audit --omit=dev` reported zero advisories; the full tree reported 7 dependency findings (1 moderate, 6 high), including development-tool paths. | npm audit snapshot on audit date, not a security audit or claim of production exploitability. Plan compatible dependency upgrades and retest; do not run a forced major upgrade blindly. |
+| P2 | Deployment and maintenance | Production build reports a 1.09 MB gzip Babylon.js chunk. Current disposable clean install reports 7 full-tree dependency advisories (1 moderate, 6 high) and 0 from `npm audit --omit=dev`; this does not assess exploitability. | Current checks ran 13 November 2026. Review affected paths and compatible updates before release; do not run a forced major upgrade blindly. |
 
 ## Current clean-branch checks — 13 November 2026
 
 - `npm test`: 117 passed. The Node-only environment does not visually verify the imported model.
 - `npm run build`: passed with the existing Babylon.js large-chunk warning (about 1.09 MB gzip).
+- Disposable clean install: `npm ci` installed 42 packages; its full dependency audit reported 7 advisories (1 moderate, 6 high), while `npm audit --omit=dev` reported 0 production advisories. `npm test` and `npm run build` passed from that install.
 - `npm run test:browser`: batting and bowling smoke at three emulated viewport sizes; physical devices remain open.
-- Production-preview batting and bowling smoke at 568×240, 667×300 and 1024×768 is recorded in `TODO.md`.
+- Clean-install production-preview batting and bowling smoke passed at 568×240, 667×300 and 1024×768 without browser errors; the harness shut down its preview server.
 - `npm run test:repeat-match`: two full matches passed in one shared profile with replay verification on each; leaderboard and history counts each increased from 1 to 2.
 - Full browser checks recorded in `TODO.md`: strict square-shot six/four in both innings orders, contact variants, wide, no-ball/free-hit, unswung miss, pause/visibility/rotation, forced sudden death, and rematch.
 - Persisted-event replay matched the visible scorecards for a regular 12-event match and a forced sudden-death 14-event match. A dismissal-heavy replay unit case also passed.
 - Known failed control: the original straight-shot strict six scenario remains a failure; the square-shot success does not establish broad attainability or calibration.
-- These scripted checks do not establish physical-device behavior, real-world physics, human playability, audio quality, or competitive balance. Clean installation and physical-device coverage remain open.
+- These scripted checks do not establish physical-device behavior, real-world physics, human playability, audio quality, or competitive balance. Physical-device coverage remains open.
 
 ## Historical automated checks on the camera-based backup
 
