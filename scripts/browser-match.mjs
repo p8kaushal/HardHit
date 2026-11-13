@@ -26,6 +26,7 @@ try {
   const botBatsFast = process.argv.includes('--bot-bats-fast');
   const botBatsSpin = process.argv.includes('--bot-bats-spin');
   const fixtureWide = process.argv.includes('--fixture-wide');
+  const verifyReplay = process.argv.includes('--verify-replay');
   if ([botBatsFast, botBatsSpin, fixtureWide].filter(Boolean).length > 1) throw new Error('Choose only one bot batting delivery override');
   const pauseFlight = process.argv.includes('--pause-flight') || pauseVisibility || pauseRotation;
   if (pauseRotation && pauseVisibility) throw new Error('Choose either --pause-rotation or --pause-visibility');
@@ -243,6 +244,54 @@ try {
     await new Promise(resolve => setTimeout(resolve, 60));
   }
   await page.waitForSelector('#match-summary-modal.active', { timeout: 1000 });
+  if (verifyReplay) {
+    const replay = await page.evaluate(async () => {
+      const stored = JSON.parse(localStorage.getItem('six_hitting_contest_match_history') || 'null');
+      const record = stored?.records?.[0];
+      if (!record) throw new Error('Completed match was not persisted before replay');
+      const { replayMatchRecord } = await import('/src/match-replay.ts');
+      const replayed = replayMatchRecord(record);
+      const inningsFor = batterId => {
+        const innings = replayed.state.innings.find(item => item.batter.id === batterId);
+        return innings ? { score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled } : null;
+      };
+      return {
+        id: record.id,
+        expectedOutcome: record.outcome,
+        recordedEvents: record.events.length,
+        replayEvents: replayed.state.events.length,
+        status: replayed.state.status,
+        outcome: replayed.state.winnerId === replayed.state.player.id ? 'WON' : replayed.state.winnerId === replayed.state.bot.id ? 'LOST' : 'TIED',
+        player: inningsFor(replayed.state.player.id),
+        bot: inningsFor(replayed.state.bot.id),
+      };
+    });
+    const visible = await page.evaluate(() => ({
+      outcome: /DRAW|TIE/.test(document.querySelector('#summary-winner-title')?.textContent?.toUpperCase() ?? '') ? 'TIED' :
+        document.querySelector('#summary-winner-title')?.textContent?.toUpperCase().includes('WON') ? 'WON' : 'LOST',
+      player: {
+        score: Number(document.querySelector('#summary-player-runs')?.textContent),
+        wickets: Number(document.querySelector('#summary-player-wickets')?.textContent?.split('/')[0]),
+        legal: document.querySelectorAll('#summary-player-tracker .mini-dot:not(.extra)').length,
+      },
+      bot: {
+        score: Number(document.querySelector('#summary-bot-runs')?.textContent),
+        wickets: Number(document.querySelector('#summary-bot-wickets')?.textContent?.split('/')[0]),
+        legal: document.querySelectorAll('#summary-bot-tracker .mini-dot:not(.extra)').length,
+      },
+    }));
+    if (replay.status !== 'completed' || replay.recordedEvents !== replay.replayEvents || replay.outcome !== replay.expectedOutcome || replay.outcome !== visible.outcome) {
+      throw new Error(`Persisted match replay result mismatch: replay=${JSON.stringify(replay)}, visible=${JSON.stringify(visible)}`);
+    }
+    for (const role of ['player', 'bot']) {
+      const actual = replay[role];
+      const shown = visible[role];
+      if (!actual || actual.score !== shown.score || actual.wickets !== shown.wickets || actual.legal !== shown.legal) {
+        throw new Error(`Persisted match replay ${role} innings mismatch: replay=${JSON.stringify(replay)}, visible=${JSON.stringify(visible)}`);
+      }
+    }
+    console.log(`Persisted match replay matched the visible scorecards for ${replay.recordedEvents} events: ${JSON.stringify(replay)}`);
+  }
   if (fixtureWide) {
     const wide = await page.evaluate(() => {
       const dots = [...document.querySelectorAll('#summary-bot-tracker .mini-dot')];
