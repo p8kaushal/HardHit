@@ -3,7 +3,7 @@
 ## Active non-camera realism work
 
 - Work on `feature/gameplay-realism-clean`, based on local `main` at `bb0d8d1`; do not merge or deploy. Camera batting is excluded. See `REALISM_AUDIT_AND_PLAN.md` for the user-approved direction and phases. Its prior findings and test results describe `feature/gameplay-realism-camera-base-backup`, not this clean branch. Port the applicable non-camera changes, reconcile differences, and verify each increment.
-- Ported six ground-contact interpolation and rope-step handling; 104 unit tests, build and the bat-first full-match browser regression passed on this branch. The browser run did not assert a six. Uncapped distances and unrounded longest-six ranking are now ported; 105 unit tests and build passed, including synthetic long-distance and near-tie fixtures. Port and independently verify pending-shot display, transition guard and relevant browser tests next.
+- Ported six ground-contact interpolation, uncapped distances, unrounded longest-six ranking, pending-shot tracker and a guard waiting for final-flight resolution before innings transition. All 107 unit tests and build passed; bat-first and forced sudden-death browser matches passed. Those browser runs did not assert a six or inspect the pending marker. Port and independently verify the relevant expanded browser fixtures next; prior backup evidence does not establish clean-branch behavior.
 
 Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. The user approved proceeding phase by phase. Unchecked items are not verified or complete.
 

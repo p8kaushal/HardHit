@@ -1,4 +1,4 @@
-import { MatchController, globalAutoAssistConfig, initBattingDelivery, inningsBallLimit } from './game';
+import { MatchController, globalAutoAssistConfig, initBattingDelivery, inningsBallLimit, isPendingShotOutcome } from './game';
 import { GameScene } from './scene';
 import { BallOutcome, DeliveryChoice, MatchState, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
@@ -987,6 +987,10 @@ export class UIManager {
             dot.className = 'over-dot red wicket';
             dot.textContent = 'W';
             dot.title = `Ball ${outcome.ballNumber}: Wicket (${outcome.wicketReason || 'Dismissed'})`;
+          } else if (isPendingShotOutcome(outcome)) {
+            dot.className = outcome.isExtra ? 'over-dot blue extra pending' : 'over-dot gray legal pending';
+            dot.textContent = outcome.extraType === 'noball' ? 'NB…' : outcome.isFreeHit ? 'FH…' : '…';
+            dot.title = `Ball ${outcome.ballNumber}: ${outcome.extraType === 'noball' ? 'No-ball; ' : outcome.isFreeHit ? 'Free hit; ' : ''}shot in flight, runs pending`;
           } else if (outcome.isExtra || outcome.extraType) {
             // Blue dot: Extra ball (Wide / No-ball)
             dot.className = 'over-dot blue extra';

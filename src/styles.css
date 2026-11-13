@@ -1367,6 +1367,14 @@ body {
   transform: scale(1.05);
 }
 
+.over-dot.pending {
+  background: #374151;
+  border: 1.5px solid #e5e7eb;
+  color: #fff;
+  box-shadow: none;
+  text-shadow: none;
+}
+
 @keyframes pulseGold {
   0%, 100% {
     box-shadow: 0 0 10px rgba(251, 191, 36, 0.7);

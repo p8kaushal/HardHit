@@ -8,6 +8,11 @@ export function inningsBallLimit(tieBreakerActive: boolean): number {
   return tieBreakerActive ? 1 : 6;
 }
 
+/** Contact has been recorded, but the outgoing flight has not yet scored. */
+export function isPendingShotOutcome(outcome: BallOutcome | undefined): boolean {
+  return !!outcome && outcome.runs === undefined && !!outcome.shot && !outcome.missed && !outcome.isWicket && outcome.extraType !== 'wide';
+}
+
 export const globalAutoAssistConfig: { 
   isRookie: boolean, 
   currentDelivery: DeliveryChoice | null, 
@@ -437,7 +442,7 @@ export class MatchController {
 
   public handleInningsCompletion(): void {
     const currentInnings = this.getCurrentInnings();
-    if (currentInnings.finished && !this.transitionPending) {
+    if (currentInnings.finished && !this.transitionPending && !isPendingShotOutcome(currentInnings.balls[currentInnings.balls.length - 1])) {
       this.transitionPending = true;
       globalAutoAssistConfig.isBallInPlay = false;
       globalAutoAssistConfig.isDeliveryActive = false;
@@ -504,7 +509,8 @@ export class MatchController {
 
   /** Run after the current innings transition has actually updated match state. */
   public afterInningsTransition(callback: () => void): void {
-    if (this.transitionPending) this.transitionCallbacks.push(callback);
+    const innings = this.getCurrentInnings();
+    if (this.transitionPending || (innings.finished && isPendingShotOutcome(innings.balls[innings.balls.length - 1]))) this.transitionCallbacks.push(callback);
     else callback();
   }
 

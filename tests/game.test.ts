@@ -1079,6 +1079,54 @@ test('the over display keeps upcoming legal balls after extras and shows the sud
   }
 });
 
+test('over tracker shows pending flight instead of a dot for normal, no-ball and free-hit shots', () => {
+  const game = match();
+  const originalDocument = globalThis.document;
+  const children: any[] = [];
+  const tracker = {
+    children,
+    appendChild: (child: any) => { children.push(child); },
+    removeChild: () => { children.pop(); },
+    querySelectorAll: () => children,
+    get lastChild() { return children[children.length - 1]; }
+  };
+  Object.assign(globalThis, { document: {
+    getElementById: (id: string) => id === 'over-tracker' ? tracker : null,
+    createElement: () => ({ className: '', textContent: '', title: '' })
+  } });
+  try {
+    const ui = Object.create(UIManager.prototype) as any;
+    ui.controller = game;
+    const shot = { direction: 2, type: 'lofted' as const, timing: 0.5, contactZone: 0.5 };
+    game.recordBall(delivery(0.5), shot);
+    ui.updateHUD();
+    assert.equal(children[0].textContent, '…');
+    assert.match(children[0].title, /shot in flight, runs pending/);
+    game.finalizeBallOutcome(80, false, true);
+    ui.updateHUD();
+    assert.equal(children[0].textContent, '6');
+
+    game.recordBall({ ...delivery(0.5), frontFootHeel: 0.01 }, shot);
+    ui.updateHUD();
+    assert.equal(children[1].textContent, 'NB…');
+    assert.match(children[1].className, /\bextra\b/);
+    game.finalizeBallOutcome(80, false, true);
+    ui.updateHUD();
+    assert.equal(children[1].textContent, 'NB6');
+
+    game.recordBall(delivery(0.5), shot);
+    ui.updateHUD();
+    assert.equal(children[2].textContent, 'FH…');
+    assert.match(children[2].title, /Free hit; shot in flight/);
+    game.finalizeBallOutcome(65, true, true);
+    ui.updateHUD();
+    assert.equal(children[2].textContent, '4');
+    assert.equal(game.getCurrentInnings().score, 17);
+  } finally {
+    Object.assign(globalThis, { document: originalDocument });
+  }
+});
+
 test('summary tracker labels extras and free hits with their legal ball number', () => {
   const game = match();
   const originalDocument = globalThis.document;
@@ -1621,6 +1669,9 @@ test('the result banner uses the same finalized distance as the score', () => {
     assert.equal(outcome.runs, 6);
     assert.equal(game.getCurrentInnings().biggestSix, 150);
     assert.equal(title, 'SIX! 150.0m');
+    const previousResolve = resolveBall;
+    previousResolve();
+    assert.equal(game.getCurrentInnings().score, 6, 'duplicate flight callback must not score twice');
     const next = game.recordBall(ball, { direction: 0, type: 'grounded', timing: 0.5, contactZone: 0.5 });
     ui.deliveryStarted = false;
     ui.deliveryGeneration++;
@@ -1628,6 +1679,9 @@ test('the result banner uses the same finalized distance as the score', () => {
     ui.gameScene.getShotDistance = () => 45;
     ui.gameScene.shotReachedBoundary = false;
     ui.deliverBall3D();
+    previousResolve();
+    assert.equal(next.runs, undefined, 'stale flight callback must not resolve the next delivery');
+    assert.equal(game.getCurrentInnings().score, 6);
     resolveBall();
     assert.equal(next.runs, 2);
     assert.equal(title, '2 RUNS');
@@ -1906,6 +1960,49 @@ test('a tied match completes both sudden-death innings and awards draw progressi
     assert.equal(game.state.winnerId, null);
     assert.equal(game.state.tieBreakDetails?.deciderTier, 'draw');
     assert.equal(game.state.progression?.xpGained, 50);
+  } finally {
+    Object.assign(globalThis, { document: originalDocument, window: originalWindow, performance: originalPerformance });
+  }
+});
+
+test('final contacted ball resolves before innings transition and queued callbacks', () => {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalPerformance = globalThis.performance;
+  let now = originalPerformance.now();
+  const timers: Array<() => void> = [];
+  Object.assign(globalThis, {
+    document: {
+      createElement: () => ({ style: {}, parentNode: { removeChild() {} } }),
+      getElementById: () => null,
+      body: { appendChild() {} }
+    },
+    performance: { now: () => now },
+    window: { setTimeout: (callback: () => void) => { timers.push(() => { now += 2100; callback(); }); return timers.length; } }
+  });
+  try {
+    for (const sudden of [false, true]) {
+      const game = match();
+      game.state.tieBreakerActive = sudden;
+      const innings = game.getCurrentInnings();
+      for (let i = 1; i < (sudden ? 1 : 6); i++) game.recordBall(delivery(0.5), null);
+      const final = game.recordBall(delivery(0.5), { direction: 2, type: 'lofted', timing: 0.5, contactZone: 0.5 });
+      assert.equal(innings.finished, true);
+      assert.equal(final.runs, undefined);
+      let callbackCount = 0;
+      game.handleInningsCompletion();
+      game.afterInningsTransition(() => { callbackCount++; });
+      assert.equal(timers.length, 0, 'transition must wait for flight');
+      assert.equal(callbackCount, 0);
+      assert.equal(game.state.currentInningsIndex, 0);
+      assert.equal(game.finalizeBallOutcome(80, false, true), 6);
+      assert.equal(innings.score, 6);
+      assert.equal(timers.length, 1);
+      assert.equal(callbackCount, 0);
+      timers.shift()!();
+      assert.equal(game.state.currentInningsIndex, 1);
+      assert.equal(callbackCount, 1);
+    }
   } finally {
     Object.assign(globalThis, { document: originalDocument, window: originalWindow, performance: originalPerformance });
   }
