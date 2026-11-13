@@ -7,7 +7,7 @@ const server = await createServer({ configFile: false, server: { host: '127.0.0.
 let browser;
 try {
   await server.listen();
-  browser = await puppeteer.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+  browser = await puppeteer.launch({ headless: true, ...(process.env.HARDHIT_BROWSER_PROFILE ? { userDataDir: process.env.HARDHIT_BROWSER_PROFILE } : {}), args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const page = await browser.newPage();
   await page.setViewport({ width: 1024, height: 768, isMobile: true, hasTouch: true });
   await page.evaluateOnNewDocument(() => {
@@ -366,6 +366,11 @@ try {
     console.log('Browser match passed: two innings, scorecards and return to lobby.');
   }
   if (errors.length) throw new Error(`Browser errors:\n${errors.join('\n')}`);
+  const leaderboardEntries = await page.evaluate(() => {
+    try { return JSON.parse(localStorage.getItem('six_hitting_contest_leaderboard') || '[]').length; }
+    catch { return -1; }
+  });
+  console.log(`Persistent leaderboard entries: ${leaderboardEntries}`);
   const replayPath = process.argv.find(arg => arg.startsWith('--replay-out='))?.slice('--replay-out='.length);
   if (replayPath) {
     const replay = await page.evaluate(() => window.__matchReplay);

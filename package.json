@@ -15,7 +15,8 @@
     "test:match:bat-first": "node scripts/browser-match.mjs --bat-first --swing",
     "test:match:sixes": "node scripts/browser-match.mjs --bat-first --swing --loft",
     "test:match:sudden": "node scripts/browser-match.mjs --force-tie",
-    "test:rematch": "node scripts/browser-match.mjs --rematch"
+    "test:rematch": "node scripts/browser-match.mjs --rematch",
+    "test:repeat-match": "node scripts/browser-repeat-match.mjs"
   },
   "dependencies": {
     "babylonjs": "^6.33.0"

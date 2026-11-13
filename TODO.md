@@ -72,7 +72,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [x] Use the recorded legal ball number and identify wides, no-balls and free hits in summary scorecard labels; cover extra chains in unit tests and rendered scorecards in a full match.
 - [ ] Verify run-up switching and batting timing feedback on physical phones and tablets, including repeated side changes and different shot timings.
 - [x] Prevent repeated rendering of the same match summary from duplicating its leaderboard entry; cover successive matches.
-- [ ] Test persistence and summary behavior through repeated rematches and lobby returns in the browser; a single rematch and lobby return have each been checked.
+- [x] Test persistence and summary behavior through repeated full matches and lobby returns in one shared browser profile. `npm run test:repeat-match` completed two matches with scorecards and lobby returns; persisted leaderboard entries increased from 1 to 2. The single-match `--rematch` flow separately verifies a fresh match state.
 - [ ] Exercise repeated full matches, interactive batting, no-balls/free hits, wides, wickets and sudden-death presentation in a real browser; verify sound and errors.
 - [x] Cancel held bowling and clear held inputs on pause or focus loss; track the bowling pointer so another finger cannot release it. Cover interruption logic in automated tests and normal pointer/keyboard bowling in an emulated browser.
 - [x] In a touch-emulated browser, rotate during a held bowling action, confirm the run-up is cancelled without recording a ball, then rotate back and bowl successfully.
