@@ -621,6 +621,22 @@ test('front-foot landing and line distinguish legal balls, wides and no-balls', 
   assert.equal(checkExtraBall(delivery(0.5, 1)).type, 'wide');
 });
 
+test('wide checks consider both the normal stance and batter movement on either side', () => {
+  const cases: Array<{ name: string; line: number; batterX: number; expected: 'wide' | null }> = [
+    { name: 'reachable line despite moving away', line: 0.7, batterX: -1, expected: null },
+    { name: 'wide from normal stance and moved stance', line: 1.4, batterX: -0.2, expected: 'wide' },
+    { name: 'movement brings a wide line within reach', line: 1.4, batterX: 0.6, expected: null },
+    { name: 'mirrored reachable line despite moving away', line: -0.7, batterX: 1, expected: null },
+    { name: 'mirrored wide from both stances', line: -1.4, batterX: 0.2, expected: 'wide' },
+    { name: 'mirrored movement brings line within reach', line: -1.4, batterX: -0.6, expected: null },
+  ];
+  for (const item of cases) {
+    const actual = checkExtraBall({ ...delivery(0.5, item.line), batterPosition: { x: item.batterX, z: 0 } });
+    assert.equal(actual.type, item.expected, item.name);
+    assert.equal(actual.isExtra, item.expected !== null, item.name);
+  }
+});
+
 test('front-foot landing is independent of release timing and captured for replay', () => {
   const heel = sampleFrontFootLanding(50, 1, 1);
   assert.ok(heel > 0);
