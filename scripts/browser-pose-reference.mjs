@@ -20,6 +20,7 @@ try {
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { waitUntil: 'networkidle0' });
   const results = await page.evaluate(async ({ encoded, reference }) => {
     const { default: PoseWorker } = await import('/src/pose-worker.ts?worker');
+    const { seekPoseReferenceFrame } = await import('/scripts/pose-reference-seek.mjs');
     const worker = new PoseWorker();
     const request = (message, transfer = []) => new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Annotated-frame pose worker timed out.')), 30000);
@@ -44,21 +45,9 @@ try {
       });
       if (video.videoWidth !== reference.width || video.videoHeight !== reference.height) throw new Error('Reference dimensions must match the decoded source video.');
       const results = [];
-      for (const frame of reference.frames) {
+      for (const [index, frame] of reference.frames.entries()) {
         if (frame.time >= video.duration) throw new Error('An annotated frame is beyond the video duration.');
-        // Browsers clamp tiny seeks near zero to the current time without firing `seeked`.
-        // Skip the seek when the decoded position is already within a frame-sized tolerance.
-        const frameTolerance = 1 / 30;
-        if (Math.abs(video.currentTime - frame.time) > frameTolerance) await new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('Annotated-frame seek timed out.')), 15000);
-          video.onseeked = () => {
-            clearTimeout(timer);
-            if (Math.abs(video.currentTime - frame.time) > frameTolerance) reject(new Error('Decoded video position does not match the annotated frame time.'));
-            else resolve();
-          };
-          video.onerror = () => { clearTimeout(timer); reject(new Error('Could not seek to annotated frame.')); };
-          video.currentTime = frame.time;
-        });
+        await seekPoseReferenceFrame(video, frame.time, index === 0);
         const bitmap = await createImageBitmap(video);
         const response = await request({ type: 'frame', bitmap, timestamp: 1000 + frame.time * 1000 }, [bitmap]);
         if (response.type !== 'result') throw new Error('Expected an annotated-frame inference result.');

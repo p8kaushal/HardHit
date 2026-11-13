@@ -36,6 +36,12 @@ Next verify a camera-resize race: an old accepted pose could still be recent whe
 
 The worker result is rejected when its submitted bitmap dimensions no longer match the video, and calibration requires the last accepted landmarks to match the current video dimensions. The development camera regression passed an immediate calibration attempt using old-size landmarks, an in-flight old-size result, and fresh-frame recovery, plus the existing lifecycle cases. Production camera lifecycle regression, 133 unit tests and build passed; the new injected resize-race case runs only in the development harness. Physical device behavior remains open.
 
+### Current increment — pose reference seeks
+
+The pose reference harness skips seeks within 1/30 second, so distinct adjacent frames in a high-frame-rate clip may be scored from the same decoded frame. Replace the frame-sized skip with an effectively-identical-time check, retaining a narrowly bounded frame-zero clamp workaround and rejecting duplicate effective target times. Verify actual decoded-frame changes on the local 120 fps clip, the near-zero workaround, and real worker/scorer smoke. Browser video timestamps still do not prove exact decoded frame indices for variable-frame-rate sources.
+
+The seeker now advances to distinct times and rejects multiple indistinguishable near-zero references. On a local 120 fps WebM, the browser advanced to 0.008333 seconds and 2,071,999 pixels changed from the initial decoded frame; the ambiguous near-zero second reference was rejected. A real pose-worker synthetic frame-zero smoke passed at 0.0001 seconds with a deliberately loose tolerance. All 134 unit tests and the production build passed. These verify tooling behavior, not landmark accuracy or variable-frame-rate frame identity.
+
 ### New live feedback — 6:39 PM recording
 
 November 13 verification: partial torso calibration and prominent guidance are implemented; the camera browser regression passed, including missing-foot calibration, countdown, scrolling and short landscape mode-selector access. The mobile fixture needed an initial painted frame, and the selector needed to stack above shot controls. All 132 unit tests, production build, browser smoke, both practice modes, full matches in both orders, sudden death and rematch passed. Real-camera fidelity and the previously failed strict six scenario remain open.
