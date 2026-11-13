@@ -749,9 +749,12 @@ export class UIManager {
         const hasBounced = this.gameScene.shotBoundaryOnFull ? false : (globalAutoAssistConfig.hasBounced || false);
         const runs = this.controller.finalizeBallOutcome(rawDistance, hasBounced, this.gameScene.shotReachedBoundary);
         const shotDistanceMeters = lastBall.distance;
+        const fieldedBy = this.gameScene.getShotFielder();
         
         let title = `${runs} RUNS`;
-        let desc = `Estimated from shot distance: ${runs} run${runs === 1 ? '' : 's'}.`;
+        let desc = fieldedBy
+          ? `Fielded by ${fieldedBy}; estimated from the stopped distance: ${runs} run${runs === 1 ? '' : 's'}.`
+          : `Estimated from shot distance: ${runs} run${runs === 1 ? '' : 's'}.`;
         if (runs === 6) {
            gameSound.play('boundary');
            title = `SIX! ${(shotDistanceMeters || 0).toFixed(1)}m`;
@@ -760,9 +763,11 @@ export class UIManager {
            gameSound.play('boundary');
            title = `FOUR!`;
            desc = `Bounced over the boundary towards ${getDirectionName(lastBall.shot.direction)}!`;
-        } else if (runs === 0) {
+        } else if (runs === 0 && !fieldedBy) {
            title = `Dot Ball`;
            desc = `Estimated from shot distance: no runs.`;
+        } else if (runs === 0) {
+           title = `Fielded`;
         }
         if (lastBall.extraType === 'noball') desc += ` No-ball: front foot ${((lastBall.delivery.frontFootHeel ?? 0) * 100).toFixed(1)} cm over; one penalty and a free hit.`;
         // Step 2: Freeze the tracking camera target on ball's final location and display scoring result banner for exactly 2.0 seconds
@@ -862,7 +867,8 @@ export class UIManager {
       const quality = shotFlightQuality(outcome.shot, outcome.delivery, assist);
       const batterPower = innings.batter.stats.batting.power;
       const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, deliveryVelocityAtCrease(outcome.delivery), {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower);
-      
+      const fielding = innings.bowler.stats.fielding ?? { agility: 50, reaction: 50 };
+      this.gameScene.setFieldingRatings(fielding.agility, fielding.reaction);
       this.gameScene.animateHitPath(outcome.distance, outcome.shot.direction, vOut);
       this.controller.setCameraMode('follow_shot');
       // Result toast is deferred to onBallResolvedCallback

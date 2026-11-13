@@ -5,7 +5,7 @@ import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchContro
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
-import { createDefaultFieldLayout, fielderReachProfileFromRatings, findEarliestInterception } from '../src/fielding';
+import { createDefaultFieldLayout, fielderReachProfileFromRatings, findEarliestInterception, hasFielderReacted, moveFielderTowardBall } from '../src/fielding';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
@@ -586,6 +586,7 @@ test('partially saved profiles retain progress while missing stats get defaults'
   assert.equal(player.rank, 'Silver');
   assert.equal(player.stats.batting.power, 72);
   assert.equal(player.stats.bowling.accuracy, 50);
+  assert.deepEqual(player.stats.fielding, { agility: 50, reaction: 50 });
 });
 
 test('a match can start when browser storage is unavailable', () => {
@@ -1080,6 +1081,29 @@ test('fielder ratings map monotonically to bounded movement profiles', () => {
   assert.ok(high.reactionSeconds < low.reactionSeconds);
   assert.ok(high.reachRadiusMeters > low.reachRadiusMeters);
   assert.throws(() => fielderReachProfileFromRatings({ x: 0, z: 0 }, 101, 50), /between 0 and 100/);
+});
+
+test('fielder movement is bounded by rated speed and elapsed time', () => {
+  assert.deepEqual(moveFielderTowardBall({ x: 0, z: 0 }, { x: 3, z: 4 }, 2, 1), { x: 1.2, z: 1.6 });
+  assert.deepEqual(moveFielderTowardBall({ x: 0, z: 0 }, { x: 3, z: 4 }, 8, 1), { x: 3, z: 4 });
+  assert.throws(() => moveFielderTowardBall({ x: 0, z: 0 }, { x: 1, z: 0 }, -1, 1), /Invalid fielder movement/);
+});
+
+test('fielder movement begins only after its rated reaction delay', () => {
+  const profile = fielderReachProfileFromRatings({ x: 0, z: 0 }, 50, 50);
+  assert.ok(Math.abs(profile.reactionSeconds - 0.3) < 1e-12);
+  assert.equal(hasFielderReacted(profile, 0.299), false);
+  assert.equal(hasFielderReacted(profile, 0.3), true);
+  assert.throws(() => hasFielderReacted(profile, -0.1), /Invalid fielder reaction/);
+});
+
+test('bot fielding ratings scale with difficulty and remain bounded', () => {
+  const rookie = createBotPlayer('Rookie').stats.fielding!;
+  const medium = createBotPlayer('Medium').stats.fielding!;
+  const hard = createBotPlayer('Hard').stats.fielding!;
+  assert.ok(rookie.agility < medium.agility && medium.agility < hard.agility);
+  assert.ok(rookie.reaction < medium.reaction && medium.reaction < hard.reaction);
+  assert.ok(hard.agility <= 100 && hard.reaction <= 100);
 });
 
 test('seeded random snapshots reproduce subsequent bot inputs', () => {
@@ -1695,6 +1719,22 @@ test('fixed-step observer captures every simulated position without changing phy
   assert.equal(stallSamples, 30, 'long-stall observer is bounded by the fixed-step catch-up cap');
 });
 
+test('fixed-step observer can stop a ball at an interception sample', () => {
+  const ball: BallState = {
+    position: { x: 0, y: 2, z: 0 }, velocity: { x: 0, y: 0, z: 8 },
+    hasBounced: true, reachedBoundary: false, stopped: false,
+  };
+  let samples = 0;
+  advanceBallFrame(ball, 0, 1 / 30, () => {
+    samples++;
+    return true;
+  });
+  assert.equal(samples, 1);
+  assert.equal(ball.stopped, true);
+  assert.ok(ball.position.z > 0);
+  assert.ok(ball.position.z < 0.1);
+});
+
 test('rope crossing and bounce are resolved in their actual order within a physics step', () => {
   const nearRope = (height: number): BallState => ({
     position: { x: 64.95, y: height, z: 0 },
@@ -2081,6 +2121,7 @@ test('the result banner uses the same finalized distance as the score', () => {
       prepareDeliverySound() {}, setCameraMode() {},
       animateDelivery: (_aim: unknown, _length: unknown, _type: unknown, _arrived: unknown, resolved: () => void) => { resolveBall = resolved; },
       getShotDistance: () => 150,
+      getShotFielder: () => null,
       shotBoundaryOnFull: true,
       shotReachedBoundary: true
     };

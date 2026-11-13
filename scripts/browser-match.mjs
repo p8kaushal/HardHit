@@ -26,6 +26,7 @@ try {
   const botBatsFast = process.argv.includes('--bot-bats-fast');
   const botBatsSpin = process.argv.includes('--bot-bats-spin');
   const fixtureWide = process.argv.includes('--fixture-wide');
+  const fieldingFixture = process.argv.includes('--require-fielding');
   const verifyReplay = process.argv.includes('--verify-replay');
   if ([botBatsFast, botBatsSpin, fixtureWide].filter(Boolean).length > 1) throw new Error('Choose only one bot batting delivery override');
   const pauseFlight = process.argv.includes('--pause-flight') || pauseVisibility || pauseRotation;
@@ -48,7 +49,7 @@ try {
       }, { timeout: 5000 }, portrait);
     });
   }
-  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide }) => {
+  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture }) => {
     const { GameScene } = await import('/src/scene.ts');
     const { UIManager } = await import('/src/ui.ts');
     const { globalAutoAssistConfig } = await import('/src/game.ts');
@@ -57,6 +58,16 @@ try {
     const { deliveryContactPoint, BALL_RADIUS_METERS } = await import('/src/formula.ts');
     const animateDelivery = GameScene.prototype.animateDelivery;
     const endDeliveryCycle = GameScene.prototype.endDeliveryCycle;
+    const getShotFielder = GameScene.prototype.getShotFielder;
+    const showResultToast = UIManager.prototype.showResultToast;
+    UIManager.prototype.showResultToast = function (title, description, ...args) {
+      if (fieldingFixture && title === 'Fielded') (window.__fieldingToasts ??= []).push({ title, description });
+      return showResultToast.call(this, title, description, ...args);
+    };
+    const setFieldingRatings = GameScene.prototype.setFieldingRatings;
+    GameScene.prototype.setFieldingRatings = function (agility, reaction) {
+      return setFieldingRatings.call(this, fieldingFixture ? 100 : agility, fieldingFixture ? 100 : reaction);
+    };
     const deliverBall3D = UIManager.prototype.deliverBall3D;
     UIManager.prototype.deliverBall3D = function (...args) {
       window.__fielderSceneCheck = {
@@ -88,6 +99,15 @@ try {
     window.__matchReplay = [];
     let playerBatting = false;
     let playerController;
+    GameScene.prototype.getShotFielder = function (...args) {
+      const fieldedBy = getShotFielder.apply(this, args);
+      const trace = window.__playerShotTrace.at(-1);
+      if (traceShots && playerBatting && trace) {
+        trace.fieldedBy = fieldedBy;
+        trace.fielderPosition = fieldedBy ? this.getFielderPositions().find(fielder => fielder.name === fieldedBy)?.position ?? null : null;
+      }
+      return fieldedBy;
+    };
     window.__flightPause = null;
     const recordBall = MatchController.prototype.recordBall;
     MatchController.prototype.recordBall = function (delivery, shot) {
@@ -127,7 +147,15 @@ try {
     };
     const animateHitPath = GameScene.prototype.animateHitPath;
     GameScene.prototype.animateHitPath = function (distance, direction, velocity, ...rest) {
+      if (fieldingFixture && playerBatting && velocity) {
+        velocity = { ...velocity, x: velocity.x * 0.35, z: velocity.z * 0.35 };
+      }
       const result = animateHitPath.call(this, distance, direction, velocity, ...rest);
+      if (fieldingFixture && playerBatting && !window.__fieldingFixtureSet) {
+        const pointFielder = this.fielderRoots.get('point');
+        pointFielder?.position.set(2.5, 0, -8.4);
+        window.__fieldingFixtureSet = true;
+      }
       const trace = window.__playerShotTrace.at(-1);
       if (traceShots && playerBatting && trace && !('launchVelocity' in trace)) {
         Object.assign(trace, { launchVelocity: velocity ? { ...velocity } : null, launchPosition: this.shotOrigin ? { x: this.shotOrigin.x, y: this.shotOrigin.y, z: this.shotOrigin.z } : null });
@@ -186,7 +214,7 @@ try {
         arrived();
       }, ...rest);
     };
-  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide });
+  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture });
   if (process.argv.includes('--force-tie')) {
     // Test-only fixture: make regular-innings deliveries legal dots so the
     // real UI must play both sudden-death innings. Production code is unchanged.
@@ -381,6 +409,7 @@ try {
       const validSix = trace.some(shot => shot.runs === 6 && shot.reachedBoundary === true && shot.bounced === false);
       const validFour = trace.some(shot => shot.runs === 4 && shot.reachedBoundary === true && shot.bounced === true);
       if (process.argv.includes('--require-six') && !validSix) throw new Error('No traced six cleared the boundary on the full');
+      if (process.argv.includes('--require-six') && trace.some(shot => shot.runs === 6 && shot.fieldedBy)) throw new Error('A boundary-on-full shot was intercepted by a ground fielder');
       if (process.argv.includes('--require-four') && !validFour) throw new Error('No traced four bounced before reaching the boundary');
       if (noBallFixture && (trace[0]?.extra !== 'noball' || trace[0]?.runs !== 6 || trace[0]?.bounced !== false || trace[1]?.freeHit !== true || six.noBallSixes !== 1)) {
         throw new Error(`No-ball six or following free hit was not recorded correctly: ${JSON.stringify({ trace: trace.slice(0, 2), six })}`);
@@ -421,6 +450,29 @@ try {
     }
     if (process.argv.includes('--require-four') && !six.fours) throw new Error('No four was recorded in the player scorecard');
     console.log(`Lofted batting recorded ${six.count} six(es), biggest ${six.biggest.toFixed(1)}m.`);
+  }
+  if (process.argv.includes('--require-fielding')) {
+    if (!process.argv.includes('--trace-shots')) throw new Error('--require-fielding requires --trace-shots');
+    const trace = await page.evaluate(() => window.__playerShotTrace);
+    const fielded = trace.find(shot => shot.fieldedBy && shot.bounced && !shot.reachedBoundary && shot.runs < 4);
+    if (!fielded) throw new Error(`No ground ball was intercepted into fewer than four estimated runs: ${JSON.stringify(trace.map(shot => ({ shot: shot.shot, fieldedBy: shot.fieldedBy, bounced: shot.bounced, reachedBoundary: shot.reachedBoundary, runs: shot.runs, flightDistance: shot.flightDistance })))}`);
+    const noFielder = await page.evaluate(async shot => {
+      const { stepBall } = await import('/src/ball-physics.ts');
+      const { evaluateFinalOutcome } = await import('/src/formula.ts');
+      const state = { position: { ...shot.launchPosition }, velocity: { ...shot.launchVelocity }, hasBounced: false, reachedBoundary: false, stopped: false };
+      for (let i = 0; i < 5000 && !state.stopped && !(state.reachedBoundary && (!state.boundaryOnFull || state.hasBounced)); i++) stepBall(state, 1 / 120);
+      const distance = Math.hypot(state.position.x - shot.launchPosition.x, state.position.z - shot.launchPosition.z);
+      return { distance, runs: evaluateFinalOutcome(distance, state.hasBounced, state.reachedBoundary) };
+    }, fielded);
+    const fielderGap = fielded.fielderPosition && fielded.flightEndpoint
+      ? Math.hypot(fielded.fielderPosition.x - fielded.flightEndpoint.x, fielded.fielderPosition.z - fielded.flightEndpoint.z)
+      : Infinity;
+    const resultToasts = await page.evaluate(() => window.__fieldingToasts ?? []);
+    const resultToast = resultToasts.find(toast => toast.description.includes(`Fielded by ${fielded.fieldedBy};`));
+    if (noFielder.runs <= fielded.runs || fielderGap > 0.61 || !resultToast) {
+      throw new Error(`Interception did not move the fielder, identify it, and reduce the unobstructed run estimate: ${JSON.stringify({ fielded, noFielder, fielderGap, resultToast })}`);
+    }
+    console.log(`Ground ball was stopped by ${fielded.fieldedBy} for ${fielded.runs} estimated run(s); without fielding it would score ${noFielder.runs} at ${noFielder.distance.toFixed(1)}m.`);
   }
   for (const selector of ['#summary-player-tracker .mini-dot', '#summary-bot-tracker .mini-dot']) {
     if (await page.$$eval(selector, els => els.length) < 6) throw new Error(`Incomplete scorecard: ${selector}`);

@@ -67,7 +67,8 @@ export function resolveShot(delta_t: number, botTier: string, shotType: string, 
 
 const DEFAULT_STATS: PlayerStats = {
   batting: { power: 50, timing: 50, placement: 50, technique: 50, stamina: 50 },
-  bowling: { pace: 50, swing: 50, spin: 50, accuracy: 50, stamina: 50, variation: 50 }
+  bowling: { pace: 50, swing: 50, spin: 50, accuracy: 50, stamina: 50, variation: 50 },
+  fielding: { agility: 50, reaction: 50 }
 };
 
 let sessionPlayer: Player | null = null;
@@ -75,7 +76,11 @@ let sessionPlayer: Player | null = null;
 function defaultPlayer(): Player {
   return {
     id: 'player_1', name: 'You (All-Rounder)', isBot: false, xp: 0, rank: 'Bronze',
-    stats: { batting: { ...DEFAULT_STATS.batting }, bowling: { ...DEFAULT_STATS.bowling } }
+    stats: {
+      batting: { ...DEFAULT_STATS.batting },
+      bowling: { ...DEFAULT_STATS.bowling },
+      fielding: { ...DEFAULT_STATS.fielding! },
+    }
   };
 }
 
@@ -97,6 +102,11 @@ function normalizePlayer(value: unknown): Player {
       const stat = source[key];
       if (typeof stat === 'number' && Number.isFinite(stat)) target[key] = Math.max(0, Math.min(100, stat));
     }
+  }
+  const fielding = stats.fielding && typeof stats.fielding === 'object' ? stats.fielding as Record<string, unknown> : {};
+  for (const key of ['agility', 'reaction'] as const) {
+    const stat = fielding[key];
+    if (typeof stat === 'number' && Number.isFinite(stat)) player.stats.fielding![key] = Math.max(0, Math.min(100, stat));
   }
   return player;
 }
@@ -158,7 +168,11 @@ export function createBotPlayer(difficulty: 'Rookie' | 'Medium' | 'Hard'): Playe
       accuracy: Math.min(100, Math.round(50 * statsMultiplier)),
       stamina: Math.min(100, Math.round(50 * statsMultiplier)),
       variation: Math.min(100, Math.round(50 * statsMultiplier))
-    }
+    },
+    fielding: {
+      agility: Math.min(100, Math.round(50 * statsMultiplier)),
+      reaction: Math.min(100, Math.round(50 * statsMultiplier))
+    },
   };
 
   return {

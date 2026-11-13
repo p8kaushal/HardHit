@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — rated live ground fielding
+
+- **Scope:** use the bowling-side player's provisional agility/reaction ratings to move visible fielders during fixed-step ball flight; stop a reachable, low ground ball at the fielding point so final distance-based runs decrease, and identify the fielder in the result message.
+- [x] **Acceptance:** reaction delay and speed limits have focused unit coverage; `npm test` passed 133 tests, production build passed with the existing Babylon chunk warning, and `git diff --check` passed. The controlled full browser match stopped a low ground ball with the point fielder for 0 estimated runs; replaying the same launch without fielders scored 1. The result toast identified the fielder. A strict lofted match scored sixes on the full without fielding stops. These ratings and fielding distances are provisional, and the browser fixture uses an adjusted launch for a clear scoring-threshold regression. Airborne catches, throws and actual running remain open.
+
 ### Completed bounded increment — Phase 2 no-ball precedence matrix
 
 - **Scope:** extend no-ball-over-wide coverage to mirrored outside lines with right- and left-handed batters, and assert adjudication, penalty score, legal-ball count and free-hit state.

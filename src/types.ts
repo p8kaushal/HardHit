@@ -15,9 +15,16 @@ export interface BowlerStats {
   variation: number;  // 0 - 100
 }
 
+export interface FieldingStats {
+  agility: number;    // 0 - 100
+  reaction: number;   // 0 - 100
+}
+
 export interface PlayerStats {
   batting: BatterStats;
   bowling: BowlerStats;
+  /** Optional for compatibility with profiles saved before fielding ratings existed. */
+  fielding?: FieldingStats;
 }
 
 export interface Player {

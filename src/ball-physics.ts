@@ -14,7 +14,7 @@ export function advanceBallFrame(
   state: BallState,
   accumulator: number,
   elapsedSeconds: number,
-  onStep?: (state: Readonly<BallState>, stepSeconds: number) => void,
+  onStep?: (state: Readonly<BallState>, stepSeconds: number) => boolean | void,
 ): number {
   const step = 1 / 120;
   const elapsed = Number.isFinite(elapsedSeconds) ? Math.max(0, Math.min(elapsedSeconds, 0.25)) : 0;
@@ -24,7 +24,7 @@ export function advanceBallFrame(
     stepBall(state, step);
     remaining = Math.max(0, remaining - step);
     steps++;
-    onStep?.(state, step);
+    if (onStep?.(state, step) === true) state.stopped = true;
     if (state.stopped || (state.reachedBoundary && (!state.boundaryOnFull || state.hasBounced))) break;
   }
   return remaining;

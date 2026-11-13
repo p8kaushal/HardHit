@@ -4,7 +4,7 @@ import { CameraMode, DeliveryChoice, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
-import { createDefaultFieldLayout, type FieldingPosition, type FieldingTrajectorySample } from './fielding';
+import { createDefaultFieldLayout, fielderReachProfileFromRatings, hasFielderReacted, moveFielderTowardBall, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
@@ -40,6 +40,9 @@ export class GameScene {
   public batMesh: BABYLON.Mesh | null = null;
   private batPivot: BABYLON.TransformNode | null = null;
   private readonly fielderRoots = new Map<FieldingPosition['name'], BABYLON.TransformNode>();
+  private readonly fielderProfiles = new Map<FieldingPosition['name'], FielderReachProfile>();
+  private fieldingRatings = { agility: 50, reaction: 50 };
+  private shotFieldedBy: FieldingPosition['name'] | null = null;
 
 
   // Animation state
@@ -472,6 +475,16 @@ export class GameScene {
       name,
       position: { x: root.position.x, z: root.position.z },
     }));
+  }
+
+  public setFieldingRatings(agility: number, reaction: number): void {
+    // Validate against the same bounded scale used to build movement profiles.
+    fielderReachProfileFromRatings({ x: 0, z: 0 }, agility, reaction);
+    this.fieldingRatings = { agility, reaction };
+  }
+
+  public getShotFielder(): FieldingPosition['name'] | null {
+    return this.shotFieldedBy;
   }
 
   private buildFielders(): void {
@@ -1007,6 +1020,25 @@ export class GameScene {
           timeSeconds: this.shotElapsedSeconds,
           position: { x: state.position.x, y: state.position.y, z: state.position.z },
         });
+        if (state.reachedBoundary || !state.hasBounced || state.position.y > 1.2) return false;
+        for (const [name, profile] of this.fielderProfiles) {
+          if (!hasFielderReacted(profile, this.shotElapsedSeconds)) continue;
+          const root = this.fielderRoots.get(name);
+          if (!root) continue;
+          const next = moveFielderTowardBall(
+            { x: root.position.x, z: root.position.z },
+            { x: state.position.x, z: state.position.z },
+            profile.speedMetersPerSecond,
+            stepSeconds,
+          );
+          root.position.x = next.x;
+          root.position.z = next.z;
+          if (Math.hypot(state.position.x - next.x, state.position.z - next.z) <= profile.reachRadiusMeters) {
+            this.shotFieldedBy = name;
+            return true;
+          }
+        }
+        return false;
       });
       globalAutoAssistConfig.hasBounced = this.shotPhysics.hasBounced;
       this.shotReachedBoundary = this.shotPhysics.reachedBoundary;
@@ -1081,6 +1113,14 @@ export class GameScene {
     }];
     this.shotReachedBoundary = false;
     this.shotBoundaryOnFull = false;
+    this.shotFieldedBy = null;
+    this.fielderProfiles.clear();
+    for (const fielder of createDefaultFieldLayout(this.batterHand)) {
+      const root = this.fielderRoots.get(fielder.name);
+      if (!root) continue;
+      root.position.set(fielder.position.x, 0, fielder.position.z);
+      this.fielderProfiles.set(fielder.name, fielderReachProfileFromRatings(fielder.position, this.fieldingRatings.agility, this.fieldingRatings.reaction));
+    }
     this.shotPhysics = { position: this.currentBallPos, velocity: currentVelocity, hasBounced: false, reachedBoundary: false, stopped: false };
     this.physicsAccumulator = 0;
     

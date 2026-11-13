@@ -63,6 +63,31 @@ export interface FieldingInterception {
   movementMeters: number;
 }
 
+/** Move a fielder toward a ground target by at most speed × elapsed time. */
+export function moveFielderTowardBall(
+  current: { x: number; z: number },
+  target: { x: number; z: number },
+  speedMetersPerSecond: number,
+  elapsedSeconds: number,
+): { x: number; z: number } {
+  if (![current.x, current.z, target.x, target.z, speedMetersPerSecond, elapsedSeconds].every(Number.isFinite) || speedMetersPerSecond < 0 || elapsedSeconds < 0) {
+    throw new Error('Invalid fielder movement input');
+  }
+  const dx = target.x - current.x;
+  const dz = target.z - current.z;
+  const distance = Math.hypot(dx, dz);
+  const movement = Math.min(distance, speedMetersPerSecond * elapsedSeconds);
+  if (distance === 0 || movement === 0) return { ...current };
+  return { x: current.x + dx / distance * movement, z: current.z + dz / distance * movement };
+}
+
+export function hasFielderReacted(profile: FielderReachProfile, elapsedSeconds: number): boolean {
+  if (!Number.isFinite(profile.reactionSeconds) || profile.reactionSeconds < 0 || !Number.isFinite(elapsedSeconds) || elapsedSeconds < 0) {
+    throw new Error('Invalid fielder reaction time');
+  }
+  return elapsedSeconds + 1e-10 >= profile.reactionSeconds;
+}
+
 /** Return the earliest sampled ball position a fielder can reach after reacting. */
 export function findEarliestInterception(
   trajectory: readonly FieldingTrajectorySample[],
