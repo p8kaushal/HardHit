@@ -1060,6 +1060,52 @@ test('saved regular match events replay through controller adjudication', () => 
     game.state.innings.map(innings => ({ score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled })));
 });
 
+test('saved tied match replays through both sudden-death innings', () => {
+  const game = new MatchController('Medium', 0x8899);
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  const random = Math.random;
+  const addDots = (count: number) => {
+    for (let ball = 0; ball < count; ball++) {
+      const innings = game.getCurrentInnings();
+      const x = innings.batter.batterHand === 'LHB' ? -0.7 : 0.7;
+      game.recordBall(delivery(0.5, x), null);
+    }
+  };
+  try {
+    addDots(6);
+    game.state.currentInningsIndex = 1;
+    addDots(6);
+    Math.random = () => 0.9;
+    (game as any).resolveMatch(false);
+    assert.equal(game.state.tieBreakerActive, true);
+    addDots(1);
+    game.state.currentInningsIndex = 3;
+    addDots(1);
+    (game as any).resolveMatch(false);
+  } finally {
+    Math.random = random;
+  }
+  assert.equal(game.state.status, 'completed');
+  assert.equal(game.state.winnerId, null);
+  const record = {
+    id: 'sudden-replay-fixture', seed: game.state.randomSeed, createdAt: 2, outcome: 'TIED' as const,
+    setup: {
+      difficulty: game.botDifficulty,
+      player: structuredClone(game.state.player),
+      bot: structuredClone(game.state.bot),
+      tossWinnerId: game.state.tossWinnerId,
+      tossChoice: game.state.tossChoice,
+    },
+    events: structuredClone(game.state.events),
+  };
+  const replay = replayMatchRecord(record);
+  assert.equal(replay.state.status, 'completed');
+  assert.equal(replay.state.tieBreakerActive, true);
+  assert.equal(replay.state.winnerId, null);
+  assert.equal(replay.state.innings.length, 4);
+});
+
 test('match history storage is versioned, bounded and duplicate-safe', () => {
   const key = 'six_hitting_contest_match_history';
   const previous = storage.get(key);
