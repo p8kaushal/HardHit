@@ -1,4 +1,4 @@
-import type { MatchEvent } from './types';
+import type { MatchEvent, Player } from './types';
 
 const KEY = 'six_hitting_contest_match_history';
 const VERSION = 1;
@@ -9,6 +9,13 @@ export interface MatchHistoryRecord {
   seed?: number;
   createdAt: number;
   outcome: 'WON' | 'LOST' | 'TIED';
+  setup?: {
+    difficulty: 'Rookie' | 'Medium' | 'Hard';
+    player: Player;
+    bot: Player;
+    tossWinnerId: string;
+    tossChoice: 'bat' | 'bowl';
+  };
   events: MatchEvent[];
 }
 

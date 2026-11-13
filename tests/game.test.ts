@@ -1031,16 +1031,18 @@ test('match history storage is versioned, bounded and duplicate-safe', () => {
   const previous = storage.get(key);
   storage.delete(key);
   try {
+    const setup = { difficulty: 'Medium' as const, player: createBotPlayer('Rookie'), bot: createBotPlayer('Medium'), tossWinnerId: 'player', tossChoice: 'bat' as const };
     for (let index = 0; index < MAX_MATCH_HISTORY + 3; index++) {
-      assert.equal(saveMatchRecord({ id: `match-${index}`, createdAt: index + 1, outcome: 'TIED', events: [] }), true);
+      assert.equal(saveMatchRecord({ id: `match-${index}`, createdAt: index + 1, outcome: 'TIED', setup, events: [] }), true);
     }
     assert.equal(readMatchHistory().length, MAX_MATCH_HISTORY);
     assert.equal(readMatchHistory()[0].id, `match-${MAX_MATCH_HISTORY + 2}`);
-    assert.equal(saveMatchRecord({ id: `match-${MAX_MATCH_HISTORY + 2}`, createdAt: 999, outcome: 'WON', events: [] }), true);
+    assert.equal(saveMatchRecord({ id: `match-${MAX_MATCH_HISTORY + 2}`, createdAt: 999, outcome: 'WON', setup, events: [] }), true);
     assert.equal(readMatchHistory()[0].outcome, 'TIED');
+    assert.equal(readMatchHistory()[0].setup?.tossChoice, 'bat');
     storage.set(key, '{broken');
     assert.deepEqual(readMatchHistory(), []);
-    assert.equal(saveMatchRecord({ id: '', createdAt: 0, outcome: 'TIED', events: [] }), false);
+    assert.equal(saveMatchRecord({ id: '', createdAt: 0, outcome: 'TIED', setup, events: [] }), false);
   } finally {
     if (previous === undefined) storage.delete(key); else storage.set(key, previous);
   }

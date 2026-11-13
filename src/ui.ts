@@ -1301,6 +1301,13 @@ export class UIManager {
         ...(state.randomSeed === undefined ? {} : { seed: state.randomSeed }),
         createdAt: Date.now(),
         outcome,
+        setup: {
+          difficulty: this.controller.botDifficulty,
+          player: state.player,
+          bot: state.bot,
+          tossWinnerId: state.tossWinnerId,
+          tossChoice: state.tossChoice,
+        },
         events: state.events,
       });
       this.recordedSummary = state;
