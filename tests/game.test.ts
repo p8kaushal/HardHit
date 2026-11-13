@@ -1106,6 +1106,41 @@ test('saved tied match replays through both sudden-death innings', () => {
   assert.equal(replay.state.innings.length, 4);
 });
 
+test('saved match replay preserves wide, no-ball and free-hit chains', () => {
+  const game = new MatchController('Medium', 0x9911);
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  const shot = { direction: 2, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
+  const noBall = game.recordBall({ ...delivery(0.5), frontFootHeel: 0.01 }, shot);
+  assert.equal(noBall.extraType, 'noball');
+  game.finalizeBallOutcome(32, false, true);
+  const wide = game.recordBall(delivery(0.5, 1), null);
+  assert.equal(wide.extraType, 'wide');
+  let legal = 0;
+  while (legal < 6) {
+    const result = game.recordBall(delivery(0.5), shot);
+    if (result.extraType) continue;
+    game.finalizeBallOutcome(legal === 0 ? 70 : 8, legal !== 0, legal === 0);
+    legal++;
+  }
+  assert.equal(game.getCurrentInnings().balls[2].isFreeHit, true);
+  game.state.currentInningsIndex = 1;
+  for (let ball = 0; ball < 6; ball++) game.recordBall({ ...delivery(0.5, -0.7), type: 'legspin', turn: 1 }, null);
+  (game as any).resolveMatch(false);
+  const record = {
+    id: 'extras-replay-fixture', seed: game.state.randomSeed, createdAt: 3,
+    outcome: game.state.winnerId === game.state.player.id ? 'WON' as const : game.state.winnerId === game.state.bot.id ? 'LOST' as const : 'TIED' as const,
+    setup: { difficulty: game.botDifficulty, player: structuredClone(game.state.player), bot: structuredClone(game.state.bot), tossWinnerId: game.state.tossWinnerId, tossChoice: game.state.tossChoice },
+    events: structuredClone(game.state.events),
+  };
+  const replay = replayMatchRecord(record);
+  assert.equal(replay.state.status, 'completed');
+  assert.deepEqual(replay.state.innings.map(innings => ({ score: innings.score, legal: innings.ballsBowled, freeHit: innings.isNextFreeHit })),
+    game.state.innings.map(innings => ({ score: innings.score, legal: innings.ballsBowled, freeHit: innings.isNextFreeHit })));
+  assert.equal(replay.state.events.filter(event => event.extraType === 'wide').length, 1);
+  assert.equal(replay.state.events.filter(event => event.extraType === 'noball').length, 1);
+});
+
 test('match history storage is versioned, bounded and duplicate-safe', () => {
   const key = 'six_hitting_contest_match_history';
   const previous = storage.get(key);
