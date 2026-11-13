@@ -1005,6 +1005,26 @@ test('seeded random snapshots reproduce subsequent bot inputs', () => {
   assert.throws(() => new SeededRandom({ algorithm: 'other' as 'hardhit-lcg32-v1', state: 1 }), /Unsupported random snapshot/);
 });
 
+test('match event log copies delivery inputs and records final flight outcome', () => {
+  const game = new MatchController('Medium', 42);
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  const input = delivery(0.5);
+  const shot = { direction: 2, type: 'lofted' as const, timing: 0.5, contactZone: 0.5 };
+  const outcome = game.recordBall(input, shot);
+  const event = game.state.events[0];
+  assert.equal(event.resolved, false);
+  assert.notEqual(event.delivery, input);
+  input.aimTarget.x = 99;
+  shot.direction = 7;
+  assert.equal(event.delivery.aimTarget.x, 0);
+  assert.equal(event.shot?.direction, 2);
+  assert.equal(game.finalizeBallOutcome(73, false, true), 6);
+  assert.equal(event.resolved, true);
+  assert.equal(event.runs, outcome.runs ?? 6);
+  assert.deepEqual(event.flight, { hasBounced: false, reachedBoundary: true });
+});
+
 test('match seed is recorded and reproduces bot delivery sequence', () => {
   const first = new MatchController('Medium', 0x1234);
   const replay = new MatchController('Medium', 0x1234);

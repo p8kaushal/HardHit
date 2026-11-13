@@ -117,6 +117,7 @@ export interface MatchProgression {
 
 export interface MatchState {
   randomSeed?: number;
+  events: MatchEvent[];
   player: Player;
   bot: Player;
   tossWinnerId: string;
@@ -129,6 +130,27 @@ export interface MatchState {
   cameraMode: CameraMode;
   tieBreakDetails?: TieBreakDetails;
   progression?: MatchProgression;
+}
+
+export interface MatchEvent {
+  sequence: number;
+  type: 'delivery';
+  inningsIndex: number;
+  ballNumber: number;
+  batterId: string;
+  bowlerId: string;
+  delivery: DeliveryChoice;
+  shot: ShotChoice | null;
+  missed: boolean;
+  isWicket: boolean;
+  wicketReason: string;
+  isFreeHit: boolean;
+  isExtra: boolean;
+  extraType: 'wide' | 'noball' | null;
+  distance: number;
+  runs?: number;
+  resolved: boolean;
+  flight?: { hasBounced: boolean; reachedBoundary?: boolean };
 }
 
 export interface InputIntent {

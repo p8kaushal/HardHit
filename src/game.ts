@@ -209,6 +209,7 @@ export class MatchController {
   private createInitialMatchState(player: Player, bot: Player): MatchState {
     return {
       ...(this.randomSeed === undefined ? {} : { randomSeed: this.randomSeed }),
+      events: [],
       player,
       bot,
       tossWinnerId: '',
@@ -395,6 +396,25 @@ export class MatchController {
     };
 
     innings.balls.push(outcome);
+    const pendingFlight = !!shot && !missed && !isWicket && extra.type !== 'wide';
+    this.state.events.push({
+      sequence: this.state.events.length,
+      type: 'delivery',
+      inningsIndex: this.state.currentInningsIndex,
+      ballNumber,
+      batterId: innings.batter.id,
+      bowlerId: innings.bowler.id,
+      delivery: { ...delivery, aimTarget: { ...delivery.aimTarget }, ...(delivery.batterPosition ? { batterPosition: { ...delivery.batterPosition } } : {}) },
+      shot: shot ? { ...shot } : null,
+      missed,
+      isWicket,
+      wicketReason,
+      isFreeHit,
+      isExtra: extra.isExtra,
+      extraType: extra.type,
+      distance,
+      ...(!pendingFlight ? { ...(outcome.runs === undefined ? {} : { runs: outcome.runs }), resolved: true } : { resolved: false }),
+    });
 
     if (!extra.isExtra) {
       innings.ballsBowled += 1;
@@ -436,6 +456,13 @@ export class MatchController {
       
       lastBall.distance = distance;
       lastBall.runs = runs;
+      const event = [...this.state.events].reverse().find(item => item.inningsIndex === this.state.currentInningsIndex && item.ballNumber === lastBall.ballNumber);
+      if (event && !event.resolved) {
+        event.distance = distance;
+        event.runs = runs;
+        event.resolved = true;
+        event.flight = { hasBounced, ...(reachedBoundary === undefined ? {} : { reachedBoundary }) };
+      }
       
       console.log(`[GAME EVENT] Dynamic resolution: ${distance.toFixed(1)}m, bounced: ${hasBounced} => ${runs} runs. Score: ${innings.score}`);
       this.handleInningsCompletion();
