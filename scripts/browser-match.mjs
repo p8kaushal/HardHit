@@ -66,25 +66,22 @@ try {
         }
         globalAutoAssistConfig.currentDelivery = this.activeDelivery;
       }
+      if (!playerIsBowling && noBallFixture && !window.__noBallInjected && this.activeDelivery) {
+        Object.assign(this.activeDelivery, { frontFootHeel: 0.01 });
+        window.__noBallInjected = true;
+        globalAutoAssistConfig.currentDelivery = this.activeDelivery;
+      }
       return deliverBall3D.apply(this, args);
     };
     window.__matchContacts = [];
     window.__playerShotTrace = [];
     window.__matchReplay = [];
     let playerBatting = false;
-    let noBallInjected = false;
     let playerController;
     window.__flightPause = null;
     const recordBall = MatchController.prototype.recordBall;
     MatchController.prototype.recordBall = function (delivery, shot) {
       const contact = window.__matchContacts.at(-1);
-      // Test-only: mark the first player delivery as a front-foot no-ball.
-      // Ball trajectory and controls remain unchanged; this is not a test of
-      // whether the rendered bowler's foot matches the no-ball decision.
-      if (noBallFixture && !noBallInjected && this.getCurrentInnings().batter.id === this.state.player.id) {
-        delivery = { ...delivery, frontFootHeel: 0.01 };
-        noBallInjected = true;
-      }
       const result = recordBall.call(this, delivery, shot);
       window.__matchReplay.push({
         batter: this.getCurrentInnings().batter.id,
