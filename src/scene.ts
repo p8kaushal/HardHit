@@ -102,14 +102,6 @@ export class GameScene {
         if ((globalAutoAssistConfig.isDeliveryActive || globalAutoAssistConfig.isBallInPlay || this.isAnimatingBall) && this.ballMesh) {
           this.ballMesh.rotation.x += Math.min(this.engine.getDeltaTime(), 50) * 0.012;
         }
-        if (this.isAnimatingBall && this.isBotBatting) {
-          if (this.ballMesh && this.ballMesh.position.z <= -7.5 && !this.hasBotSwung) {
-            this.hasBotSwung = true;
-            if (this.botBattingTriggerCallback) {
-              this.botBattingTriggerCallback();
-            }
-          }
-        }
         if (this.activeCameraMode === 'follow_shot' && this.ballMesh) {
           const pose = followShotPose(this.ballMesh.position, this.shotCameraDirection);
           const currentTarget = this.primaryCamera.getTarget();
@@ -625,6 +617,9 @@ export class GameScene {
     this.onBallCreaseCrossedCallback = onCreaseCrossed || null;
     this.creaseCrossedFired = false;
     this.hasBotSwung = false;
+    const delivery: DeliveryChoice = { aimTarget: { ...aimTarget }, type: deliveryType, line: 'middle', length: 'good', releaseTiming: 0.5, overTheWicket, bowlingArm: globalAutoAssistConfig.bowlerArm || 'Right', turn, swing, pace };
+    const contactProgress = batterContactProgress(delivery);
+    const botSwingProgress = Math.max(0, contactProgress - 150 / deliveryDurationMs(deliveryType, pace));
     
     // Ensure active camera remains strictly locked in player's perspective during delivery
     const preContactCam: CameraMode = this.isBotBatting ? 'bowler_eye' : 'batter_eye';
@@ -635,7 +630,6 @@ export class GameScene {
       this.bounceMarker.parent = null;
       this.bounceMarker.isVisible = true;
       this.bounceMarker.setEnabled(true);
-      const delivery: DeliveryChoice = { aimTarget, type: deliveryType, line: 'middle', length: 'good', releaseTiming: 0.5, overTheWicket, bowlingArm: globalAutoAssistConfig.bowlerArm || 'Right', turn, swing, pace };
       const pitch = deliveryPitchPoint(delivery);
       this.bounceMarker.position.set(pitch.x, 0.08, pitch.z);
     }
@@ -730,8 +724,14 @@ export class GameScene {
       }
 
       this.ballAnimationTime += deliveryAnimationStep(this.engine.getDeltaTime(), currentSpeedScale);
-      this.notifyDeliveryBounce(this.ballAnimationTime / 60, deliveryType, aimTarget.z);
+      const progress = Math.min(contactProgress, this.ballAnimationTime / 60);
+      this.notifyDeliveryBounce(progress, deliveryType, aimTarget.z);
       const index = Math.floor(this.ballAnimationTime);
+
+      if (this.isBotBatting && !this.hasBotSwung && progress >= botSwingProgress) {
+        this.hasBotSwung = true;
+        this.botBattingTriggerCallback?.();
+      }
 
       if (this.timingRing && this.ballMesh) {
         const startZ = 10.0;
@@ -761,9 +761,9 @@ export class GameScene {
         }
       }
 
-      if (index >= this.ballTrajectoryPoints.length - 1) {
-        // Ball passed/reached batter stumps
-        this.ballMesh?.position.copyFrom(this.ballTrajectoryPoints[this.ballTrajectoryPoints.length - 1]);
+      if (progress >= contactProgress) {
+        const contact = sampleDeliveryPath(delivery, contactProgress);
+        this.ballMesh?.position.set(contact.x, contact.y + BALL_VISUAL_OFFSET, contact.z);
         this.isAnimatingBall = false;
         this.updateDeliveryAnimation = null;
         this.ballMesh?.setEnabled(false);
@@ -772,6 +772,10 @@ export class GameScene {
         if (this.predictionPath) {
           this.predictionPath.dispose();
           this.predictionPath = null;
+        }
+        if (!this.creaseCrossedFired) {
+          this.creaseCrossedFired = true;
+          this.onBallCreaseCrossedCallback?.();
         }
         if (this.onBallArrivedCallback) this.onBallArrivedCallback();
         return;
@@ -782,13 +786,6 @@ export class GameScene {
         BABYLON.Vector3.LerpToRef(this.ballTrajectoryPoints[index], next, this.ballAnimationTime - index, this.ballMesh.position);
       }
       
-      if (!this.creaseCrossedFired && this.ballMesh && this.ballMesh.position.z <= -8.5) {
-        this.creaseCrossedFired = true;
-        if (this.onBallCreaseCrossedCallback) {
-          this.onBallCreaseCrossedCallback();
-        }
-      }
-
       // Draw custom line trail
       this.drawBallTrail();
 
