@@ -1022,6 +1022,10 @@ test('bot distribution simulation is reproducible, bounded and reports the right
     assert.equal(tier.overs, 80);
     assert.ok(tier.legalBalls <= 480);
     assert.ok(tier.attempts >= tier.legalBalls);
+    assert.equal(tier.attempts, tier.legalBalls + tier.wides + tier.noBalls);
+    assert.ok(tier.runs >= tier.wides + tier.noBalls);
+    assert.ok(tier.dots >= 0 && tier.fours >= 0 && tier.sixes >= 0);
+    assert.ok(tier.dots + tier.fours + tier.sixes <= tier.legalBalls);
     assert.ok(tier.legalRate >= 0 && tier.legalRate <= 1);
     assert.ok(tier.wicketRate >= 0 && tier.wicketRate <= 1);
     assert.ok(Math.abs(Object.values(tier.deliveryShares).reduce((sum, share) => sum + share, 0) - 1) < 1e-9);
