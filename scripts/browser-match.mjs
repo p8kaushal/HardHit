@@ -59,6 +59,13 @@ try {
     const endDeliveryCycle = GameScene.prototype.endDeliveryCycle;
     const deliverBall3D = UIManager.prototype.deliverBall3D;
     UIManager.prototype.deliverBall3D = function (...args) {
+      window.__fielderSceneCheck = {
+        positions: this.gameScene.getFielderPositions(),
+        meshes: this.gameScene.scene.meshes.filter(mesh => mesh.name.startsWith('fielder_')).map(mesh => ({
+          pickable: mesh.isPickable,
+          visible: mesh.isVisible && mesh.isEnabled(),
+        })),
+      };
       const playerIsBowling = this.controller.getCurrentInnings().batter.id !== this.controller.state.player.id;
       if (playerIsBowling && this.activeDelivery) {
         if (botBatsFast) Object.assign(this.activeDelivery, { type: 'fast', pace: 0.95, turn: 0, swing: 0 });
@@ -321,6 +328,11 @@ try {
     console.log(`Wide delivery recorded as WD without consuming a legal ball (bot score ${wide.score}).`);
   }
   const contacts = await page.evaluate(() => window.__matchContacts);
+  const fielders = await page.evaluate(() => window.__fielderSceneCheck);
+  if (!fielders || fielders.positions.length !== 9 || fielders.meshes.length !== 36 || fielders.meshes.some(mesh => mesh.pickable || !mesh.visible) || fielders.positions.some(fielder => Math.hypot(fielder.position.x, fielder.position.z) >= 65)) {
+    throw new Error(`Visible default fielder setup is incomplete: ${JSON.stringify(fielders)}`);
+  }
+  console.log(`Visible fielding setup has ${fielders.positions.length} players in range with ${fielders.meshes.length} enabled, non-pickable meshes.`);
   // The sudden-death fixture intentionally records no shot in the regular innings.
   const requireRecordedShot = !process.argv.includes('--force-tie');
   if (contacts.length < 6 || contacts.some(contact => contact.error >= 1e-6 || !contact.swung || !contact.recorded || (requireRecordedShot && !contact.shot))) throw new Error(`Bowling contact mismatch: ${JSON.stringify(contacts)}`);

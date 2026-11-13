@@ -54,6 +54,11 @@
 - **Scope:** define nine named default fielder positions and a bounded mapping from agility/reaction ratings to movement profiles in pitch metres and seconds.
 - [x] **Acceptance:** nine positions fit within the modeled 65 m field, mirror exactly by batter hand, and 0–100 agility/reaction map monotonically to 2–6 m/s movement, 0.15–0.45 s reaction, and 0.30–0.60 m reach. `npm test` passed 129 tests; build and `git diff --check` passed. These are prototype defaults, not measured fielding data; live visual and scoring integration remain open.
 
+### Completed bounded increment — visible default fielders
+
+- **Scope:** render nine simple fielders at the tested default layout and mirror their positions when batter handedness changes.
+- [x] **Acceptance:** browser match verified nine fielders in-range with 36 enabled, visible, non-pickable meshes; unit matrix verifies mirrored handedness positions and the stable mesh count shows no duplicate creation on hand changes. `npm test` passed 129 tests; build and `git diff --check` passed. This increment is visual only; no scoring behavior or movement animation is connected.
+
 ### Completed bounded increment — Phase 3 trajectory symmetry
 
 - **Scope:** add a deterministic unit regression comparing sampled mirror-image delivery paths across the full flight for pace swing and spin turn; no trajectory tuning.

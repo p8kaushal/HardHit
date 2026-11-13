@@ -4,7 +4,7 @@ import { CameraMode, DeliveryChoice, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
-import type { FieldingTrajectorySample } from './fielding';
+import { createDefaultFieldLayout, type FieldingPosition, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
@@ -39,6 +39,7 @@ export class GameScene {
   private batterHead: BABYLON.TransformNode | null = null;
   public batMesh: BABYLON.Mesh | null = null;
   private batPivot: BABYLON.TransformNode | null = null;
+  private readonly fielderRoots = new Map<FieldingPosition['name'], BABYLON.TransformNode>();
 
 
   // Animation state
@@ -84,6 +85,7 @@ export class GameScene {
     this.buildStadium();
     this.setupCameras();
     this.buildCharacters();
+    this.buildFielders();
     this.buildBall();
 
     const observer = this.scene.onBeforeRenderObservable.add(() => {
@@ -452,6 +454,8 @@ export class GameScene {
 
   public setBatterHandedness(hand: 'RHB' | 'LHB'): void {
     this.batterHand = hand;
+    const layout = createDefaultFieldLayout(hand);
+    for (const fielder of layout) this.fielderRoots.get(fielder.name)?.position.set(fielder.position.x, 0, fielder.position.z);
     if (!this.batterRoot) return;
     
     this.batterRoot.parent = null;
@@ -461,6 +465,47 @@ export class GameScene {
     this.batterRoot.setEnabled(true);
 
     this.updateBatterPosition();
+  }
+
+  public getFielderPositions(): Array<{ name: FieldingPosition['name']; position: { x: number; z: number } }> {
+    return Array.from(this.fielderRoots, ([name, root]) => ({
+      name,
+      position: { x: root.position.x, z: root.position.z },
+    }));
+  }
+
+  private buildFielders(): void {
+    const shirt = new BABYLON.StandardMaterial('fielderKit', this.scene);
+    shirt.diffuseColor = BABYLON.Color3.FromHexString('#bf6b35');
+    shirt.specularColor = BABYLON.Color3.Black();
+    const trousers = new BABYLON.StandardMaterial('fielderTrousers', this.scene);
+    trousers.diffuseColor = BABYLON.Color3.FromHexString('#e5e1d4');
+    trousers.specularColor = BABYLON.Color3.Black();
+    const skin = new BABYLON.StandardMaterial('fielderSkin', this.scene);
+    skin.diffuseColor = BABYLON.Color3.FromHexString('#b98260');
+    skin.specularColor = BABYLON.Color3.Black();
+    for (const fielder of createDefaultFieldLayout(this.batterHand)) {
+      const root = new BABYLON.TransformNode(`fielder_${fielder.name}`, this.scene);
+      root.position.set(fielder.position.x, 0, fielder.position.z);
+      const torso = BABYLON.MeshBuilder.CreateCylinder(`fielder_${fielder.name}_torso`, { height: 0.7, diameter: 0.42, tessellation: 8 }, this.scene);
+      torso.parent = root;
+      torso.position.y = 1.12;
+      torso.material = shirt;
+      torso.isPickable = false;
+      const head = BABYLON.MeshBuilder.CreateSphere(`fielder_${fielder.name}_head`, { diameter: 0.28, segments: 8 }, this.scene);
+      head.parent = root;
+      head.position.y = 1.65;
+      head.material = skin;
+      head.isPickable = false;
+      for (const [index, x] of [-0.12, 0.12].entries()) {
+        const leg = BABYLON.MeshBuilder.CreateCylinder(`fielder_${fielder.name}_leg${index}`, { height: 0.72, diameter: 0.15, tessellation: 6 }, this.scene);
+        leg.parent = root;
+        leg.position.set(x, 0.42, 0);
+        leg.material = trousers;
+        leg.isPickable = false;
+      }
+      this.fielderRoots.set(fielder.name, root);
+    }
   }
 
   private batterStanceAngle(): number {
