@@ -8,6 +8,12 @@ Verify that both immediate and delayed calibration reject a fresh pose with a mi
 
 The development camera browser regression passed with the new missing-shoulder checks for both calibration paths and subsequent full-body recovery, along with the existing partial-view and lifecycle checks. Real camera pose accuracy remains unverified.
 
+### Current investigation — reported multi-person warning
+
+The user's 6:39 PM recording shows a multiple-person warning while one person is apparent. A local, mirrored-back crop from 100–120 seconds retains on-screen landmark overlays and is diagnostic only. The recorded replay timed out at its initial frame, and seeking to 10 seconds reached calibration but failed its freshness gate; no conclusion about false detections follows. Synchronize replay calibration with an actually fresh accepted worker result, preserve freshness/ambiguity protection, and retry before considering any runtime change. Keep the recording and crop outside the repository.
+
+Replay now initiates calibration immediately after a fresh, single-pose worker result with visible torso. The 6:39 crop from a 10-second seek ran: 83 results, 40 with single-person landmarks and 43 multiple-pose results, with 872 rendered/target comparisons and zero mismatches. A separate earlier recording replay also passed (91 results, 32 single and 59 ambiguous). Both recordings contain overlays, and the earlier one contains another person; counts do not establish live false-positive rates or physical accuracy. The initial no-seek and stale-calibration failures above remain part of the record. No change to ambiguity rejection is justified by these replays alone.
+
 ### New live feedback — 6:39 PM recording
 
 November 13 verification: partial torso calibration and prominent guidance are implemented; the camera browser regression passed, including missing-foot calibration, countdown, scrolling and short landscape mode-selector access. The mobile fixture needed an initial painted frame, and the selector needed to stack above shot controls. All 132 unit tests, production build, browser smoke, both practice modes, full matches in both orders, sudden death and rematch passed. Real-camera fidelity and the previously failed strict six scenario remain open.

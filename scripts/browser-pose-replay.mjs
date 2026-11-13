@@ -108,6 +108,13 @@ try {
             window.__replayLastPoints = points;
           }
           handler(event);
+          if (window.__replayCalibrateNext && event.data?.type === 'result' && event.data.poseCount === 1 && performance.now() - event.data.timestamp <= 500) {
+            const points = event.data.landmarks;
+            if ([11,12,23,24].every(i => { const p = points[i]; return p && (p.visibility ?? 0) >= .45 && p.x > 0 && p.x < 1 && p.y > 0 && p.y < 1; })) {
+              window.__replayCalibrateNext = false;
+              document.querySelector('#playzone-pose-calibrate').click();
+            }
+          }
         };
       }
     };
@@ -135,7 +142,8 @@ try {
     const status = document.querySelector('#playzone-pose-status').textContent;
     return /Body landmarks visible|Move back/.test(status) && p?.length && [11,12,23,24].every(i => (p[i]?.visibility ?? 0) >= .45 && p[i].x > 0 && p[i].x < 1 && p[i].y > 0 && p[i].y < 1);
   }, { timeout: 30000 });
-  await page.click('#playzone-pose-calibrate');
+  await page.evaluate(() => { window.__replayCalibrateNext = true; });
+  await page.waitForFunction(() => !window.__replayCalibrateNext, { timeout: 30000 });
   assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Calibrated/);
   await page.click('#playzone-pose-xray');
   await page.evaluate(() => window.__replayVideo.play());
