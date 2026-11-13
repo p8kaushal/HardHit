@@ -369,6 +369,11 @@ try {
     catch { return -1; }
   });
   console.log(`Persistent leaderboard entries: ${leaderboardEntries}`);
+  const historyEntries = await page.evaluate(() => {
+    try { return JSON.parse(localStorage.getItem('six_hitting_contest_match_history') || 'null')?.records?.length ?? 0; }
+    catch { return -1; }
+  });
+  console.log(`Persistent match-history entries: ${historyEntries}`);
   const replayPath = process.argv.find(arg => arg.startsWith('--replay-out='))?.slice('--replay-out='.length);
   if (replayPath) {
     const replay = await page.evaluate(() => window.__matchReplay);

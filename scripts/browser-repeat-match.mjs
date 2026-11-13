@@ -19,9 +19,10 @@ function runMatch(index) {
     child.on('error', reject);
     child.on('close', code => {
       if (code !== 0) return reject(new Error(`Match ${index} exited ${code}: ${stderr}`));
-      const entries = Number(stdout.match(/Persistent leaderboard entries: (\d+)/)?.[1]);
-      if (!Number.isInteger(entries)) return reject(new Error(`Match ${index} did not report persisted leaderboard entries`));
-      resolve(entries);
+      const leaderboard = Number(stdout.match(/Persistent leaderboard entries: (\d+)/)?.[1]);
+      const history = Number(stdout.match(/Persistent match-history entries: (\d+)/)?.[1]);
+      if (!Number.isInteger(leaderboard) || !Number.isInteger(history)) return reject(new Error(`Match ${index} did not report persisted result counts`));
+      resolve({ leaderboard, history });
     });
   });
 }
@@ -29,8 +30,10 @@ function runMatch(index) {
 try {
   const first = await runMatch(1);
   const second = await runMatch(2);
-  if (second !== first + 1) throw new Error(`Expected second match to add one leaderboard entry; counts were ${first} then ${second}`);
-  console.log(`Repeated-match persistence passed: leaderboard grew from ${first} to ${second}.`);
+  if (second.leaderboard !== first.leaderboard + 1 || second.history !== first.history + 1) {
+    throw new Error(`Expected second match to add one leaderboard and history entry; counts were ${JSON.stringify(first)} then ${JSON.stringify(second)}`);
+  }
+  console.log(`Repeated-match persistence passed: leaderboard ${first.leaderboard} → ${second.leaderboard}, history ${first.history} → ${second.history}.`);
 } catch (error) {
   console.error(error);
   process.exitCode = 1;

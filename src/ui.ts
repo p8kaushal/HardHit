@@ -9,6 +9,7 @@ import { KeyboardInputManager } from './input';
 import { suggestedShotDirection, TouchBattingControls } from './touch-controls';
 import { initBowlingAdjustmentReadouts, isSpinDelivery, updateBowlingAdjustmentVisibility } from './bowling-controls';
 import { addLeaderboardEntry, readLeaderboard } from './leaderboard';
+import { saveMatchRecord } from './match-history';
 import { clearGameTimeout, gameNow, isGamePaused, setGameTimeout } from './game-clock';
 import { gameSound } from './sound';
 
@@ -1287,12 +1288,20 @@ export class UIManager {
 
     // 5. Save personal best to Leaderboard
     if (this.recordedSummary !== state) {
+      const outcome = state.winnerId === state.player.id ? 'WON' : (state.winnerId === state.bot.id ? 'LOST' : 'TIED');
       addLeaderboardEntry({
         date: new Date().toLocaleDateString(),
         opponent: state.bot.name,
         biggestSix: playerInnings?.biggestSix ?? 0,
         wicketsLost: playerInnings ? playerInnings.wicketsLost : 0,
-        outcome: state.winnerId === state.player.id ? 'WON' : (state.winnerId === state.bot.id ? 'LOST' : 'TIED')
+        outcome
+      });
+      saveMatchRecord({
+        id: `${state.randomSeed ?? 'legacy'}-${Date.now()}-${state.events.length}`,
+        ...(state.randomSeed === undefined ? {} : { seed: state.randomSeed }),
+        createdAt: Date.now(),
+        outcome,
+        events: state.events,
       });
       this.recordedSummary = state;
     }

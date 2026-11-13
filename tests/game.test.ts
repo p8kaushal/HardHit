@@ -8,6 +8,7 @@ import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics'
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
+import { MAX_MATCH_HISTORY, readMatchHistory, saveMatchRecord } from '../src/match-history';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
 import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
@@ -1023,6 +1024,26 @@ test('match event log copies delivery inputs and records final flight outcome', 
   assert.equal(event.resolved, true);
   assert.equal(event.runs, outcome.runs ?? 6);
   assert.deepEqual(event.flight, { hasBounced: false, reachedBoundary: true });
+});
+
+test('match history storage is versioned, bounded and duplicate-safe', () => {
+  const key = 'six_hitting_contest_match_history';
+  const previous = storage.get(key);
+  storage.delete(key);
+  try {
+    for (let index = 0; index < MAX_MATCH_HISTORY + 3; index++) {
+      assert.equal(saveMatchRecord({ id: `match-${index}`, createdAt: index + 1, outcome: 'TIED', events: [] }), true);
+    }
+    assert.equal(readMatchHistory().length, MAX_MATCH_HISTORY);
+    assert.equal(readMatchHistory()[0].id, `match-${MAX_MATCH_HISTORY + 2}`);
+    assert.equal(saveMatchRecord({ id: `match-${MAX_MATCH_HISTORY + 2}`, createdAt: 999, outcome: 'WON', events: [] }), true);
+    assert.equal(readMatchHistory()[0].outcome, 'TIED');
+    storage.set(key, '{broken');
+    assert.deepEqual(readMatchHistory(), []);
+    assert.equal(saveMatchRecord({ id: '', createdAt: 0, outcome: 'TIED', events: [] }), false);
+  } finally {
+    if (previous === undefined) storage.delete(key); else storage.set(key, previous);
+  }
 });
 
 test('match seed is recorded and reproduces bot delivery sequence', () => {
