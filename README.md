@@ -112,3 +112,4 @@ Ensure you have the following installed locally:
 Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.
 
 Sound effects have their own licences and credits in [public/audio/CREDITS.txt](public/audio/CREDITS.txt).
+The bundled runtime dependency and third-party asset inventory are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

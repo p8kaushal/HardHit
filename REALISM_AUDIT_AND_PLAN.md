@@ -63,6 +63,7 @@ HardHit's main mode remains the six-hitting contest: six legal deliveries per si
 - Disposable clean install: `npm ci` installed 42 packages; its full dependency audit reported 7 advisories (1 moderate, 6 high), while `npm audit --omit=dev` reported 0 production advisories. `npm test` and `npm run build` passed from that install.
 - `npm run test:browser`: batting and bowling smoke at three emulated viewport sizes; physical devices remain open.
 - Clean-install production-preview batting and bowling smoke passed at 568×240, 667×300 and 1024×768 without browser errors; the harness shut down its preview server.
+- Runtime asset inventory and attribution are recorded in `THIRD_PARTY_NOTICES.md`; Babylon.js's Apache-2.0 license/notice are included, and the three BudgetPixel WAV credits map to CC BY 4.0 source pages. BudgetPixel qualifies its grant as applying to rights it holds, so the deeper rights chain remains unverified.
 - `npm run test:repeat-match`: two full matches passed in one shared profile with replay verification on each; leaderboard and history counts each increased from 1 to 2.
 - Full browser checks recorded in `TODO.md`: strict square-shot six/four in both innings orders, contact variants, wide, no-ball/free-hit, unswung miss, pause/visibility/rotation, forced sudden death, and rematch.
 - Persisted-event replay matched the visible scorecards for a regular 12-event match and a forced sudden-death 14-event match. A dismissal-heavy replay unit case also passed.
