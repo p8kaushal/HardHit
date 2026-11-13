@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
 const profile = await mkdtemp(join(tmpdir(), 'hardhit-repeat-match-'));
-const commonArgs = ['--swing', '--loft', '--square', '--require-six', '--require-four'];
+const commonArgs = ['--swing', '--loft', '--square', '--require-six', '--require-four', '--verify-replay'];
 
 function runMatch(index) {
   return new Promise((resolve, reject) => {
