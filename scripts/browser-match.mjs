@@ -24,7 +24,8 @@ try {
   const pauseRotation = process.argv.includes('--pause-rotation');
   const botBatsFast = process.argv.includes('--bot-bats-fast');
   const botBatsSpin = process.argv.includes('--bot-bats-spin');
-  if (botBatsFast && botBatsSpin) throw new Error('Choose only one bot batting delivery override');
+  const fixtureWide = process.argv.includes('--fixture-wide');
+  if ([botBatsFast, botBatsSpin, fixtureWide].filter(Boolean).length > 1) throw new Error('Choose only one bot batting delivery override');
   const pauseFlight = process.argv.includes('--pause-flight') || pauseVisibility || pauseRotation;
   if (pauseRotation && pauseVisibility) throw new Error('Choose either --pause-rotation or --pause-visibility');
   if (noBallFixture && !['--trace-shots', '--swing', '--loft', '--square'].every(flag => process.argv.includes(flag))) {
@@ -45,7 +46,7 @@ try {
       }, { timeout: 5000 }, portrait);
     });
   }
-  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin }) => {
+  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide }) => {
     const { GameScene } = await import('/src/scene.ts');
     const { UIManager } = await import('/src/ui.ts');
     const { globalAutoAssistConfig } = await import('/src/game.ts');
@@ -59,6 +60,10 @@ try {
       if (playerIsBowling && this.activeDelivery) {
         if (botBatsFast) Object.assign(this.activeDelivery, { type: 'fast', pace: 0.95, turn: 0, swing: 0 });
         if (botBatsSpin) Object.assign(this.activeDelivery, { type: 'legspin', pace: 0.65, turn: 0.9, swing: 0 });
+        if (fixtureWide && !window.__wideInjected) {
+          Object.assign(this.activeDelivery, { aimTarget: { x: 1.65, z: -3.5 }, line: 'off', length: 'good', frontFootHeel: -0.1, swing: 0, turn: 0 });
+          window.__wideInjected = true;
+        }
         globalAutoAssistConfig.currentDelivery = this.activeDelivery;
       }
       return deliverBall3D.apply(this, args);
@@ -159,7 +164,7 @@ try {
         arrived();
       }, ...rest);
     };
-  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin });
+  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide });
   if (process.argv.includes('--force-tie')) {
     // Test-only fixture: make regular-innings deliveries legal dots so the
     // real UI must play both sudden-death innings. Production code is unchanged.
@@ -240,6 +245,15 @@ try {
     await new Promise(resolve => setTimeout(resolve, 60));
   }
   await page.waitForSelector('#match-summary-modal.active', { timeout: 1000 });
+  if (fixtureWide) {
+    const wide = await page.evaluate(() => {
+      const dots = [...document.querySelectorAll('#summary-bot-tracker .mini-dot')];
+      const wideIndex = dots.findIndex(dot => dot.textContent === 'WD');
+      return { wideIndex, legalBalls: document.querySelectorAll('#summary-bot-tracker .mini-dot:not(.extra)').length, score: document.querySelector('#summary-bot-runs')?.textContent };
+    });
+    if (wide.wideIndex < 0 || wide.legalBalls !== 6) throw new Error(`Wide was not scored as an extra without consuming a legal ball: ${JSON.stringify(wide)}`);
+    console.log(`Wide delivery recorded as WD without consuming a legal ball (bot score ${wide.score}).`);
+  }
   const contacts = await page.evaluate(() => window.__matchContacts);
   // The sudden-death fixture intentionally records no shot in the regular innings.
   const requireRecordedShot = !process.argv.includes('--force-tie');
