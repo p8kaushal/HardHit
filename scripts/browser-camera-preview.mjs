@@ -640,6 +640,7 @@ try {
   await page.click('#playzone-intensity-gentle');
   await page.evaluate(() => { window.__poseCountOverride = 2; });
   await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Multiple people'));
+  assert.match(await page.$eval('#playzone-pose-status', e => e.textContent), /If you are alone.*camera or background/);
   assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Multiple people/);
   assert.match(await page.$eval('#playzone-intensity-status', e => e.textContent), /Sample cancelled/);
   assert.equal(await page.$eval('#playzone-pose-overlay', canvas => canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data.some((value,index) => index % 4 === 3 && value > 0)), false, 'ambiguous results must clear old overlay points');

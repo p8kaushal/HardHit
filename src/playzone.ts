@@ -75,7 +75,7 @@ export class Playzone {
       this.poseTrackingActive = state === 'tracking';
       this.renderIntensityControls();
     }, (landmarks, world, timestamp, multiplePeople, frameSubmittedAt) => {
-      if (multiplePeople) this.resetPoseMovement('Multiple people detected. Keep only the player in view, then calibrate again.');
+      if (multiplePeople) this.resetPoseMovement('Multiple people may be in view. If you are alone, adjust the camera or background, then calibrate again.');
       this.updateHandMotion(landmarks, timestamp);
       this.updatePoseMovement(landmarks, world, frameSubmittedAt);
     }, stats => {

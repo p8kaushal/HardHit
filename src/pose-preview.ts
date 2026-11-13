@@ -90,7 +90,7 @@ export class PosePreview {
         if ((event.data.poseCount ?? 0) > 1) {
           this.onLandmarks([], [], NaN, true);
           this.draw([]);
-          this.show('tracking', 'Multiple people detected. Keep only the player in view, then calibrate again.');
+          this.show('tracking', 'Multiple people may be in view. If you are alone, adjust the camera or background, then calibrate again.');
           return;
         }
         this.onLandmarks(event.data.landmarks, event.data.worldLandmarks ?? [], event.data.timestamp, false, this.lastFrameAt);

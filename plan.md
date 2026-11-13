@@ -20,6 +20,10 @@ An exploratory CPU model run used 20 one-second samples from the overlaid, mirro
 
 As a limited positive control, two side-by-side copies of Google's local pose fixture, tightly cropped around the person, produced two non-overlapping pose boxes on all 20 repeated VIDEO-mode calls. A first version with more background produced only one pose on all 20 calls. These are repeated static synthetic composites, not independent people or an occlusion benchmark; they show sensitivity to framing and do not validate overlap-based identity or safety thresholds.
 
+Improve the ambiguity message so a player alone is not told as a certainty that another person is present: explain that multiple poses may represent people and suggest adjusting the camera or background before recalibrating. Keep the same immediate rejection and explicit recalibration behavior; verify ambiguity and recovery in the camera lifecycle regression.
+
+The setup and tracking status now describe multiple detected poses and suggest adjusting the camera or background if alone. The development camera regression passed the ambiguity message, reset and recovery checks, and the production build passed. This improves guidance only; it does not reduce false detections or prove the user's live issue resolved.
+
 ### New live feedback — 6:39 PM recording
 
 November 13 verification: partial torso calibration and prominent guidance are implemented; the camera browser regression passed, including missing-foot calibration, countdown, scrolling and short landscape mode-selector access. The mobile fixture needed an initial painted frame, and the selector needed to stack above shot controls. All 132 unit tests, production build, browser smoke, both practice modes, full matches in both orders, sudden death and rematch passed. Real-camera fidelity and the previously failed strict six scenario remain open.
