@@ -315,6 +315,27 @@ test('partial world landmarks never mix screen and world coordinates in an angle
   }
 });
 
+test('image fallback respects frame aspect while world directions stay unchanged', () => {
+  const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, z: 0, visibility: 1 }));
+  for (const [i,x,y] of [[11,.45,.25],[12,.55,.25],[13,.5,.35],[14,.6,.35],[23,.46,.55],[24,.54,.55]] as const) points[i] = { x, y, z: 0, visibility: 1 };
+  const portrait = points.map(p => ({ ...p, x: .5 + (p.x - .5) * 4 }));
+  const landscapeTracker = new PoseRetarget(), portraitTracker = new PoseRetarget();
+  assert.equal(landscapeTracker.calibrate(points, false, [], 1000, 2), true);
+  assert.equal(portraitTracker.calibrate(portrait, false, [], 1000, .5), true);
+  landscapeTracker.update(points, false, [], 1100); portraitTracker.update(portrait, false, [], 1100);
+  const a = landscapeTracker.getDirections().leftShoulder!, b = portraitTracker.getDirections().leftShoulder!;
+  assert.ok(Math.abs(a.x - Math.SQRT1_2) < 1e-8 && Math.abs(a.y + Math.SQRT1_2) < 1e-8);
+  assert.ok(a.subtract(b).length() < 1e-8, 'equal pixel geometry should give equal directions');
+  const world = points.map(p => ({ ...p }));
+  const first = new PoseRetarget(), second = new PoseRetarget();
+  assert.equal(first.calibrate(points, false, world, 1000, 2), true);
+  assert.equal(second.calibrate(points, false, world, 1000, .5), true);
+  first.update(points, false, world, 1100); second.update(points, false, world, 1100);
+  assert.ok(first.getDirections().leftShoulder!.subtract(second.getDirections().leftShoulder!).length() < 1e-8);
+  assert.equal(new PoseRetarget().calibrate(points, false, [], 1000, 0), false);
+  assert.equal(new PoseRetarget().calibrate(points, false, [], 1000, NaN), false);
+});
+
 test('visible arm and foot directions fall back together when world coordinates are invalid', () => {
   const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, z: 0, visibility: 1 }));
   for (const [index, x, y] of [[0,.5,.1],[11,.35,.25],[12,.65,.25],[13,.25,.35],[14,.75,.35],[15,.2,.5],[16,.8,.5],[23,.4,.55],[24,.6,.55],[25,.35,.7],[26,.65,.7],[27,.3,.85],[28,.7,.85],[31,.2,.88],[32,.8,.88]] as const) points[index] = { x, y, z: 0, visibility: 1 };

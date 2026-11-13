@@ -4,6 +4,7 @@
 
 - Persistent camera-batting goal was resumed by the user. Continue the active sequence in `plan.md`; live physical validation remains open.
 - Latest camera task: the 6:39 PM recording showed calibration rejected when feet were outside the frame. Partial torso calibration and larger guidance beside the preview are implemented and passed the camera browser regression, including short landscape control access. Live-camera fidelity remains to be reviewed.
+- [x] Correct image-plane pose geometry for video aspect ratio and reset calibration when camera dimensions change; 133 unit tests, build, development/production camera regressions and an overlaid-recording replay passed. Live accuracy remains open.
 - Earlier fixes committed: top-left pinned camera preview (`126aaa8`), torso bend direction (`b7711eb`), camera-to-world limb directions (`2569cfe`), repeated bat annotation replacement (`1cab672`). Automated evidence is in `plan.md`; none establishes live-camera accuracy.
 - The earlier codebase audit and test guide is complete and recorded in `AUDIT_AND_TESTING.md`. No product source was changed for that audit.
 - Camera batting remains unfinished. Existing pose preview and hand-motion diagnostics do not track a physical bat or control shots.

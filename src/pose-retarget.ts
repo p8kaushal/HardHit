@@ -39,6 +39,7 @@ export class PoseRetarget {
   private torsoLastSeen = -Infinity;
   private holdingPose = false;
   private lastUpdateAt = 0;
+  private imageAspect = 1;
   reset(): void { this.baseline = null; this.origin = null; this.facing = null; this.directions = {}; this.distalLastSeen = {}; this.confidence = {}; this.frontAxisSign = null; this.headAxisSign = null; this.headYaw = 0; this.headLastSeen = -Infinity; this.lastPose = null; this.torsoLastSeen = -Infinity; this.holdingPose = false; this.lastUpdateAt = 0; this.offset = { x: 0, y: 0, z: 0 }; this.lastVisible.fill(0); this.smoothed.forEach(v => { v.x = v.y = v.z = 0; }); }
   getOffset(): { x: number; y: number; z: number } { return { ...this.offset }; }
   getFacing(): number | null { return this.facing; }
@@ -65,8 +66,8 @@ export class PoseRetarget {
   private center(points: PoseLandmark[]): { x: number; y: number; scale: number } | null {
     const [ls, rs, lh, rh] = [11, 12, 23, 24].map(index => points[index]);
     if (![ls, rs, lh, rh].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y) && (p.visibility ?? 0) >= .45)) return null;
-    const x = (lh.x + rh.x) / 2, y = (lh.y + rh.y) / 2;
-    const scale = Math.hypot(x - (ls.x + rs.x) / 2, y - (ls.y + rs.y) / 2);
+    const x = (lh.x + rh.x) / 2 * this.imageAspect, y = (lh.y + rh.y) / 2;
+    const scale = Math.hypot(x - (ls.x + rs.x) / 2 * this.imageAspect, y - (ls.y + rs.y) / 2);
     return scale >= .04 ? { x, y, scale } : null;
   }
   private angles(points: PoseLandmark[], mirror: boolean, world: PoseLandmark[]): (Angles | null)[] {
@@ -77,7 +78,8 @@ export class PoseRetarget {
       const valid = (p: PoseLandmark | undefined) => p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z ?? 0);
       const source = mappedIndices.every(i => valid(world[i])) ? world : points;
       if (!mappedIndices.every(i => valid(source[i]))) return null;
-      return mappedIndices.map(i => ({ x: source[i].x * (mirror ? -1 : 1), y: source[i].y, z: source[i].z ?? 0 }));
+      const scale = source === points ? this.imageAspect : 1;
+      return mappedIndices.map(i => ({ x: source[i].x * scale * (mirror ? -1 : 1), y: source[i].y, z: (source[i].z ?? 0) * scale }));
     };
     const direction = (a: PoseLandmark, b: PoseLandmark): Angles => ({ x: Math.atan2((b.z ?? 0) - (a.z ?? 0), b.y - a.y), y: 0, z: Math.atan2(b.x - a.x, b.y - a.y) });
     const values = segments.map(segment => {
@@ -101,7 +103,9 @@ export class PoseRetarget {
     } else values.push(null, null);
     return values;
   }
-  calibrate(points: PoseLandmark[], mirror: boolean, world: PoseLandmark[] = [], now = performance.now()): boolean {
+  calibrate(points: PoseLandmark[], mirror: boolean, world: PoseLandmark[] = [], now = performance.now(), imageAspect = 1): boolean {
+    if (!Number.isFinite(imageAspect) || imageAspect <= 0) return false;
+    this.imageAspect = imageAspect;
     const angles = this.angles(points, mirror, world);
     const center = this.center(points);
     if (!angles[segments.length] || !center) return false;
@@ -185,7 +189,8 @@ export class PoseRetarget {
       const from = source[a], to = source[b];
       let target: BABYLON.Vector3 | null = null;
       if (visible && from && to && [from.x, from.y, to.x, to.y, from.z ?? 0, to.z ?? 0].every(Number.isFinite)) {
-        target = new BABYLON.Vector3((to.x - from.x) * (mirror ? -1 : 1), from.y - to.y, (from.z ?? 0) - (to.z ?? 0));
+        const scale = source === points ? this.imageAspect : 1;
+        target = new BABYLON.Vector3((to.x - from.x) * scale * (mirror ? -1 : 1), from.y - to.y, ((from.z ?? 0) - (to.z ?? 0)) * scale);
         if (target.length() < .02) target = null;
         else target.normalize();
       }
@@ -201,7 +206,8 @@ export class PoseRetarget {
       const from = source[a], to = source[b];
       let target: BABYLON.Vector3 | null = null;
       if (isVisible(segment.from) && isVisible(segment.to) && from && to && [from.x, from.y, to.x, to.y, from.z ?? 0, to.z ?? 0].every(Number.isFinite)) {
-        target = new BABYLON.Vector3((to.x - from.x) * (mirror ? -1 : 1), from.y - to.y, (from.z ?? 0) - (to.z ?? 0));
+        const scale = source === points ? this.imageAspect : 1;
+        target = new BABYLON.Vector3((to.x - from.x) * scale * (mirror ? -1 : 1), from.y - to.y, ((from.z ?? 0) - (to.z ?? 0)) * scale);
         if (target.length() < .015) target = null;
         else target.normalize();
       }

@@ -26,6 +26,12 @@ The setup and tracking status now describe multiple detected poses and suggest a
 
 Found a published 2,127-image bat keypoint dataset lead, but its page does not specify endpoint semantics or establish cricket coverage, and source-image rights remain unverified. A related listing suggests baseball. No model was downloaded or evaluated; `CAMERA_BATTING.md` records the source and qualification steps. This does not replace diverse actual-cricket-bat references or establish detection accuracy.
 
+### Current increment — image-plane aspect ratio
+
+When pose world landmarks are unavailable, normalized image x/y coordinates currently imply a square camera image. Use the actual video width/height to convert image coordinates to consistent proportions in fallback directions, torso angles and movement scale, while keeping valid world-coordinate geometry unchanged. Lock the aspect ratio at calibration and require recalibration if the video dimensions change. Verify landscape and portrait geometry, world-landmark invariance, invalid dimensions and camera lifecycle; synthetic geometry is not a physical-accuracy claim.
+
+Implemented aspect correction for image-derived x/z and movement centers using the calibrated video dimensions; world-space limb directions remain unchanged. A changed video width or height resets calibration. Synthetic unit tests cover equal pixel geometry in landscape/portrait, world-direction invariance and invalid aspect values; 133 tests and the production build passed. Development and production camera regressions passed, including dimension-change rejection and recalibration. The 6:39 overlaid crop replay passed with 83 results, 28 single-pose results, 54 ambiguous results and 836 rig/target comparisons without mismatches. These are synthetic geometry and model/rig consistency checks, not proof of real-device pose accuracy. No recordings or per-frame outputs are committed.
+
 ### New live feedback — 6:39 PM recording
 
 November 13 verification: partial torso calibration and prominent guidance are implemented; the camera browser regression passed, including missing-foot calibration, countdown, scrolling and short landscape mode-selector access. The mobile fixture needed an initial painted frame, and the selector needed to stack above shot controls. All 132 unit tests, production build, browser smoke, both practice modes, full matches in both orders, sudden death and rematch passed. Real-camera fidelity and the previously failed strict six scenario remain open.

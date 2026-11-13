@@ -219,6 +219,13 @@ try {
   assert.equal(await page.$eval('#playzone-pose-calibrate-delay', e => e.textContent), 'Calibrate in 5 seconds');
   await page.click('#playzone-pose-calibrate');
   assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Calibrated!/);
+  await page.$eval('#playzone-camera-preview', video => { Object.defineProperty(video, 'videoWidth', { configurable: true, value: video.videoWidth + 1 }); });
+  await page.waitForFunction(() => document.querySelector('#playzone-retarget-status').textContent.includes('Camera dimensions changed'));
+  await page.$eval('#playzone-camera-preview', video => { delete video.videoWidth; });
+  const resizedSerial = await page.evaluate(() => window.__poseResultSerial);
+  await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, resizedSerial);
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Calibrated!/);
   await page.waitForFunction(() => window.__poseFacing === 0 && window.__poseScene);
   await page.waitForFunction(() => {
     const scene = window.__poseScene.scene;

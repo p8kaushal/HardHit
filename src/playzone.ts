@@ -52,6 +52,7 @@ export class Playzone {
   private poseLandmarks: PoseLandmark[] = [];
   private poseWorldLandmarks: PoseLandmark[] = [];
   private poseCalibrated = false;
+  private calibratedVideoSize: { width: number; height: number } | null = null;
   private poseAnimationUntil = 0;
   private poseWatchdog: number | null = null;
   private calibrationTimer: number | null = null;
@@ -464,6 +465,7 @@ export class Playzone {
     this.poseWatchdog = null;
     const wasCalibrated = this.poseCalibrated;
     this.poseCalibrated = false;
+    this.calibratedVideoSize = null;
     this.poseRetarget.reset();
     if (wasCalibrated) this.scene.setBatterHandedness(this.batter.batterHand ?? 'RHB');
     get<HTMLElement>('playzone-retarget-status').textContent = message;
@@ -478,7 +480,10 @@ export class Playzone {
     });
     const age = performance.now() - this.poseLandmarksAt;
     const fresh = age >= 0 && age <= 500 && !isGamePaused() && this.poseLandmarksRevision === gameClockRevision();
-    this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && fresh && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks);
+    const video = get<HTMLVideoElement>('playzone-camera-preview');
+    const width = video.videoWidth, height = video.videoHeight;
+    this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && fresh && width > 0 && height > 0 && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks, performance.now(), width / height);
+    if (this.poseCalibrated) this.calibratedVideoSize = { width, height };
     get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? fullBody ? 'Calibrated! Your current stance is the reference. Move to control the character.' : 'Calibrated with a partial view. Show your whole body for leg tracking.' : !fresh ? 'Could not calibrate. Wait for a fresh tracked pose, then try again.' : 'Could not calibrate. Face the camera with both shoulders and hips visible, then try again.';
     if (this.poseCalibrated) this.updatePoseMovement(this.poseLandmarks, this.poseWorldLandmarks, this.poseLandmarksAt);
   }
@@ -589,6 +594,11 @@ export class Playzone {
     this.poseLandmarksAt = landmarks.length && Number.isFinite(frameSubmittedAt) ? frameSubmittedAt : -Infinity;
     this.poseLandmarksRevision = landmarks.length ? gameClockRevision() : -1;
     if (!this.poseCalibrated) return;
+    const video = get<HTMLVideoElement>('playzone-camera-preview');
+    if (!this.calibratedVideoSize || video.videoWidth !== this.calibratedVideoSize.width || video.videoHeight !== this.calibratedVideoSize.height) {
+      this.resetPoseMovement('Camera dimensions changed. Calibrate again.');
+      return;
+    }
     this.poseWatchdog = window.setTimeout(() => {
       this.poseWatchdog = null;
       this.poseLandmarks = [];
