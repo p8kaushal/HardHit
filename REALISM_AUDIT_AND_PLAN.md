@@ -61,11 +61,12 @@ HardHit's main mode remains the six-hitting contest: six legal deliveries per si
 - `npm test`: 117 passed. The Node-only environment does not visually verify the imported model.
 - `npm run build`: passed with the existing Babylon.js large-chunk warning (about 1.09 MB gzip).
 - `npm run test:browser`: batting and bowling smoke at three emulated viewport sizes; physical devices remain open.
+- Production-preview batting and bowling smoke at 568×240, 667×300 and 1024×768 is recorded in `TODO.md`.
 - `npm run test:repeat-match`: two full matches passed in one shared profile with replay verification on each; leaderboard and history counts each increased from 1 to 2.
 - Full browser checks recorded in `TODO.md`: strict square-shot six/four in both innings orders, contact variants, wide, no-ball/free-hit, unswung miss, pause/visibility/rotation, forced sudden death, and rematch.
 - Persisted-event replay matched the visible scorecards for a regular 12-event match and a forced sudden-death 14-event match. A dismissal-heavy replay unit case also passed.
 - Known failed control: the original straight-shot strict six scenario remains a failure; the square-shot success does not establish broad attainability or calibration.
-- These scripted checks do not establish physical-device behavior, real-world physics, human playability, audio quality, or competitive balance. Clean installation and a fresh current production-preview run remain open unless separately recorded in `TODO.md`.
+- These scripted checks do not establish physical-device behavior, real-world physics, human playability, audio quality, or competitive balance. Clean installation and physical-device coverage remain open.
 
 ## Historical automated checks on the camera-based backup
 
