@@ -1881,6 +1881,21 @@ test('sampled delivery paths mirror across arms for swing and opposite spin', ()
   }
 });
 
+test('bounce marker coordinates match the sampled ball at bounce across delivery variants', () => {
+  const cases: DeliveryChoice[] = [
+    { ...delivery(0.5, 0.35), bowlingArm: 'Right', overTheWicket: true, swing: 0.7 },
+    { ...delivery(0.5, -0.35), bowlingArm: 'Left', overTheWicket: false, swing: -0.7 },
+    { ...delivery(0.5, 0.25), type: 'offspin', bowlingArm: 'Right', overTheWicket: true, turn: 0.8 },
+    { ...delivery(0.5, -0.25), type: 'legspin', bowlingArm: 'Left', overTheWicket: true, turn: 0.8 },
+  ];
+  for (const choice of cases) {
+    const marker = deliveryPitchPoint(choice);
+    const ball = sampleDeliveryPath(choice, deliveryBounceProgress(choice.type, choice.aimTarget.z));
+    assert.ok(Math.abs(marker.x - ball.x) < 1e-9, `${choice.type} marker X mismatch`);
+    assert.ok(Math.abs(marker.z - ball.z) < 1e-9, `${choice.type} marker Z mismatch`);
+  }
+});
+
 test('a yorker reaches the batter lower than a short delivery', () => {
   assert.ok(deliveryArrivalHeight(-8.2) < deliveryArrivalHeight(-2.2));
   assert.ok(deliveryArrivalHeight(-2.2) < deliveryArrivalHeight(0.5));
