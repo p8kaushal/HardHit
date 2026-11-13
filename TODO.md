@@ -44,6 +44,11 @@
 - **Scope:** allow a caller to observe every simulated fixed-step ball position so the full live trajectory can feed fielding adjudication.
 - [x] **Acceptance:** optional physics observer receives every completed step; live scene stores timestamped full-flight samples and exposes defensive copies through `getShotTrajectory()`. Regression compares observed/unobserved state and accumulator, validates ordered samples and the catch-up cap. `npm test` passed 127 tests; build and `git diff --check` passed. Fielding still does not consume these samples.
 
+### Completed bounded increment — live trajectory capture browser check
+
+- **Scope:** make the browser trace capture the scene's trajectory at flight resolution and compare sample ordering and endpoint with the resolved physics state.
+- [x] **Acceptance:** `node scripts/browser-match.mjs --bat-first --swing --loft --square --require-six --trace-shots` completed both innings and lobby; six player shots had 315–332 finite samples at 120 Hz with their last sample matching final physics position. The strict match scored six sixes. `npm test` passed 127 tests; build and `git diff --check` passed. This verifies trajectory capture, not fielding impact.
+
 ### Completed bounded increment — Phase 3 trajectory symmetry
 
 - **Scope:** add a deterministic unit regression comparing sampled mirror-image delivery paths across the full flight for pace swing and spin turn; no trajectory tuning.

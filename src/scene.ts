@@ -960,7 +960,7 @@ export class GameScene {
         this.shotElapsedSeconds += stepSeconds;
         this.shotTrajectory.push({
           timeSeconds: this.shotElapsedSeconds,
-          position: { ...state.position },
+          position: { x: state.position.x, y: state.position.y, z: state.position.z },
         });
       });
       globalAutoAssistConfig.hasBounced = this.shotPhysics.hasBounced;

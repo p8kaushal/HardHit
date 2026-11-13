@@ -56,6 +56,7 @@ try {
     const { setGamePaused, isGamePaused } = await import('/src/game-clock.ts');
     const { deliveryContactPoint, BALL_RADIUS_METERS } = await import('/src/formula.ts');
     const animateDelivery = GameScene.prototype.animateDelivery;
+    const endDeliveryCycle = GameScene.prototype.endDeliveryCycle;
     const deliverBall3D = UIManager.prototype.deliverBall3D;
     UIManager.prototype.deliverBall3D = function (...args) {
       const playerIsBowling = this.controller.getCurrentInnings().batter.id !== this.controller.state.player.id;
@@ -154,6 +155,21 @@ try {
         requestAnimationFrame(pauseWhenMoving);
       }
       return result;
+    };
+    GameScene.prototype.endDeliveryCycle = function (...args) {
+      const trace = window.__playerShotTrace.at(-1);
+      if (traceShots && playerBatting && trace && !trace.flightSamples && this.shotPhysics) {
+        const flightSamples = this.getShotTrajectory();
+        Object.assign(trace, {
+          flightSamples,
+          flightEndpoint: {
+            x: this.shotPhysics.position.x,
+            y: this.shotPhysics.position.y,
+            z: this.shotPhysics.position.z,
+          },
+        });
+      }
+      return endDeliveryCycle.apply(this, args);
     };
     GameScene.prototype.animateDelivery = function (target, length, type, arrived, ...rest) {
       return animateDelivery.call(this, target, length, type, () => {
@@ -339,7 +355,17 @@ try {
     }
     if (process.argv.includes('--trace-shots')) {
       const trace = await page.evaluate(() => window.__playerShotTrace);
-      console.log(`Player shot trace: ${JSON.stringify(trace)}`);
+      console.log(`Player shot trace: ${JSON.stringify(trace.map(({ flightSamples, ...shot }) => ({ ...shot, flightSampleCount: flightSamples?.length ?? 0, flightFirst: flightSamples?.[0], flightLast: flightSamples?.at(-1) })))}`);
+      const incompleteTrajectory = trace.find(shot => shot.launchVelocity && (
+        !Array.isArray(shot.flightSamples) || shot.flightSamples.length < 2 ||
+        shot.flightSamples.some((sample, index) => !Number.isFinite(sample.timeSeconds) || (index > 0 && Math.abs(sample.timeSeconds - shot.flightSamples[index - 1].timeSeconds - 1 / 120) > 1e-9)) ||
+        !shot.flightEndpoint || ['x', 'y', 'z'].some(axis =>
+          !Number.isFinite(shot.flightEndpoint[axis]) ||
+          shot.flightSamples.some(sample => !Number.isFinite(sample.position[axis])) ||
+          Math.abs(shot.flightSamples.at(-1).position[axis] - shot.flightEndpoint[axis]) > 1e-9
+        )
+      ));
+      if (incompleteTrajectory) throw new Error(`Live fixed-step trajectory was incomplete or disagreed with its endpoint: ${JSON.stringify(incompleteTrajectory)}`);
       const validSix = trace.some(shot => shot.runs === 6 && shot.reachedBoundary === true && shot.bounced === false);
       const validFour = trace.some(shot => shot.runs === 4 && shot.reachedBoundary === true && shot.bounced === true);
       if (process.argv.includes('--require-six') && !validSix) throw new Error('No traced six cleared the boundary on the full');
