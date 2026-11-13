@@ -745,7 +745,7 @@ export class MatchController {
       { name: 'Variation', apply: () => stats.bowling.variation = Math.min(100, stats.bowling.variation + statInc) }
     ];
     
-    const choice = upgradeOptions[Math.floor(Math.random() * upgradeOptions.length)];
+    const choice = upgradeOptions[Math.floor(this.random() * upgradeOptions.length)];
     const newVal = choice.apply();
 
     this.state.progression = {

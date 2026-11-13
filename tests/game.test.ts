@@ -2058,6 +2058,28 @@ test('provisional carry estimate does not consume unseeded randomness', () => {
   }
 });
 
+test('seeded match progression uses only the controller random stream', () => {
+  const storageBefore = new Map(storage);
+  const originalRandom = Math.random;
+  const game = new MatchController('Medium', 0x51a7);
+  const originalPlayer = structuredClone(game.state.player);
+  const upgrades: unknown[] = [];
+  try {
+    Math.random = () => { throw new Error('seeded progression must not use global randomness'); };
+    for (let run = 0; run < 2; run++) {
+      game.state.player = structuredClone(originalPlayer);
+      (game as any).applyProgression(false);
+      upgrades.push(game.state.progression?.statUpgraded);
+    }
+    assert.deepEqual(upgrades[0], upgrades[1]);
+  } finally {
+    Math.random = originalRandom;
+    Object.assign(game.state.player, originalPlayer);
+    storage.clear();
+    for (const [key, value] of storageBefore) storage.set(key, value);
+  }
+});
+
 test('harder bot batting is more consistent around the arrival time', () => {
   const originalRandom = Math.random;
   const averageDeviation = (tier: 'Rookie' | 'Hard'): number => {
