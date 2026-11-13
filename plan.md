@@ -24,6 +24,8 @@ Improve the ambiguity message so a player alone is not told as a certainty that 
 
 The setup and tracking status now describe multiple detected poses and suggest adjusting the camera or background if alone. The development camera regression passed the ambiguity message, reset and recovery checks, and the production build passed. This improves guidance only; it does not reduce false detections or prove the user's live issue resolved.
 
+Found a published 2,127-image bat keypoint dataset lead, but its page does not specify endpoint semantics or establish cricket coverage, and source-image rights remain unverified. A related listing suggests baseball. No model was downloaded or evaluated; `CAMERA_BATTING.md` records the source and qualification steps. This does not replace diverse actual-cricket-bat references or establish detection accuracy.
+
 ### New live feedback — 6:39 PM recording
 
 November 13 verification: partial torso calibration and prominent guidance are implemented; the camera browser regression passed, including missing-foot calibration, countdown, scrolling and short landscape mode-selector access. The mobile fixture needed an initial painted frame, and the selector needed to stack above shot controls. All 132 unit tests, production build, browser smoke, both practice modes, full matches in both orders, sudden death and rematch passed. Real-camera fidelity and the previously failed strict six scenario remain open.

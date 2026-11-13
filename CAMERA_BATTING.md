@@ -1,5 +1,9 @@
 # Camera-batting implementation and evidence
 
+## Bat keypoint dataset lead — November 13, 2026
+
+The [bat-pose dataset version 9 page](https://universe.roboflow.com/chriss-workspace-4bheu/bat-pose/dataset/9) describes a keypoint dataset with 2,127 images and an MIT label. The page does not specify the meaning of its keypoints, establish cricket-bat coverage, or provide independently verified rights for the source imagery. A related listing describes baseball, which suggests a domain mismatch but does not prove the content of this version. No images or weights were downloaded, and no model was evaluated or selected. Inspect the actual labels, source rights, diversity, and local model availability before considering transfer learning; do not treat the listing as evidence of endpoint accuracy.
+
 The user authorized autonomous stage/phase transitions on November 12, 2026. Follow the project work protocol, update `plan.md` and `TODO.md` for each increment, and commit verified work. Personal approval between implementation stages is no longer required. Unrelated workspace changes must be preserved. Merge and deployment authorization remain separate.
 
 ## Remaining stages and acceptance
