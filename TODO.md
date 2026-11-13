@@ -10,6 +10,11 @@
 - **Scope:** add a deterministic unit regression comparing sampled mirror-image delivery paths across the full flight for pace swing and spin turn; no trajectory tuning.
 - [x] **Acceptance:** mirrored paths have equal Y/Z and opposite X at release, bounce, between-bounce samples and crease. `npm test` passed 119 tests; `npm run build` and `git diff --check` passed. This verifies code symmetry only, not calibration or visible marker timing on physical devices.
 
+### Completed bounded increment — Phase 3 bowling-side symmetry
+
+- **Scope:** extend full-flight mirror comparison to both over-the-wicket and around-the-wicket releases for pace swing and opposite spin types.
+- [x] **Acceptance:** mirrored paths agree at release, bounce, intermediate samples and crease in both bowling-side configurations. `npm test` passed 121 tests; build and `git diff --check` passed. This checks mathematical symmetry, not bowling realism.
+
 ### Completed bounded increment — Phase 3 bounce-marker agreement
 
 - **Scope:** assert the rendered marker's source coordinates (`deliveryPitchPoint`) equal the shared sampled trajectory at its bounce progress across pace, swing and spin variants.
