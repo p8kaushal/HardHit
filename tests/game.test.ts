@@ -326,6 +326,16 @@ test('image fallback respects frame aspect while world directions stay unchanged
   const a = landscapeTracker.getDirections().leftShoulder!, b = portraitTracker.getDirections().leftShoulder!;
   assert.ok(Math.abs(a.x - Math.SQRT1_2) < 1e-8 && Math.abs(a.y + Math.SQRT1_2) < 1e-8);
   assert.ok(a.subtract(b).length() < 1e-8, 'equal pixel geometry should give equal directions');
+  const moved = structuredClone(points), movedPortrait = structuredClone(portrait);
+  for (const i of [11, 12, 23, 24]) {
+    const dx = i < 20 ? .02 : .01;
+    moved[i].x += dx; moved[i].y += .02;
+    movedPortrait[i].x += dx * 4; movedPortrait[i].y += .02;
+  }
+  const pose = landscapeTracker.update(moved, false, [], 1200)!, portraitPose = portraitTracker.update(movedPortrait, false, [], 1200)!;
+  assert.ok(Math.abs(pose.spine!.z - portraitPose.spine!.z) < 1e-8, 'equal pixel torso lean should give equal fallback rotation');
+  const offset = landscapeTracker.getOffset(), portraitOffset = portraitTracker.getOffset();
+  assert.ok(Math.abs(offset.x - portraitOffset.x) < 1e-8 && Math.abs(offset.y - portraitOffset.y) < 1e-8, 'equal pixel movement should give equal visual offsets');
   const world = points.map(p => ({ ...p }));
   const first = new PoseRetarget(), second = new PoseRetarget();
   assert.equal(first.calibrate(points, false, world, 1000, 2), true);
