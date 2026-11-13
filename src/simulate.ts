@@ -1,70 +1,74 @@
 import { createBotPlayer } from './game';
 import { botChooseDelivery, botChooseShot } from './bot';
 import { evaluateWicket, checkExtraBall } from './formula';
+import type { DeliveryType } from './types';
 
-export function runBotSimulation(matchCount: number = 500, specificTier?: 'Rookie' | 'Medium' | 'Hard', _mode: 'bowling' | 'batting' | 'full' = 'full') {
-  const tiersToRun: ('Rookie' | 'Medium' | 'Hard')[] = specificTier ? [specificTier] : ['Rookie', 'Medium', 'Hard'];
-  const results = [];
-
-  for (const bowlTier of tiersToRun) {
-    let totalDeliveriesFaced = 0;
-    let totalWides = 0;
-    let totalLegalDeliveries = 0;
-    let totalWickets = 0;
-    let maxCreaseX = 0;
-
-    for (let m = 0; m < matchCount; m++) {
-      const bowler = createBotPlayer(bowlTier);
-      const batter = createBotPlayer('Rookie'); // Bat tier doesn't matter much for bowling QA
-      batter.batterHand = m < matchCount / 2 ? 'RHB' : 'LHB'; // Split RHB/LHB
-
-      let ballsBowled = 0;
-      while (ballsBowled < 6) {
-        const delivery = botChooseDelivery(bowler, bowlTier);
-        
-        const absX = Math.abs(delivery.aimTarget.x);
-        if (absX > maxCreaseX) {
-          maxCreaseX = absX;
-        }
-
-        const extra = checkExtraBall(delivery, batter.batterHand || 'RHB');
-        
-        if (extra.isExtra) {
-          if (extra.type === 'wide') {
-            totalWides++;
-          }
-          // Assuming wide/no-ball doesn't count towards ballsBowled in an over
-          continue; 
-        }
-        
-        totalLegalDeliveries++;
-        totalDeliveriesFaced++;
-        
-        const shot = botChooseShot(batter, bowler, delivery, 'Rookie');
-        const wicketResult = evaluateWicket(batter, bowler, delivery, shot);
-        
-        if (wicketResult.isWicket) {
-          totalWickets++;
-        }
-        
-        ballsBowled++;
-      }
-    }
-
-    const totalBalls = totalDeliveriesFaced + totalWides;
-    const legalRate = totalBalls > 0 ? ((totalLegalDeliveries / totalBalls) * 100).toFixed(2) + '%' : '0%';
-    const widesRate = totalBalls > 0 ? ((totalWides / totalBalls) * 100).toFixed(2) + '%' : '0%';
-
-    results.push({
-      "Tier": bowlTier,
-      "Total Overs": matchCount,
-      "Legal Balls %": legalRate,
-      "Wide %": widesRate,
-      "Wickets": totalWickets,
-      "Max Crease X Offset": maxCreaseX.toFixed(3)
-    });
-  }
-
-  console.table(results);
+export interface BotSimulationResult {
+  tier: 'Rookie' | 'Medium' | 'Hard';
+  overs: number;
+  attempts: number;
+  legalBalls: number;
+  wides: number;
+  noBalls: number;
+  wickets: number;
+  incompleteOvers: number;
+  legalRate: number;
+  wicketRate: number;
+  deliveryShares: Record<DeliveryType, number>;
 }
 
+function randomFromSeed(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => ((state = (1664525 * state + 1013904223) >>> 0) / 4294967296);
+}
+
+/** Synthetic bot-over distribution check; it is not a real-match calibration. */
+export function runBotSimulation(
+  overCount = 500,
+  specificTier?: BotSimulationResult['tier'],
+  seed = 12345,
+): BotSimulationResult[] {
+  if (!Number.isInteger(overCount) || overCount <= 0) throw new Error('overCount must be a positive integer');
+  const tiers: BotSimulationResult['tier'][] = specificTier ? [specificTier] : ['Rookie', 'Medium', 'Hard'];
+  const results = tiers.map((tier, tierIndex): BotSimulationResult => {
+    const random = randomFromSeed((seed + tierIndex * 0x9e3779b9) >>> 0);
+    const bowler = createBotPlayer(tier);
+    const batter = createBotPlayer('Rookie');
+    let attempts = 0, legalBalls = 0, wides = 0, noBalls = 0, wickets = 0, incompleteOvers = 0;
+    const deliveryCounts: Record<DeliveryType, number> = { fast: 0, medium: 0, slow: 0, offspin: 0, legspin: 0 };
+
+    for (let over = 0; over < overCount; over++) {
+      let legalInOver = 0;
+      let overAttempts = 0;
+      const hand = over % 2 === 0 ? 'RHB' : 'LHB';
+      batter.batterHand = hand;
+      while (legalInOver < 6 && overAttempts < 24) {
+        overAttempts++;
+        attempts++;
+        const delivery = botChooseDelivery(bowler, tier, hand, random);
+        deliveryCounts[delivery.type]++;
+        const extra = checkExtraBall(delivery, hand);
+        if (extra.isExtra) {
+          if (extra.type === 'wide') wides++;
+          else noBalls++;
+          continue;
+        }
+        const shot = botChooseShot(batter, bowler, delivery, 'Rookie', random);
+        const result = evaluateWicket(batter, bowler, delivery, shot);
+        if (result.isWicket) wickets++;
+        legalBalls++;
+        legalInOver++;
+      }
+      if (legalInOver < 6) incompleteOvers++;
+    }
+    const typeTotal = Object.values(deliveryCounts).reduce((sum, count) => sum + count, 0);
+    return {
+      tier, overs: overCount, attempts, legalBalls, wides, noBalls, wickets, incompleteOvers,
+      legalRate: attempts ? legalBalls / attempts : 0,
+      wicketRate: legalBalls ? wickets / legalBalls : 0,
+      deliveryShares: Object.fromEntries(Object.entries(deliveryCounts).map(([type, count]) => [type, typeTotal ? count / typeTotal : 0])) as Record<DeliveryType, number>,
+    };
+  });
+  console.table(results.map(result => ({ ...result, deliveryShares: JSON.stringify(result.deliveryShares) })));
+  return results;
+}

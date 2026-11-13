@@ -6,6 +6,7 @@ import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
+import { runBotSimulation } from '../src/simulate';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
 import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
@@ -974,6 +975,21 @@ test('seeded bot bowling uses bounded pace, spin and swing variety', () => {
   assert.ok(swinging.length >= 180 && swinging.length <= 400, `unexpected swing share: ${swinging.length}`);
   assert.ok(swinging.some(ball => (ball.swing ?? 0) < 0) && swinging.some(ball => (ball.swing ?? 0) > 0));
   assert.ok(deliveries.every(ball => Number.isFinite(ball.pace) && ball.pace! >= 0 && ball.pace! <= 1 && Number.isFinite(ball.turn) && ball.turn! >= 0 && ball.turn! <= 1));
+});
+
+test('bot distribution simulation is reproducible, bounded and reports the right denominators', () => {
+  const first = runBotSimulation(80, undefined, 0x51a7);
+  const second = runBotSimulation(80, undefined, 0x51a7);
+  assert.deepEqual(first, second);
+  for (const tier of first) {
+    assert.equal(tier.overs, 80);
+    assert.ok(tier.legalBalls <= 480);
+    assert.ok(tier.attempts >= tier.legalBalls);
+    assert.ok(tier.legalRate >= 0 && tier.legalRate <= 1);
+    assert.ok(tier.wicketRate >= 0 && tier.wicketRate <= 1);
+    assert.ok(Math.abs(Object.values(tier.deliveryShares).reduce((sum, share) => sum + share, 0) - 1) < 1e-9);
+    assert.ok(tier.incompleteOvers < tier.overs);
+  }
 });
 
 test('well-timed shots retain their selected direction on every bot tier', () => {
