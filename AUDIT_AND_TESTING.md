@@ -2,6 +2,8 @@
 
 Feature-level source audit and fresh automated verification on November 12, 2026. Baseline: `928a389` on `feature/camera-batting`. The pre-existing `.gitignore` change is excluded. Automated browser checks use headless Chromium with emulated viewports, not physical devices. Passing tests do not establish cricket realism or camera accuracy.
 
+**Current-state note, November 13:** this is the historical audit at `928a389`, not a new audit of later commits. Subsequent calibration, camera geometry, reference tooling and bat segmentation research are recorded in `plan.md` and `CAMERA_BATTING.md`. The audit document and `.gitignore` change were committed in `0a74dc8`. The latest full unit run recorded in the plan passed 134 tests; individual later increments have their own verification and limitations. The strict six-producing match and real-device camera fidelity remain open.
+
 ## Implemented features
 
 | Area | Built behavior | How to try it |
@@ -19,9 +21,9 @@ Feature-level source audit and fresh automated verification on November 12, 2026
 | Interruption handling | Pause-aware game clock; held input cancellation; delivery generations and stale callback protection; rotation/focus safeguards | Rotate or background during a bowling hold and delivery; resume and check score/control state |
 | Camera capture | Explicit camera start/stop, permission/error feedback, cleanup on exit/mode/page hide | Camera setup → Start camera; stop, switch to bowling, hide tab or leave practice |
 | Pose preview | Local worker/model, mirrored overlay, framing feedback, rate/round-trip/rejection statistics | Start pose tracking with one full-body person visible |
-| Camera body movement | Immediate and five-second full-body calibration, approximate limbs/head/torso/turns, visual offsets, optional apparent-size depth, X-ray confidence, brief-loss hold and stale/multi-person rejection | Use delayed calibration upright facing camera; move limbs/turn/bend; toggle X-ray/mirror/depth |
+| Camera body movement | Immediate and five-second calibration with a visible torso, approximate limbs/head/torso/turns, visual offsets, optional apparent-size depth, X-ray confidence, brief-loss hold and stale/multi-pose rejection | Use delayed calibration upright facing camera; show the full body for leg tracking; move limbs/turn/bend; toggle X-ray/mirror/depth |
 | Hand diagnostics | Opt-in two-wrist motion event, image direction, relative speed/intensity samples, estimated timing against practice delivery | Enable Preview two-hand movement; hold still to Ready, move hands together and stop; record gentler/stronger samples |
-| Reference tools | Recorded pose replay, annotated pose scoring, local four-point bat annotation with occlusion, endpoint prediction scorer | See commands below and CAMERA_BATTING.md |
+| Reference tools | Recorded pose replay, local body landmark annotation and scoring, local four-point bat annotation with occlusion, endpoint prediction scorer | See commands below and CAMERA_BATTING.md |
 | Bat-hand geometry | Pure confidence/distance association primitive with synthetic tests | `src/bat-hand-association.ts`; no in-game control is connected |
 
 ## Not complete or not physically validated

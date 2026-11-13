@@ -1,5 +1,9 @@
 # HardHit project plan index
 
+## Current status — November 13, 2026
+
+This is the camera-batting work history and roadmap. The latest completed increments and evidence are described under the recording-review section immediately below; older stage proposals and results are historical and may describe superseded behavior. The persistent goal currently reports `usageLimited` and is not complete. The branch has experimental body tracking and diagnostics only: physical bat endpoints, two-hand constraints, camera-driven shots and match camera control are not implemented. Live body fidelity and device performance remain open. The latest offline MobileSAM experiment used oracle prompts on one clip; automatic detector boxes did not yield a 50-pixel endpoint pass. See `TODO.md` for next tasks, `CAMERA_BATTING.md` for evidence/tooling, and local ignored `handoff.md` for the current workspace state. No merge or deployment is authorized.
+
 ## Active recording review — November 12, 2026
 
 ### Current increment — missing torso calibration

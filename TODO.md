@@ -1,13 +1,17 @@
 # Gameplay to-do
 
-## Current status — November 12, 2026
+## Current status — November 13, 2026
 
-- Persistent camera-batting goal was resumed by the user. Continue the active sequence in `plan.md`; live physical validation remains open.
+- The camera-batting goal was resumed, but its current system status is `usageLimited`; do not claim it is complete. Continue the sequence in `plan.md` when the goal can resume. Live physical validation remains open.
 - Latest camera task: the 6:39 PM recording showed calibration rejected when feet were outside the frame. Partial torso calibration and larger guidance beside the preview are implemented and passed the camera browser regression, including short landscape control access. Live-camera fidelity remains to be reviewed.
 - [x] Correct image-plane pose geometry for video aspect ratio and reset calibration when camera dimensions change; 133 unit tests, build, development/production camera regressions and an overlaid-recording replay passed. Live accuracy remains open.
 - [x] Reject stale-size calibration landmarks and in-flight frames crossing a camera dimension change; verify rejection and recovery in the development camera regression. Real-device changes remain unverified.
 - [x] Fix pose-reference seeks that skipped adjacent high-frame-rate timestamps; browser-checked the next decoded 120 fps frame and real-worker frame-zero smoke. Variable-frame-rate frame identity remains open.
 - [x] Provide a local manual body-reference annotator and validate synthetic export, point revision and scorer integration. Actual independent human labels and real-device accuracy remain open.
+- [x] Evaluate MobileSAM endpoint feasibility: 18/22 sampled frames passed with human boxes and oracle endpoint ordering; neither evaluated automatic-box pipeline passed any of the 22. This is one clip and not a deployed detector.
+- [ ] Obtain clean, unmirrored full-body and actual-bat footage and independent human annotations. Validate posture, facing, limbs, occlusion and speed on real devices before selecting thresholds or camera-driven gameplay.
+- [ ] Investigate endpoint-capable segmentation with reliable independent prompts and varied clips; independently validate grip association, occlusion and false positives before two-hand constraints.
+- [ ] Define and calibrate swing events, shot type, field direction, strength and timing; integrate explicitly enabled practice control with session/delivery timestamp protection, then match control after practice verification.
 - Earlier fixes committed: top-left pinned camera preview (`126aaa8`), torso bend direction (`b7711eb`), camera-to-world limb directions (`2569cfe`), repeated bat annotation replacement (`1cab672`). Automated evidence is in `plan.md`; none establishes live-camera accuracy.
 - The earlier codebase audit and test guide is complete and recorded in `AUDIT_AND_TESTING.md`. No product source was changed for that audit.
 - Camera batting remains unfinished. Existing pose preview and hand-motion diagnostics do not track a physical bat or control shots.
@@ -17,7 +21,7 @@
 - [ ] Make the lofted browser match reliably produce and assert a six if that behavior remains an acceptance requirement; the strict `--require-six` run currently fails with zero sixes.
 - [ ] Re-run the audit commands after any fixes. Current baseline and reproduction steps are in `AUDIT_AND_TESTING.md`.
 
-Preserve the pre-existing `.gitignore` change. Do not merge or deploy without separate authorization. `handoff.md` is locally ignored; keep it out of commits unless the user specifically asks otherwise.
+The `.gitignore` change and audit document were committed in `0a74dc8`. Do not merge or deploy without separate authorization. `handoff.md` is locally ignored; keep it out of commits unless the user specifically asks otherwise.
 
 ## Prior camera-batting work checklist
 
