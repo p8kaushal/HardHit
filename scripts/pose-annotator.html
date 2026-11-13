@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Local body landmark annotation</title>
+<style>
+body { font: 16px system-ui; max-width: 1000px; margin: 1rem auto; padding: 0 1rem; background: #121820; color: #f2f4f7; }
+button, input, select { font: inherit; margin: .25rem; padding: .45rem; }
+#stage { position: relative; width: min(100%, calc(70vh * var(--aspect, 1))); }
+canvas { display: block; width: 100%; height: auto; background: #000; }
+#view { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+#status { color: #d6eadb; }
+</style>
+</head>
+<body>
+<h1>Body landmark reference</h1>
+<p>Select an unmirrored camera clip without model overlays. For each frame, choose a landmark and click its visible position. Skip hidden or uncertain points. All video and annotations stay in this tab until you export them.</p>
+<input id="file" type="file" accept="video/*">
+<button id="load" type="button">Load clip</button>
+<label>Time (seconds) <input id="time" type="number" min="0" step="0.001" value="0"></label>
+<button id="seek" type="button" disabled>Go to time</button>
+<label>Maximum error (pixels) <input id="tolerance" type="number" min="0.001" step="any" placeholder="Choose a tolerance"></label>
+<label>Landmark <select id="landmark"></select></label>
+<button id="clear-point" type="button" disabled>Remove selected point</button>
+<button id="save" type="button" disabled>Save frame</button>
+<button id="export" type="button" disabled>Export reference</button>
+<p id="status" role="status">Choose a clip to begin.</p>
+<div id="stage"><video id="video" hidden></video><canvas id="frame"></canvas><canvas id="view"></canvas></div>
+<script type="module">
+import { seekPoseReferenceFrame } from './pose-reference-seek.mjs';
+const names = ['nose','left eye inner','left eye','left eye outer','right eye inner','right eye','right eye outer','left ear','right ear','mouth left','mouth right','left shoulder','right shoulder','left elbow','right elbow','left wrist','right wrist','left pinky','right pinky','left index','right index','left thumb','right thumb','left hip','right hip','left knee','right knee','left ankle','right ankle','left heel','right heel','left foot index','right foot index'];
+const $ = selector => document.querySelector(selector);
+const file = $('#file'), video = $('#video'), frame = $('#frame'), view = $('#view'), context = frame.getContext('2d'), overlay = view.getContext('2d'), landmark = $('#landmark'), status = $('#status');
+names.forEach((name, index) => landmark.add(new Option(`${index}: ${name}`, index)));
+landmark.value = '11';
+let url = null, points = new Map(), frames = [], loaded = false;
+function draw() {
+  if (!loaded) return;
+  frame.width = video.videoWidth; frame.height = video.videoHeight; view.width = frame.width; view.height = frame.height;
+  $('#stage').style.setProperty('--aspect', String(frame.width / frame.height));
+  context.drawImage(video, 0, 0); overlay.clearRect(0, 0, view.width, view.height);
+  overlay.fillStyle = '#ff5b5b'; overlay.font = `${Math.max(16, frame.width / 45)}px sans-serif`;
+  for (const [index, point] of points) { overlay.beginPath(); overlay.arc(point.x * view.width, point.y * view.height, Math.max(4, frame.width / 160), 0, 2 * Math.PI); overlay.fill(); overlay.fillText(names[index], point.x * view.width + 8, point.y * view.height - 8); }
+  status.textContent = `Time ${video.currentTime.toFixed(4)} s · ${points.size} visible points · ${frames.length} saved frames`;
+}
+$('#load').onclick = async () => {
+  if (!file.files[0]) return;
+  try {
+    loaded = false; points = new Map(); frames = [];
+    for (const id of ['seek','clear-point','save','export']) $(`#${id}`).disabled = true;
+    if (url) URL.revokeObjectURL(url); url = URL.createObjectURL(file.files[0]); video.src = url; video.muted = true;
+    await new Promise((resolve, reject) => { video.onloadeddata = resolve; video.onerror = () => reject(new Error('Could not load clip.')); });
+    loaded = true; points = new Map(); frames = []; $('#time').value = '0';
+    for (const id of ['seek','clear-point','save','export']) $(`#${id}`).disabled = false;
+    draw();
+  } catch (error) { status.textContent = error.message; }
+};
+$('#seek').onclick = async () => {
+  if (!loaded) return;
+  const time = Number($('#time').value);
+  if (!Number.isFinite(time) || time < 0 || time >= video.duration) { status.textContent = 'Choose a time within the clip.'; return; }
+  for (const id of ['load','seek','clear-point','save','export']) $(`#${id}`).disabled = true;
+  status.textContent = 'Loading frame…';
+  try {
+    await seekPoseReferenceFrame(video, time, true);
+    const saved = frames.find(frame => Math.abs(frame.time - video.currentTime) <= .000001);
+    points = new Map(saved ? saved.points.map(({ index, x, y }) => [index, { x, y }]) : []); draw();
+  }
+  catch (error) { status.textContent = error.message; }
+  finally { for (const id of ['load','seek','clear-point','save','export']) $(`#${id}`).disabled = false; }
+};
+view.onclick = event => {
+  if (!loaded || $('#seek').disabled) return;
+  const bounds = view.getBoundingClientRect(), index = Number(landmark.value);
+  points.set(index, { x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)), y: Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height)) });
+  draw();
+};
+$('#clear-point').onclick = () => { points.delete(Number(landmark.value)); draw(); };
+$('#save').onclick = () => {
+  if (!points.size) { status.textContent = 'Mark at least one visible landmark before saving.'; return; }
+  const time = video.currentTime;
+  frames = frames.filter(frame => Math.abs(frame.time - time) > .000001);
+  frames.push({ time, points: Array.from(points, ([index, point]) => ({ index, ...point })).sort((a, b) => a.index - b.index) });
+  frames.sort((a, b) => a.time - b.time); draw();
+};
+$('#export').onclick = () => {
+  const tolerance = Number($('#tolerance').value);
+  if (!frames.length || !Number.isFinite(tolerance) || tolerance <= 0) { status.textContent = 'Save a frame and enter a positive pixel tolerance before export.'; return; }
+  const data = { version: 1, annotationSource: 'manual', mirrored: false, width: video.videoWidth, height: video.videoHeight, maxErrorPixels: tolerance, frames };
+  const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); link.download = 'pose-reference.json'; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+};
+</script>
+</body>
+</html>

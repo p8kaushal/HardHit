@@ -7,6 +7,7 @@
 - [x] Correct image-plane pose geometry for video aspect ratio and reset calibration when camera dimensions change; 133 unit tests, build, development/production camera regressions and an overlaid-recording replay passed. Live accuracy remains open.
 - [x] Reject stale-size calibration landmarks and in-flight frames crossing a camera dimension change; verify rejection and recovery in the development camera regression. Real-device changes remain unverified.
 - [x] Fix pose-reference seeks that skipped adjacent high-frame-rate timestamps; browser-checked the next decoded 120 fps frame and real-worker frame-zero smoke. Variable-frame-rate frame identity remains open.
+- [x] Provide a local manual body-reference annotator and validate synthetic export, point revision and scorer integration. Actual independent human labels and real-device accuracy remain open.
 - Earlier fixes committed: top-left pinned camera preview (`126aaa8`), torso bend direction (`b7711eb`), camera-to-world limb directions (`2569cfe`), repeated bat annotation replacement (`1cab672`). Automated evidence is in `plan.md`; none establishes live-camera accuracy.
 - The earlier codebase audit and test guide is complete and recorded in `AUDIT_AND_TESTING.md`. No product source was changed for that audit.
 - Camera batting remains unfinished. Existing pose preview and hand-motion diagnostics do not track a physical bat or control shots.

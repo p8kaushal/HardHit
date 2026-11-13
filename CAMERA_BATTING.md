@@ -173,6 +173,8 @@ This is an ambiguity check, not identity recognition. Missed people and sequenti
 
 ## Independent image-point validation
 
+To prepare a human-labeled reference, start `npm run dev` and open `/scripts/pose-annotator.html` on the printed local address. Select an unmirrored, pre-cropped clip without model overlays, choose a media time and landmark name, then click each visible point. Skip occluded or uncertain landmarks, save frames, set an explicit pixel tolerance and export the JSON. Returning to a saved time restores its points for revision; saving replaces that frame. Video and labels stay in the browser until export. This tool does not verify the person's 3D pose or the model's output and cannot guarantee frame identity in variable-frame-rate footage. The development browser smoke used synthetic clicks on a local portrait clip and validated ordering, replacement, overlay alignment and scorer compatibility; those clicks are not human labels or accuracy evidence.
+
 `npm run test:pose-reference` accepts a local unmirrored, pre-cropped WebM and its local JSON reference. It seeks to annotated times, runs the real pose worker sequentially and compares image points in source pixels. It does not run the rig or verify 3D accuracy, dynamic latency, bat detection or shot classification. Browser seeking selects the decoded frame at the requested media time; timestamps are not independent exposure measurements. Annotate the same decoded source frames.
 
 ```sh

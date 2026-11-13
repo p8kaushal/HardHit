@@ -42,6 +42,12 @@ The pose reference harness skips seeks within 1/30 second, so distinct adjacent 
 
 The seeker now advances to distinct times and rejects multiple indistinguishable near-zero references. On a local 120 fps WebM, the browser advanced to 0.008333 seconds and 2,071,999 pixels changed from the initial decoded frame; the ambiguous near-zero second reference was rejected. A real pose-worker synthetic frame-zero smoke passed at 0.0001 seconds with a deliberately loose tolerance. All 134 unit tests and the production build passed. These verify tooling behavior, not landmark accuracy or variable-frame-rate frame identity.
 
+### Current increment — manual body reference annotation
+
+Provide a local-only browser annotator for independently marking visible MediaPipe body landmarks in an unmirrored, pre-cropped clip at chosen media times. Allow selected landmark labels, revisions, ordered/replaced frames, explicit pixel tolerance and JSON compatible with the existing scorer; do not create model-generated annotations or claim occluded points are visible. Validate export and replacement with a browser fixture and the scorer, keep source clips and labels out of the repository, and state media-time/frame-index and single-view limitations.
+
+Added `scripts/pose-annotator.html` with all 33 named landmarks, selected-point editing, saved-frame restoration and replacement, explicit tolerance and local JSON export. It prevents edits while seeking and sizes the overlay to the displayed portrait frame. A local 120 fps browser smoke passed overlay alignment, two-frame ordering, revision/replacement, schema validation and scorer pass/fail controls; its clicks were synthetic. All 134 unit tests passed. This prepares independent references; it does not supply human annotations or establish physical accuracy.
+
 ### New live feedback — 6:39 PM recording
 
 November 13 verification: partial torso calibration and prominent guidance are implemented; the camera browser regression passed, including missing-foot calibration, countdown, scrolling and short landscape mode-selector access. The mobile fixture needed an initial painted frame, and the selector needed to stack above shot controls. All 132 unit tests, production build, browser smoke, both practice modes, full matches in both orders, sudden death and rematch passed. Real-camera fidelity and the previously failed strict six scenario remain open.
