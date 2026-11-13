@@ -15,8 +15,8 @@ canvas { display: block; width: 100%; height: auto; background: #000; }
 </head>
 <body>
 <h1>Body landmark reference</h1>
-<p>Select an unmirrored camera clip without model overlays. For each frame, choose a landmark and click its visible position. Skip hidden or uncertain points. All video and annotations stay in this tab until you export them.</p>
-<input id="file" type="file" accept="video/*">
+<p>Select an unmirrored WebM camera clip without model overlays. For each frame, choose a landmark and click its visible position. Skip hidden or uncertain points. All video and annotations stay in this tab until you export them.</p>
+<input id="file" type="file" accept="video/webm,.webm">
 <button id="load" type="button">Load clip</button>
 <label>Time (seconds) <input id="time" type="number" min="0" step="0.001" value="0"></label>
 <button id="seek" type="button" disabled>Go to time</button>
@@ -48,7 +48,9 @@ $('#load').onclick = async () => {
   if (!file.files[0]) return;
   try {
     loaded = false; points = new Map(); frames = [];
+    context.clearRect(0, 0, frame.width, frame.height); overlay.clearRect(0, 0, view.width, view.height);
     for (const id of ['seek','clear-point','save','export']) $(`#${id}`).disabled = true;
+    if (!file.files[0].name.toLowerCase().endsWith('.webm')) throw new Error('Choose a WebM clip for the pose reference checker.');
     if (url) URL.revokeObjectURL(url); url = URL.createObjectURL(file.files[0]); video.src = url; video.muted = true;
     await new Promise((resolve, reject) => { video.onloadeddata = resolve; video.onerror = () => reject(new Error('Could not load clip.')); });
     loaded = true; points = new Map(); frames = []; $('#time').value = '0';

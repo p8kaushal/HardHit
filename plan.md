@@ -48,6 +48,10 @@ Provide a local-only browser annotator for independently marking visible MediaPi
 
 Added `scripts/pose-annotator.html` with all 33 named landmarks, selected-point editing, saved-frame restoration and replacement, explicit tolerance and local JSON export. It prevents edits while seeking and sizes the overlay to the displayed portrait frame. A local 120 fps browser smoke passed overlay alignment, two-frame ordering, revision/replacement, schema validation and scorer pass/fail controls; its clicks were synthetic. All 134 unit tests passed. This prepares independent references; it does not supply human annotations or establish physical accuracy.
 
+The pose reference harness accepts WebM input, so restrict the new annotator to WebM too; a failed selection clears the previous frame and disables export rather than mixing clip metadata. Verify rejection and then successful annotation with a valid clip.
+
+The annotator now rejects non-WebM filenames. Its browser check passed unsupported input, valid WebM annotation and export, and rejection of an unsupported replacement without leaving prior annotations exportable. This is an input-format check, not codec validation or pose accuracy evidence.
+
 ### New live feedback — 6:39 PM recording
 
 November 13 verification: partial torso calibration and prominent guidance are implemented; the camera browser regression passed, including missing-foot calibration, countdown, scrolling and short landscape mode-selector access. The mobile fixture needed an initial painted frame, and the selector needed to stack above shot controls. All 132 unit tests, production build, browser smoke, both practice modes, full matches in both orders, sudden death and rematch passed. Real-camera fidelity and the previously failed strict six scenario remain open.

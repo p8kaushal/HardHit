@@ -18,6 +18,10 @@ try {
     URL.createObjectURL = value => { if (value instanceof Blob && !(value instanceof File)) window.__exported = value.text(); return original.call(URL, value); };
     HTMLAnchorElement.prototype.click = function () {};
   });
+  await page.$eval('#file', input => { const transfer = new DataTransfer(); transfer.items.add(new File(['x'], 'unsupported.mp4', { type: 'video/mp4' })); input.files = transfer.files; });
+  await page.click('#load');
+  assert.match(await page.$eval('#status', element => element.textContent), /Choose a WebM/);
+  assert.equal(await page.$eval('#export', button => button.disabled), true);
   await (await page.$('#file')).uploadFile(path);
   await page.click('#load');
   await page.waitForFunction(() => !document.querySelector('#save').disabled);
@@ -50,6 +54,9 @@ try {
   const predictions = reference.frames.map(frame => { const points = []; for (const p of frame.points) points[p.index] = { ...p, visibility: 1 }; return points; });
   assert.equal(scorePoseReference(reference, predictions).passed, true);
   assert.equal(scorePoseReference(reference, reference.frames.map(() => [])).passed, false);
+  await page.$eval('#file', input => { const transfer = new DataTransfer(); transfer.items.add(new File(['x'], 'unsupported.mp4', { type: 'video/mp4' })); input.files = transfer.files; });
+  await page.click('#load');
+  assert.equal(await page.$eval('#export', button => button.disabled), true, 'invalid replacement clip must not export prior annotations');
   assert.deepEqual(errors, []);
   console.log('Pose annotator export, replacement, ordering and scorer integration passed.');
 } finally {
