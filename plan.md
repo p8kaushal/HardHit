@@ -1,8 +1,8 @@
 # HardHit project plan index
 
-## Active account handoff — November 13, 2026
+## Paused account handoff — November 13, 2026
 
-The user explicitly resumed the non-camera realism goal. Continue on `feature/gameplay-realism-clean`, based on local `main` at `bb0d8d1`; camera batting is excluded. Latest verified commits include persisted-event replay in regular, dismissal-heavy, sudden-death and repeated-browser-match cases. Current evidence and remaining work are summarized at the top of `REALISM_AUDIT_AND_PLAN.md` and in `TODO.md`; the ignored local `handoff.md` carries the account-specific context. Earlier sections below are historical and may refer to other branches or superseded state. Do not merge or deploy.
+The user resumed the non-camera realism goal and later paused it after asking to finish the rated ground-fielding step through verification and handoff. `get_goal` reports **paused**. Workspace `/Users/parthkaushal/dev/proj/HardHit`; branch `feature/gameplay-realism-clean`, based on local `main` at `bb0d8d1`; camera batting is excluded. Latest implementation commit: `9e0cf6b feat: integrate rated ground fielding`. The tracked tree is clean. `npm test` passes 133 tests; `npm run build` passes with the existing ~1.09 MB gzip Babylon chunk warning. Browser checks verified a ground-stop scoring reduction and strict lofted boundary-on-full sixes. Current evidence and remaining work are summarized in `TODO.md` and the ignored local `handoff.md`. Earlier sections below are historical and may refer to other branches or superseded state. Do not merge, deploy or push.
 
 The detailed, phased gameplay plan, acceptance gates, and current phase status live in [DELIVERY_PLAN.md](DELIVERY_PLAN.md). The implementation checklist and active defects live in [TODO.md](TODO.md). Rules and known approximations are tracked in [CRICKET_RULES.md](CRICKET_RULES.md) and [PHYSICS_CALIBRATION.md](PHYSICS_CALIBRATION.md).
 
@@ -16,4 +16,4 @@ The detailed, phased gameplay plan, acceptance gates, and current phase status l
 
 ## Current readiness gaps
 
-The bot visual contact callback was aligned to the sampled/adjudicated point and passed strict browser checks, including contact variants. Overall readiness remains open: real-device coverage, physical calibration, projected obstacle landings, fielding/running, broad rules coverage and deterministic visual playback are not complete. See `TODO.md` before starting the next bounded increment.
+The bot visual contact callback was aligned to the sampled/adjudicated point and passed strict browser checks, including contact variants. Rated fielders now move during the fixed-step flight and can stop reachable low bounced balls; catches, throws, actual running and field-setting controls remain open. Overall readiness also depends on real-device coverage, physical calibration, projected obstacle landings, broad rules coverage and deterministic visual playback. See `TODO.md` before resuming the next bounded increment.
