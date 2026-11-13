@@ -410,8 +410,6 @@ export class MatchController {
       if (isNaN(distance) || !isFinite(distance) || distance < 0) {
         distance = 0.0;
       }
-      distance = Math.min(distance, 130.0);
-
       const innings = this.getCurrentInnings();
       const lastBall = innings.balls[innings.balls.length - 1];
       if (!lastBall || !lastBall.shot || lastBall.missed || lastBall.isWicket || lastBall.extraType === 'wide') return 0;
@@ -565,7 +563,7 @@ export class MatchController {
       }
     } else {
       // Standard match evaluation
-      if (Math.abs(inn1.biggestSix - inn2.biggestSix) > 0.01) {
+      if (inn1.biggestSix !== inn2.biggestSix) {
         winnerId = inn1.biggestSix > inn2.biggestSix ? inn1.batter.id : inn2.batter.id;
         const winSix = Math.max(inn1.biggestSix, inn2.biggestSix);
         const loseSix = Math.min(inn1.biggestSix, inn2.biggestSix);
@@ -573,7 +571,9 @@ export class MatchController {
           deciderTier: 'biggest_six',
           tierLabel: 'Single Biggest Six',
           description: 'Decided via Primary Objective: Single Biggest Six Distance',
-          marginText: `Won via Single Biggest Six: ${winSix.toFixed(1)}m vs ${loseSix.toFixed(1)}m`
+          marginText: winSix.toFixed(1) === loseSix.toFixed(1)
+            ? `Both sixes display ${winSix.toFixed(1)}m; the winner's unrounded distance was greater.`
+            : `Won via Single Biggest Six: ${winSix.toFixed(1)}m vs ${loseSix.toFixed(1)}m`
         };
       } else {
         // Tie-break Tier 1: Fewer wickets lost

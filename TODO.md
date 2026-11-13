@@ -3,7 +3,7 @@
 ## Active non-camera realism work
 
 - Work on `feature/gameplay-realism-clean`, based on local `main` at `bb0d8d1`; do not merge or deploy. Camera batting is excluded. See `REALISM_AUDIT_AND_PLAN.md` for the user-approved direction and phases. Its prior findings and test results describe `feature/gameplay-realism-camera-base-backup`, not this clean branch. Port the applicable non-camera changes, reconcile differences, and verify each increment.
-- Ported six ground-contact interpolation and rope-step handling; 104 unit tests, build and the bat-first full-match browser regression passed on this branch. The browser run did not assert a six. Port and independently verify uncapped distance, unrounded ranking, pending-shot display, transition guard and relevant browser tests next.
+- Ported six ground-contact interpolation and rope-step handling; 104 unit tests, build and the bat-first full-match browser regression passed on this branch. The browser run did not assert a six. Uncapped distances and unrounded longest-six ranking are now ported; 105 unit tests and build passed, including synthetic long-distance and near-tie fixtures. Port and independently verify pending-shot display, transition guard and relevant browser tests next.
 
 Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. The user approved proceeding phase by phase. Unchecked items are not verified or complete.
 
@@ -56,7 +56,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [x] Initialize new match controllers even if a previous scene still marks a ball in play, while retaining the active-match reset guard.
 - [x] Invalidate cancelled batting flight callbacks so they cannot observe or resolve a later delivery.
 - [x] Store detached delivery and shot inputs for each recorded ball so later control changes cannot rewrite its history.
-- [x] Use the finalized scorecard distance in the shot result banner, including when a distance is capped.
+- [x] Use the finalized scorecard distance in the shot result banner. The former distance cap has since been removed.
 - [x] Keep the first run-up after changing bowling side on the newly selected side, including after a previously bowled delivery.
 - [x] Show player batting timing as early, perfect or late with a colored meter and the offset in milliseconds; hide it for bot shots and new deliveries.
 - [x] Remove the keyboard-only Rookie override that replaced a recorded shot's timing with a perfect value; preserve the displayed timing for both input methods while retaining documented difficulty assistance.

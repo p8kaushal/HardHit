@@ -14,7 +14,7 @@ The selected duration still represents the whole release-to-crease flight. The m
 
 [Peploe and colleagues, *Relationships between technique and bat speed, post-impact ball speed, and carry distance during a range hitting task in cricket*](https://doi.org/10.1016/j.humov.2018.11.004), studied 20 male batters hitting machine deliveries indoors; the authors' [accepted manuscript](https://www.stuartmcnaylor.com/publication/CB3tech/Peploe_et_al_2019.pdf) reports 239 forward-directed trials. Its reported modeled carry range was 3.5–101.5 m. For central impacts the reported launch speed was 32.3 ± 2.5 m/s and launch angle 28.3 ± 14.5° (mean ± standard deviation). These are sample statistics, not limits on all players or shots; carry was calculated by a flight model rather than directly measured at landing.
 
-The present game uses shot-type presets and timing/contact approximations rather than the study's measured bat kinematics. Do not tune individual shots merely to force this distribution. The next calibration step is to construct traceable input/output fixtures for bat speed, impact position, launch angle and velocity, then compare independent measured deliveries and real-device playback. The 130 m display cap and lack of stand collisions remain explicit approximations.
+The present game uses shot-type presets and timing/contact approximations rather than the study's measured bat kinematics. Do not tune individual shots merely to force this distribution. The next calibration step is to construct traceable input/output fixtures for bat speed, impact position, launch angle and velocity, then compare independent measured deliveries and real-device playback. Stand collisions and projected landings are not modeled.
 
 ## Aerodynamics and remaining evidence
 

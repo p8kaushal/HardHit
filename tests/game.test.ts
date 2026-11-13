@@ -1562,6 +1562,7 @@ test('boundary scoring uses the rope crossing and bounce, not carry distance alo
   assert.equal(evaluateFinalOutcome(70, false, false), 3);
   assert.equal(calculateShotDistance({ position: { x: 0, z: -8.8 } }), 0);
   assert.ok(Math.abs(calculateShotDistance({ position: { x: 3, z: -4.8 } }) - 5) < 1e-9);
+  assert.equal(calculateShotDistance({ position: { x: 0, z: 141.2 } }), 150);
 });
 
 test('finalizing a six records its runs and biggest hit consistently', () => {
@@ -1616,10 +1617,10 @@ test('the result banner uses the same finalized distance as the score', () => {
     };
     ui.deliverBall3D();
     resolveBall();
-    assert.equal(outcome.distance, 130);
+    assert.equal(outcome.distance, 150);
     assert.equal(outcome.runs, 6);
-    assert.equal(game.getCurrentInnings().biggestSix, 130);
-    assert.equal(title, 'SIX! 130.0m');
+    assert.equal(game.getCurrentInnings().biggestSix, 150);
+    assert.equal(title, 'SIX! 150.0m');
     const next = game.recordBall(ball, { direction: 0, type: 'grounded', timing: 0.5, contactZone: 0.5 });
     ui.deliveryStarted = false;
     ui.deliveryGeneration++;
@@ -1718,6 +1719,23 @@ test('flight quality uses the same human batting assistance as contact decisions
   assert.ok(shotFlightQuality(shot, ball, medium) > shotFlightQuality(shot, ball, hard));
   assert.equal(shotFlightQuality({ ...shot, timing: 0.5 }, ball, medium), shotFlightQuality({ ...shot, timing: 0.5 }, ball, hard));
   assert.equal(shot.timing, 0.3);
+});
+
+test('unrounded biggest six decides when displayed distances match and wickets favor the opponent', () => {
+  for (const longerFirst of [true, false]) {
+    const game = match();
+    const [first, second] = game.state.innings;
+    const longer = longerFirst ? first : second;
+    const shorter = longerFirst ? second : first;
+    longer.biggestSix = 80.004;
+    shorter.biggestSix = 80;
+    longer.wicketsLost = 2;
+    shorter.wicketsLost = 0;
+    (game as any).resolveMatch();
+    assert.equal(game.state.winnerId, longer.batter.id);
+    assert.equal(game.state.tieBreakDetails?.deciderTier, 'biggest_six');
+    assert.match(game.state.tieBreakDetails?.marginText ?? '', /unrounded distance was greater/);
+  }
 });
 
 test('with equal biggest six and wickets, more sixes beat greater total distance', () => {

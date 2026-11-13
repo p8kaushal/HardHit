@@ -669,7 +669,7 @@ export function calculateShotDistance(ball: { position: { x: number, z: number }
   if (isNaN(shotDistanceMeters) || !isFinite(shotDistanceMeters) || shotDistanceMeters < 0) {
     shotDistanceMeters = 0.0;
   }
-  return Math.min(shotDistanceMeters, 130.0);
+  return shotDistanceMeters;
 }
 
 export function getDirectionName(dir: number): string {
