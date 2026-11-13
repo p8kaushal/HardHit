@@ -1060,6 +1060,39 @@ test('saved regular match events replay through controller adjudication', () => 
     game.state.innings.map(innings => ({ score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled })));
 });
 
+test('saved dismissal-heavy match replay preserves wickets and match result', () => {
+  const game = new MatchController('Hard', 0x7711);
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  for (let ball = 0; ball < 6; ball++) {
+    const result = game.recordBall(delivery(0.5), { direction: 0, type: 'power', timing: 0, contactZone: 0.5 });
+    assert.equal(result.isWicket, true);
+  }
+  assert.equal(game.getCurrentInnings().wicketsLost, 6);
+  game.state.currentInningsIndex = 1;
+  for (let ball = 0; ball < 6; ball++) game.recordBall(delivery(0.5, -0.7), null);
+  (game as any).resolveMatch(false);
+  const record = {
+    id: 'dismissal-replay-fixture', seed: game.state.randomSeed, createdAt: 4,
+    outcome: game.state.winnerId === game.state.player.id ? 'WON' as const : game.state.winnerId === game.state.bot.id ? 'LOST' as const : 'TIED' as const,
+    setup: {
+      difficulty: game.botDifficulty,
+      player: structuredClone(game.state.player),
+      bot: structuredClone(game.state.bot),
+      tossWinnerId: game.state.tossWinnerId,
+      tossChoice: game.state.tossChoice,
+    },
+    events: structuredClone(game.state.events),
+  };
+  const replay = replayMatchRecord(record);
+  assert.equal(replay.state.status, 'completed');
+  assert.equal(replay.state.winnerId, game.state.winnerId);
+  assert.deepEqual(replay.state.innings.map(innings => ({ score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled })),
+    game.state.innings.map(innings => ({ score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled })));
+  assert.deepEqual(replay.state.events.map(event => ({ isWicket: event.isWicket, wicketReason: event.wicketReason })),
+    game.state.events.map(event => ({ isWicket: event.isWicket, wicketReason: event.wicketReason })));
+});
+
 test('saved tied match replays through both sudden-death innings', () => {
   const game = new MatchController('Medium', 0x8899);
   game.setTossResult(game.state.player.id, 'bat');
