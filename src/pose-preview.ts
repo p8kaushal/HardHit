@@ -18,6 +18,8 @@ export class PosePreview {
   private state: PoseState = 'idle';
   private lastMessage = '';
   private frameRevision = 0;
+  private frameWidth = 0;
+  private frameHeight = 0;
   private readonly performanceStats = new PosePerformance();
   private lastStatsAt = -Infinity;
 
@@ -69,7 +71,7 @@ export class PosePreview {
         }
         this.busy = false;
         const receivedAt = performance.now();
-        if (this.frameRevision !== gameClockRevision() || isGamePaused()) {
+        if (this.frameRevision !== gameClockRevision() || isGamePaused() || this.video.videoWidth !== this.frameWidth || this.video.videoHeight !== this.frameHeight) {
           this.performanceStats.record(this.lastFrameAt, receivedAt, 'interrupted');
           this.reportPerformance(receivedAt, true);
           this.onLandmarks([], [], NaN);
@@ -114,6 +116,8 @@ export class PosePreview {
     this.lastVideoTime = this.video.currentTime;
     void createImageBitmap(this.video).then(bitmap => {
       if (generation !== this.generation || !this.worker || frameRevision !== gameClockRevision() || isGamePaused()) { bitmap.close(); if (generation === this.generation) this.busy = false; return; }
+      this.frameWidth = bitmap.width;
+      this.frameHeight = bitmap.height;
       this.worker.postMessage({ type: 'frame', bitmap, timestamp: now }, [bitmap]);
     }).catch(() => { if (generation === this.generation) this.stop('Camera frames could not be read. Try restarting pose tracking.', true); });
   }

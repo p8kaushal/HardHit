@@ -226,6 +226,20 @@ try {
   await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, resizedSerial);
   await page.click('#playzone-pose-calibrate');
   assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Calibrated!/);
+  await page.evaluate(() => { window.__holdPoseResult = true; window.__releasePoseFrame = null; });
+  await page.waitForFunction(() => typeof window.__releasePoseFrame === 'function');
+  await page.$eval('#playzone-camera-preview', video => { Object.defineProperty(video, 'videoWidth', { configurable: true, value: video.videoWidth + 1 }); });
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Could not calibrate.*fresh tracked pose/, 'old-size landmarks must not calibrate a new-size video');
+  const dimensionInterruption = await page.evaluate(() => {
+    window.__holdPoseResult = false; window.__releasePoseFrame();
+    return { status: document.querySelector('#playzone-pose-status').textContent, serial: window.__poseResultSerial };
+  });
+  assert.match(dimensionInterruption.status, /interrupted/i, 'an old-size in-flight frame must be rejected');
+  await page.$eval('#playzone-camera-preview', video => { delete video.videoWidth; });
+  await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, dimensionInterruption.serial);
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', element => element.textContent), /Calibrated!/);
   await page.waitForFunction(() => window.__poseFacing === 0 && window.__poseScene);
   await page.waitForFunction(() => {
     const scene = window.__poseScene.scene;

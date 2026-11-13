@@ -58,6 +58,7 @@ export class Playzone {
   private calibrationTimer: number | null = null;
   private poseLandmarksAt = -Infinity;
   private poseLandmarksRevision = -1;
+  private poseLandmarksVideoSize: { width: number; height: number } | null = null;
   private previousBotTrigger: (() => void) | null = null;
   private bowlingPointerId: number | null = null;
   private bowlingKey: string | null = null;
@@ -482,9 +483,10 @@ export class Playzone {
     const fresh = age >= 0 && age <= 500 && !isGamePaused() && this.poseLandmarksRevision === gameClockRevision();
     const video = get<HTMLVideoElement>('playzone-camera-preview');
     const width = video.videoWidth, height = video.videoHeight;
-    this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && fresh && width > 0 && height > 0 && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks, performance.now(), width / height);
+    const matchingSize = this.poseLandmarksVideoSize?.width === width && this.poseLandmarksVideoSize?.height === height;
+    this.poseCalibrated = this.active && this.mode !== 'bowling' && this.poseTrackingActive && fresh && matchingSize && width > 0 && height > 0 && this.poseRetarget.calibrate(this.poseLandmarks, mirror, this.poseWorldLandmarks, performance.now(), width / height);
     if (this.poseCalibrated) this.calibratedVideoSize = { width, height };
-    get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? fullBody ? 'Calibrated! Your current stance is the reference. Move to control the character.' : 'Calibrated with a partial view. Show your whole body for leg tracking.' : !fresh ? 'Could not calibrate. Wait for a fresh tracked pose, then try again.' : 'Could not calibrate. Face the camera with both shoulders and hips visible, then try again.';
+    get<HTMLElement>('playzone-retarget-status').textContent = this.poseCalibrated ? fullBody ? 'Calibrated! Your current stance is the reference. Move to control the character.' : 'Calibrated with a partial view. Show your whole body for leg tracking.' : !fresh || !matchingSize ? 'Could not calibrate. Wait for a fresh tracked pose, then try again.' : 'Could not calibrate. Face the camera with both shoulders and hips visible, then try again.';
     if (this.poseCalibrated) this.updatePoseMovement(this.poseLandmarks, this.poseWorldLandmarks, this.poseLandmarksAt);
   }
 
@@ -593,8 +595,10 @@ export class Playzone {
     this.poseWorldLandmarks = world;
     this.poseLandmarksAt = landmarks.length && Number.isFinite(frameSubmittedAt) ? frameSubmittedAt : -Infinity;
     this.poseLandmarksRevision = landmarks.length ? gameClockRevision() : -1;
+    const currentVideo = get<HTMLVideoElement>('playzone-camera-preview');
+    this.poseLandmarksVideoSize = landmarks.length ? { width: currentVideo.videoWidth, height: currentVideo.videoHeight } : null;
     if (!this.poseCalibrated) return;
-    const video = get<HTMLVideoElement>('playzone-camera-preview');
+    const video = currentVideo;
     if (!this.calibratedVideoSize || video.videoWidth !== this.calibratedVideoSize.width || video.videoHeight !== this.calibratedVideoSize.height) {
       this.resetPoseMovement('Camera dimensions changed. Calibrate again.');
       return;
