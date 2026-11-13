@@ -5,7 +5,7 @@ import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchContro
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
-import { findEarliestInterception } from '../src/fielding';
+import { createDefaultFieldLayout, fielderReachProfileFromRatings, findEarliestInterception } from '../src/fielding';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
@@ -1057,6 +1057,29 @@ test('fielding reachability rejects invalid profiles and unsorted trajectories',
   assert.throws(() => findEarliestInterception([sample, { ...sample, timeSeconds: 0 }], {
     position: { x: 0, z: 0 }, reactionSeconds: 0, speedMetersPerSecond: 1, reachRadiusMeters: 0.5,
   }), /Invalid trajectory sample/);
+});
+
+test('default field layout mirrors by batter hand and stays inside the modeled field', () => {
+  const right = createDefaultFieldLayout('RHB');
+  const left = createDefaultFieldLayout('LHB');
+  assert.equal(right.length, 9);
+  assert.deepEqual(left.map(fielder => fielder.name), right.map(fielder => fielder.name));
+  right.forEach((fielder, index) => {
+    assert.ok(Math.hypot(fielder.position.x, fielder.position.z) < 65, `${fielder.name} is beyond the rope`);
+    assert.equal(left[index].position.x, -fielder.position.x, `${fielder.name} should mirror laterally`);
+    assert.equal(left[index].position.z, fielder.position.z, `${fielder.name} should keep its depth`);
+  });
+});
+
+test('fielder ratings map monotonically to bounded movement profiles', () => {
+  const low = fielderReachProfileFromRatings({ x: 4, z: 10 }, 0, 0);
+  const high = fielderReachProfileFromRatings({ x: 4, z: 10 }, 100, 100);
+  assert.equal(low.speedMetersPerSecond, 2);
+  assert.equal(high.speedMetersPerSecond, 6);
+  assert.equal(low.reactionSeconds, 0.45);
+  assert.ok(high.reactionSeconds < low.reactionSeconds);
+  assert.ok(high.reachRadiusMeters > low.reachRadiusMeters);
+  assert.throws(() => fielderReachProfileFromRatings({ x: 0, z: 0 }, 101, 50), /between 0 and 100/);
 });
 
 test('seeded random snapshots reproduce subsequent bot inputs', () => {
