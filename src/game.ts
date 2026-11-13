@@ -547,7 +547,7 @@ export class MatchController {
     else callback();
   }
 
-  private resolveMatch(): void {
+  private resolveMatch(applyProgression = true): void {
     const isSuddenDeath = this.state.tieBreakerActive && this.state.innings.length >= 4;
     
     // If sudden death, compare sudden death innings (indexes 2 & 3), else standard innings (indexes 0 & 1)
@@ -676,7 +676,7 @@ export class MatchController {
     this.state.status = 'completed';
     this.state.cameraMode = 'stadium_wide';
     console.log(`[GAME EVENT] Match finished. Winner ID: ${winnerId}. Decider: ${tieBreakDetails?.marginText}`);
-    this.applyProgression(winnerId === this.state.player.id);
+    if (applyProgression) this.applyProgression(winnerId === this.state.player.id);
   }
 
   private setupSuddenDeath(): void {

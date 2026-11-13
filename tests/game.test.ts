@@ -9,6 +9,7 @@ import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
 import { MAX_MATCH_HISTORY, readMatchHistory, saveMatchRecord } from '../src/match-history';
+import { replayMatchRecord } from '../src/match-replay';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
 import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
@@ -1024,6 +1025,39 @@ test('match event log copies delivery inputs and records final flight outcome', 
   assert.equal(event.resolved, true);
   assert.equal(event.runs, outcome.runs ?? 6);
   assert.deepEqual(event.flight, { hasBounced: false, reachedBoundary: true });
+});
+
+test('saved regular match events replay through controller adjudication', () => {
+  const game = new MatchController('Medium', 0x7788);
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  for (let ball = 0; ball < 6; ball++) {
+    const result = game.recordBall(delivery(0.5), { direction: 2, type: 'grounded', timing: 0.5, contactZone: 0.5 });
+    assert.equal(result.isWicket, false);
+    game.finalizeBallOutcome(20 + ball, true, false);
+  }
+  game.state.currentInningsIndex = 1;
+  for (let ball = 0; ball < 6; ball++) {
+    game.recordBall({ ...delivery(0.5, -0.25), type: 'legspin', turn: 1 }, null);
+  }
+  (game as any).resolveMatch(false);
+  const setup = {
+    difficulty: game.botDifficulty,
+    player: structuredClone(game.state.player),
+    bot: structuredClone(game.state.bot),
+    tossWinnerId: game.state.tossWinnerId,
+    tossChoice: game.state.tossChoice,
+  };
+  const record = {
+    id: 'replay-fixture', seed: game.state.randomSeed, createdAt: 1,
+    outcome: game.state.winnerId === game.state.player.id ? 'WON' as const : game.state.winnerId === game.state.bot.id ? 'LOST' as const : 'TIED' as const,
+    setup, events: structuredClone(game.state.events),
+  };
+  const replay = replayMatchRecord(record);
+  assert.equal(replay.state.status, 'completed');
+  assert.equal(replay.state.winnerId, game.state.winnerId);
+  assert.deepEqual(replay.state.innings.map(innings => ({ score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled })),
+    game.state.innings.map(innings => ({ score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled })));
 });
 
 test('match history storage is versioned, bounded and duplicate-safe', () => {
