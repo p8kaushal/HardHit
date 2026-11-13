@@ -662,6 +662,24 @@ test('LBW considers pitch, impact, offered shot, stumps, handedness and no-balls
   assert.equal(resolveMissedDelivery(delivery(0.5, 0.7), 'RHB', false), null);
 });
 
+test('mirrored handedness and bowling arm preserve offered-shot LBW decisions', () => {
+  const right = {
+    ...delivery(0.5, 0.35), type: 'offspin' as const, turn: 1,
+    bowlingArm: 'Right' as const, overTheWicket: true,
+  };
+  const left = {
+    ...right, aimTarget: { x: -0.35, z: right.aimTarget.z },
+    type: 'legspin' as const, bowlingArm: 'Left' as const,
+  };
+  for (const offeredShot of [true, false]) {
+    assert.equal(
+      resolveMissedDelivery(left, 'LHB', offeredShot),
+      resolveMissedDelivery(right, 'RHB', offeredShot),
+      `offeredShot=${offeredShot}`,
+    );
+  }
+});
+
 test('bowled decisions project past the popping crease to the rendered stumps', () => {
   const intoWicket: DeliveryChoice = { ...delivery(0.5, 0.268), overTheWicket: true, bowlingArm: 'Right', batterPosition: { x: 0.6, z: 0 } };
   const awayFromWicket: DeliveryChoice = { ...delivery(0.5, -0.047), overTheWicket: false, bowlingArm: 'Right', batterPosition: { x: -0.6, z: 0 } };
