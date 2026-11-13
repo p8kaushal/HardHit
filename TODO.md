@@ -26,6 +26,8 @@ Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. The user approved
 
 The detailed tasks below map to these phases. Completed sub-tasks do not imply a whole phase is complete. Physical-device checks, measurement sources, service access and costs must remain explicit; do not invent results or block unrelated local work while waiting for them.
 
+- [x] **Plan baseline reconciliation:** Refreshed `DELIVERY_PLAN.md`'s clean-branch baseline and code audit to current evidence: 117 tests, clean-install production-preview results, event replay scope, current bot variation, uncapped distances and remaining device/calibration gaps. Approved phase gates and unresolved product decisions are preserved.
+
 ## Additional phase acceptance work
 
 - [x] Add a repeatable browser smoke command that starts its own server, checks lobby → toss → gameplay, captures browser errors, and closes its browser and server.
