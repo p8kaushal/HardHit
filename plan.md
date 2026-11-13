@@ -2,6 +2,12 @@
 
 ## Active recording review — November 12, 2026
 
+### Current increment — missing torso calibration
+
+Verify that both immediate and delayed calibration reject a fresh pose with a missing shoulder, give actionable guidance, and recover when the torso returns. Preserve partial-body calibration when feet are missing and the existing stale-frame, pause and ambiguity safeguards. Run the camera regression and record the result; this is a lifecycle check, not physical pose accuracy validation.
+
+The development camera browser regression passed with the new missing-shoulder checks for both calibration paths and subsequent full-body recovery, along with the existing partial-view and lifecycle checks. Real camera pose accuracy remains unverified.
+
 ### New live feedback — 6:39 PM recording
 
 November 13 verification: partial torso calibration and prominent guidance are implemented; the camera browser regression passed, including missing-foot calibration, countdown, scrolling and short landscape mode-selector access. The mobile fixture needed an initial painted frame, and the selector needed to stack above shot controls. All 132 unit tests, production build, browser smoke, both practice modes, full matches in both orders, sudden death and rematch passed. Real-camera fidelity and the previously failed strict six scenario remain open.

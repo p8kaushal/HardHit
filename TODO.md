@@ -2,7 +2,7 @@
 
 ## Current status — November 12, 2026
 
-- Persistent camera-batting goal is paused at the user's request. Read the current section at the top of `handoff.md` before resuming.
+- Persistent camera-batting goal was resumed by the user. Continue the active sequence in `plan.md`; live physical validation remains open.
 - Latest camera task: the 6:39 PM recording showed calibration rejected when feet were outside the frame. Partial torso calibration and larger guidance beside the preview are implemented and passed the camera browser regression, including short landscape control access. Live-camera fidelity remains to be reviewed.
 - Earlier fixes committed: top-left pinned camera preview (`126aaa8`), torso bend direction (`b7711eb`), camera-to-world limb directions (`2569cfe`), repeated bat annotation replacement (`1cab672`). Automated evidence is in `plan.md`; none establishes live-camera accuracy.
 - The earlier codebase audit and test guide is complete and recorded in `AUDIT_AND_TESTING.md`. No product source was changed for that audit.

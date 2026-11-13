@@ -204,6 +204,14 @@ try {
   assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Calibrated.*feet/);
   await page.click('#playzone-pose-calibrate-delay');
   await page.waitForFunction(() => /Calibrated.*feet/.test(document.querySelector('#playzone-retarget-status').textContent), { timeout: 8000 });
+  await page.evaluate(() => { window.__poseOverride[11].visibility = 0; });
+  const missingTorsoSerial = await page.evaluate(() => window.__poseResultSerial);
+  await page.waitForFunction(serial => window.__poseResultSerial > serial, {}, missingTorsoSerial);
+  await page.click('#playzone-pose-calibrate');
+  assert.match(await page.$eval('#playzone-retarget-status', e => e.textContent), /Could not calibrate.*shoulders and hips/);
+  await page.click('#playzone-pose-calibrate-delay');
+  await page.waitForFunction(() => /Could not calibrate.*shoulders and hips/.test(document.querySelector('#playzone-retarget-status').textContent), { timeout: 8000 });
+  await page.evaluate(() => { window.__poseOverride[11].visibility = 1; });
   await page.evaluate(() => { window.__poseOverride[27].visibility = 1; });
   await page.waitForFunction(() => document.querySelector('#playzone-pose-status').textContent.includes('Body landmarks visible'));
   await page.click('#playzone-pose-calibrate-delay');
