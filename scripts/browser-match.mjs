@@ -1,5 +1,6 @@
 import { createServer } from 'vite';
 import puppeteer from 'puppeteer';
+import { writeFile } from 'node:fs/promises';
 
 // Seed only the isolated test page; production randomness and game timing are unchanged.
 const server = await createServer({ configFile: false, server: { host: '127.0.0.1', port: 0, open: false } });
@@ -50,6 +51,7 @@ try {
     const animateDelivery = GameScene.prototype.animateDelivery;
     window.__matchContacts = [];
     window.__playerShotTrace = [];
+    window.__matchReplay = [];
     let playerBatting = false;
     let noBallInjected = false;
     let playerController;
@@ -65,6 +67,18 @@ try {
         noBallInjected = true;
       }
       const result = recordBall.call(this, delivery, shot);
+      window.__matchReplay.push({
+        batter: this.getCurrentInnings().batter.id,
+        delivery: structuredClone(delivery),
+        shot: structuredClone(shot),
+        missed: result.missed,
+        wicket: result.isWicket,
+        wicketReason: result.wicketReason,
+        extra: result.extraType,
+        freeHit: result.isFreeHit,
+        estimatedDistance: result.distance,
+        resolved: false,
+      });
       playerBatting = this.getCurrentInnings().batter.id === this.state.player.id;
       if (traceShots && playerBatting) {
         playerController = this;
@@ -80,6 +94,8 @@ try {
     MatchController.prototype.finalizeBallOutcome = function (distance, bounced, reachedBoundary) {
       const playerBatting = this.getCurrentInnings().batter.id === this.state.player.id;
       const runs = finalize.call(this, distance, bounced, reachedBoundary);
+      const replayEntry = window.__matchReplay.at(-1);
+      if (replayEntry && !replayEntry.resolved) Object.assign(replayEntry, { resolved: true, flightDistance: distance, bounced, reachedBoundary, runs });
       if (traceShots && playerBatting) Object.assign(window.__playerShotTrace.at(-1), { flightDistance: distance, bounced, reachedBoundary, runs });
       return runs;
     };
@@ -322,6 +338,12 @@ try {
     console.log('Browser match passed: two innings, scorecards and return to lobby.');
   }
   if (errors.length) throw new Error(`Browser errors:\n${errors.join('\n')}`);
+  const replayPath = process.argv.find(arg => arg.startsWith('--replay-out='))?.slice('--replay-out='.length);
+  if (replayPath) {
+    const replay = await page.evaluate(() => window.__matchReplay);
+    await writeFile(replayPath, `${JSON.stringify(replay, null, 2)}\n`);
+    console.log(`Wrote ${replay.length} resolved delivery events to ${replayPath}`);
+  }
 } finally {
   await browser?.close();
   await server.close();
