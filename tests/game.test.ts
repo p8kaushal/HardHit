@@ -11,7 +11,7 @@ import { SeededRandom } from '../src/random';
 import { MAX_MATCH_HISTORY, readMatchHistory, saveMatchRecord } from '../src/match-history';
 import { replayMatchRecord } from '../src/match-replay';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
-import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
+import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateDistance, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout, shouldPauseGameplay } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
@@ -2043,6 +2043,19 @@ test('bot skill increases across the three difficulty tiers', () => {
   assert.deepEqual(bots.map(bot => bot.stats.bowling.accuracy), [35, 50, 65]);
   assert.deepEqual(bots.map(bot => bot.stats.batting.timing), [35, 50, 65]);
   assert.deepEqual(bots.map(bot => bot.rank), ['Bronze', 'Gold', 'Legend']);
+});
+
+test('provisional carry estimate does not consume unseeded randomness', () => {
+  const batter = getOrCreatePlayer();
+  const bowler = createBotPlayer('Rookie');
+  const shot = { direction: 0, type: 'lofted' as const, timing: 0.4, contactZone: 0.2 };
+  const random = Math.random;
+  try {
+    Math.random = () => { throw new Error('provisional distance must not use global randomness'); };
+    assert.doesNotThrow(() => calculateDistance(batter, bowler, delivery(0.5), shot, 100, true, 0.5));
+  } finally {
+    Math.random = random;
+  }
 });
 
 test('harder bot batting is more consistent around the arrival time', () => {

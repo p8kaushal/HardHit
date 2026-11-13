@@ -416,22 +416,9 @@ export function calculateDistance(
     distance = Math.max(0, parseFloat(distance.toFixed(1)));
   }
 
-  // Safe Edge Deflection System overrides distance for 1-2 runs
-  const isSafeEdge = isEdgeFallback && assistMultiplier >= 0.3;
-  if (isSafeEdge) {
-    distance = 15.0 + Math.random() * 10.0; // 15 to 25 meters (safe 1-2 runs distance)
-  }
-  
   // There are no simulated fielders yet, so a short hit cannot be called caught.
   const isMiscueWicket = false;
   const miscueReason = '';
-
-  // Calibrate carry/roll equations so the resulting shot carries/rolls at least 25m to 55m.
-  if (!batter.isBot && bowler.isBot && bowler.rank === 'Bronze') { // Rookie mode
-    if (distance > 0 && distance < 25) {
-      distance = 25.0 + Math.random() * 30.0; // 25 to 55m
-    }
-  }
   
   return {
     distance,
