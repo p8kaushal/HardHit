@@ -1,6 +1,7 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
 import { battingAssistanceMultiplier, evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, deliveryContactPoint, deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
+import { SeededRandom } from './random';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
 
@@ -174,15 +175,17 @@ export class MatchController {
   public state!: MatchState;
   public readonly botDifficulty: 'Rookie' | 'Medium' | 'Hard';
   public readonly random: () => number;
+  public readonly randomSeed?: number;
   private transitionPending = false;
   private transitionGeneration = 0;
   private transitionOverlay: HTMLElement | null = null;
   private transitionTimer: number | null = null;
   private transitionCallbacks: Array<() => void> = [];
 
-  constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard', random: () => number = Math.random) {
+  constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard', randomOrSeed: (() => number) | number = Math.random) {
     this.botDifficulty = botDifficulty;
-    this.random = random;
+    this.randomSeed = typeof randomOrSeed === 'number' ? randomOrSeed >>> 0 : undefined;
+    this.random = typeof randomOrSeed === 'number' ? new SeededRandom(this.randomSeed!).next : randomOrSeed;
     globalAutoAssistConfig.isRookie = botDifficulty === 'Rookie';
     // A controller must start with valid state even if another scene still has
     // a ball in play. The active-match reset guard applies only to reset().
@@ -205,6 +208,7 @@ export class MatchController {
 
   private createInitialMatchState(player: Player, bot: Player): MatchState {
     return {
+      ...(this.randomSeed === undefined ? {} : { randomSeed: this.randomSeed }),
       player,
       bot,
       tossWinnerId: '',

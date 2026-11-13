@@ -12,6 +12,7 @@ try {
   await page.setViewport({ width: 1024, height: 768, isMobile: true, hasTouch: true });
   await page.evaluateOnNewDocument(() => {
     let seed = 12345;
+    window.__HARDHIT_MATCH_SEED = 12345;
     Math.random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
   });
   const errors = [];

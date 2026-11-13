@@ -1005,6 +1005,14 @@ test('seeded random snapshots reproduce subsequent bot inputs', () => {
   assert.throws(() => new SeededRandom({ algorithm: 'other' as 'hardhit-lcg32-v1', state: 1 }), /Unsupported random snapshot/);
 });
 
+test('match seed is recorded and reproduces bot delivery sequence', () => {
+  const first = new MatchController('Medium', 0x1234);
+  const replay = new MatchController('Medium', 0x1234);
+  const sequence = (game: MatchController) => Array.from({ length: 12 }, () => botChooseDelivery(game.state.bot, game.botDifficulty, 'RHB', game.random));
+  assert.equal(first.state.randomSeed, 0x1234);
+  assert.deepEqual(sequence(first), sequence(replay));
+});
+
 test('well-timed shots retain their selected direction on every bot tier', () => {
   for (const tier of ['Rookie', 'Medium', 'Hard'] as const) {
     for (let direction = 0; direction < 8; direction++) {

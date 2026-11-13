@@ -116,6 +116,7 @@ export interface MatchProgression {
 }
 
 export interface MatchState {
+  randomSeed?: number;
   player: Player;
   bot: Player;
   tossWinnerId: string;

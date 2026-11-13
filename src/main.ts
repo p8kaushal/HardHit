@@ -43,7 +43,9 @@ function initLobby(): void {
     const difficulty = diffSelect.value as 'Rookie' | 'Medium' | 'Hard';
     
     // Initialize controllers
-    controller = new MatchController(difficulty);
+    const testSeed = (window as any).__HARDHIT_MATCH_SEED;
+    const seed = Number.isInteger(testSeed) ? testSeed : crypto.getRandomValues(new Uint32Array(1))[0];
+    controller = new MatchController(difficulty, seed);
 
     showScreen('screen-toss');
     resetTossUI();
