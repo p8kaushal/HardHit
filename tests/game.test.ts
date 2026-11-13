@@ -1281,6 +1281,27 @@ test('no-ball overrides wide and free-hit protection survives further extras', (
   assert.equal(game.getCurrentInnings().score, 3);
 });
 
+test('no-ball overrides mirrored wide lines for both batter hands and updates the innings once', () => {
+  for (const { hand, line } of [
+    { hand: 'RHB' as const, line: 1.4 },
+    { hand: 'RHB' as const, line: -1.4 },
+    { hand: 'LHB' as const, line: 1.4 },
+    { hand: 'LHB' as const, line: -1.4 },
+  ]) {
+    const game = new MatchController('Medium');
+    game.setTossResult(game.state.player.id, 'bat');
+    game.startMatch();
+    const innings = game.getCurrentInnings();
+    innings.batter.batterHand = hand;
+    const outcome = game.recordBall({ ...delivery(0.5, line), frontFootHeel: 0.01 }, null);
+    assert.equal(outcome.extraType, 'noball', `${hand} outside line precedence`);
+    assert.equal(outcome.extraType, 'noball', `${hand} scorecard extra type`);
+    assert.equal(innings.score, 1, `${hand} innings score`);
+    assert.equal(innings.ballsBowled, 0, `${hand} legal-ball count`);
+    assert.equal(innings.isNextFreeHit, true, `${hand} free-hit state`);
+  }
+});
+
 test('the over display keeps upcoming legal balls after extras and shows the sudden-death limit', () => {
   const game = match();
   const innings = game.getCurrentInnings();
