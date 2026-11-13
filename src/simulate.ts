@@ -2,6 +2,7 @@ import { createBotPlayer } from './game';
 import { botChooseDelivery, botChooseShot } from './bot';
 import { evaluateWicket, checkExtraBall } from './formula';
 import type { DeliveryType } from './types';
+import { SeededRandom } from './random';
 
 export interface BotSimulationResult {
   tier: 'Rookie' | 'Medium' | 'Hard';
@@ -17,11 +18,6 @@ export interface BotSimulationResult {
   deliveryShares: Record<DeliveryType, number>;
 }
 
-function randomFromSeed(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => ((state = (1664525 * state + 1013904223) >>> 0) / 4294967296);
-}
-
 /** Synthetic bot-over distribution check; it is not a real-match calibration. */
 export function runBotSimulation(
   overCount = 500,
@@ -31,7 +27,7 @@ export function runBotSimulation(
   if (!Number.isInteger(overCount) || overCount <= 0) throw new Error('overCount must be a positive integer');
   const tiers: BotSimulationResult['tier'][] = specificTier ? [specificTier] : ['Rookie', 'Medium', 'Hard'];
   const results = tiers.map((tier, tierIndex): BotSimulationResult => {
-    const random = randomFromSeed((seed + tierIndex * 0x9e3779b9) >>> 0);
+    const random = new SeededRandom((seed + tierIndex * 0x9e3779b9) >>> 0).next;
     const bowler = createBotPlayer(tier);
     const batter = createBotPlayer('Rookie');
     let attempts = 0, legalBalls = 0, wides = 0, noBalls = 0, wickets = 0, incompleteOvers = 0;

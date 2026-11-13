@@ -7,6 +7,7 @@ import { directionFromStick, suggestedShotDirection, TouchBattingControls } from
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
+import { SeededRandom } from '../src/random';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
 import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
@@ -990,6 +991,18 @@ test('bot distribution simulation is reproducible, bounded and reports the right
     assert.ok(Math.abs(Object.values(tier.deliveryShares).reduce((sum, share) => sum + share, 0) - 1) < 1e-9);
     assert.ok(tier.incompleteOvers < tier.overs);
   }
+});
+
+test('seeded random snapshots reproduce subsequent bot inputs', () => {
+  const source = new SeededRandom(0xabc123);
+  const bowler = createBotPlayer('Hard');
+  for (let i = 0; i < 37; i++) source.next();
+  const snapshot = source.snapshot();
+  const expected = Array.from({ length: 20 }, () => botChooseDelivery(bowler, 'Hard', 'LHB', source.next));
+  const restored = new SeededRandom(snapshot);
+  const actual = Array.from({ length: 20 }, () => botChooseDelivery(bowler, 'Hard', 'LHB', restored.next));
+  assert.deepEqual(actual, expected);
+  assert.throws(() => new SeededRandom({ algorithm: 'other' as 'hardhit-lcg32-v1', state: 1 }), /Unsupported random snapshot/);
 });
 
 test('well-timed shots retain their selected direction on every bot tier', () => {
