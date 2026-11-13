@@ -3,7 +3,7 @@
 ### Completed bounded increment — Phase 2 no-ball precedence matrix
 
 - **Scope:** extend no-ball-over-wide coverage to mirrored outside lines with right- and left-handed batters, and assert adjudication, penalty score, legal-ball count and free-hit state.
-- [x] **Acceptance:** all four hand/line combinations classify as no-ball, add exactly one penalty run to the innings score, consume no legal delivery and activate free-hit state. `npm test` passed 121 tests; build and `git diff --check` passed.
+- [x] **Acceptance:** all four hand/line combinations classify and record as no-ball, show the no-ball explanation, add exactly one penalty run to the innings score, consume no legal delivery and activate free-hit state. `npm test` passed 121 tests; build and `git diff --check` passed.
 
 ### Completed bounded increment — Phase 3 trajectory symmetry
 
