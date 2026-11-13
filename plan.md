@@ -1,5 +1,9 @@
 # HardHit project plan index
 
+## Account handoff — November 13, 2026
+
+The non-camera realism goal is paused at the user's request. Resume only when explicitly requested. The active branch is `feature/gameplay-realism-clean`, based on local `main`; camera batting is excluded. See `REALISM_AUDIT_AND_PLAN.md`, `TODO.md` and the ignored local `handoff.md` for current evidence, uncommitted contact-alignment work and the next steps. Earlier sections below are historical and may refer to other branches or superseded state. Do not merge or deploy.
+
 The detailed, phased gameplay plan, acceptance gates, and current phase status live in [DELIVERY_PLAN.md](DELIVERY_PLAN.md). The implementation checklist and active defects live in [TODO.md](TODO.md). Rules and known approximations are tracked in [CRICKET_RULES.md](CRICKET_RULES.md) and [PHYSICS_CALIBRATION.md](PHYSICS_CALIBRATION.md).
 
 ## Standing work protocol
