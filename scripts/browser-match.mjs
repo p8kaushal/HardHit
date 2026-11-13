@@ -22,6 +22,9 @@ try {
   const noBallFixture = process.argv.includes('--fixture-noball');
   const pauseVisibility = process.argv.includes('--pause-visibility');
   const pauseRotation = process.argv.includes('--pause-rotation');
+  const botBatsFast = process.argv.includes('--bot-bats-fast');
+  const botBatsSpin = process.argv.includes('--bot-bats-spin');
+  if (botBatsFast && botBatsSpin) throw new Error('Choose only one bot batting delivery override');
   const pauseFlight = process.argv.includes('--pause-flight') || pauseVisibility || pauseRotation;
   if (pauseRotation && pauseVisibility) throw new Error('Choose either --pause-rotation or --pause-visibility');
   if (noBallFixture && !['--trace-shots', '--swing', '--loft', '--square'].every(flag => process.argv.includes(flag))) {
@@ -42,13 +45,24 @@ try {
       }, { timeout: 5000 }, portrait);
     });
   }
-  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation }) => {
+  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin }) => {
     const { GameScene } = await import('/src/scene.ts');
+    const { UIManager } = await import('/src/ui.ts');
     const { globalAutoAssistConfig } = await import('/src/game.ts');
     const { MatchController } = await import('/src/game.ts');
     const { setGamePaused, isGamePaused } = await import('/src/game-clock.ts');
     const { deliveryContactPoint, BALL_RADIUS_METERS } = await import('/src/formula.ts');
     const animateDelivery = GameScene.prototype.animateDelivery;
+    const deliverBall3D = UIManager.prototype.deliverBall3D;
+    UIManager.prototype.deliverBall3D = function (...args) {
+      const playerIsBowling = this.controller.getCurrentInnings().batter.id !== this.controller.state.player.id;
+      if (playerIsBowling && this.activeDelivery) {
+        if (botBatsFast) Object.assign(this.activeDelivery, { type: 'fast', pace: 0.95, turn: 0, swing: 0 });
+        if (botBatsSpin) Object.assign(this.activeDelivery, { type: 'legspin', pace: 0.65, turn: 0.9, swing: 0 });
+        globalAutoAssistConfig.currentDelivery = this.activeDelivery;
+      }
+      return deliverBall3D.apply(this, args);
+    };
     window.__matchContacts = [];
     window.__playerShotTrace = [];
     window.__matchReplay = [];
@@ -145,7 +159,7 @@ try {
         arrived();
       }, ...rest);
     };
-  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation });
+  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin });
   if (process.argv.includes('--force-tie')) {
     // Test-only fixture: make regular-innings deliveries legal dots so the
     // real UI must play both sudden-death innings. Production code is unchanged.
