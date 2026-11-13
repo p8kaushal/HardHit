@@ -10,6 +10,11 @@
 - **Scope:** assert the rendered marker's source coordinates (`deliveryPitchPoint`) equal the shared sampled trajectory at its bounce progress across pace, swing and spin variants.
 - [x] **Acceptance:** fixed-input regression passes for right/left arm pace deliveries with swing and both spin types; `npm test` passed 120 tests, build and `git diff --check` passed. Geometry agreement does not verify display/render timing or calibration.
 
+### Completed bounded increment — Phase 3 incoming clock cadence
+
+- **Scope:** extend the incoming delivery animation clock regression to 30/60/120 fps and mixed frame intervals at equal elapsed time.
+- [x] **Acceptance:** 30/60/120 fps and mixed 9–41 ms slices for 1 s elapsed time produce equivalent progress within floating-point tolerance; the 50 ms per-frame catch-up cap remains covered. `npm test` passed 120 tests, build and `git diff --check` passed. This does not establish device-load performance.
+
 ## Active non-camera realism work
 
 - **Clean-branch contact-alignment increment (committed `8d3af66`):** Fixed bot visual/adjudicated contact alignment in `src/scene.ts` and extended `scripts/browser-match.mjs` with traces and lifecycle fixtures. At that increment, 107 unit tests and the build passed, as did a strict square-shot match with sixes/fours and bot-contact checks. Later clean-branch browser checks cover both innings orders, extras, misses, pause/visibility/rotation, replay and repeated-match persistence. The disposable clean-install snapshot passed 117 tests; the latest workspace suite passes 120 after Phase 2 wide and Phase 3 trajectory regressions. Physical bat collision, independent calibration, live-input determinism and visual/timing replay remain open. Camera batting remains excluded; no merge/deploy.

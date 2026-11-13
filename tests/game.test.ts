@@ -1658,10 +1658,15 @@ test('a six remains in flight beyond the rope until its landing distance is know
   assert.ok(ball.position.z - BATTER_CREASE_Z > ropeDistance + 5);
 });
 
-test('delivery animation advances at the same speed at 30 and 60 fps', () => {
-  const at30 = deliveryAnimationStep(1000 / 30, 1) * 30;
-  const at60 = deliveryAnimationStep(1000 / 60, 1) * 60;
-  assert.ok(Math.abs(at30 - at60) < 1e-9);
+test('delivery animation advances consistently across frame rates and mixed frame intervals', () => {
+  const progressFor = (frameDeltas: number[]) => frameDeltas.reduce((progress, delta) => progress + deliveryAnimationStep(delta, 1), 0);
+  const at30 = progressFor(Array.from({ length: 30 }, () => 1000 / 30));
+  const at60 = progressFor(Array.from({ length: 60 }, () => 1000 / 60));
+  const at120 = progressFor(Array.from({ length: 120 }, () => 1000 / 120));
+  const mixed = progressFor(Array.from({ length: 40 }, (_, index) => [9, 23, 41, 27][index % 4]));
+  assert.ok(Math.abs(at60 - at30) < 1e-9);
+  assert.ok(Math.abs(at120 - at30) < 1e-9);
+  assert.ok(Math.abs(mixed - at30) < 1e-9);
   assert.equal(deliveryAnimationStep(500, 1), 3);
 });
 
