@@ -1857,6 +1857,30 @@ test('delivery visuals and crease-line scoring agree for pace and spin', () => {
   }
 });
 
+test('sampled delivery paths mirror across arms for swing and opposite spin', () => {
+  const cases: Array<{ type: DeliveryChoice['type']; mirroredType: DeliveryChoice['type']; swing: number }> = [
+    { type: 'fast', mirroredType: 'fast', swing: 0.8 },
+    { type: 'offspin', mirroredType: 'legspin', swing: 0 },
+  ];
+  for (const item of cases) {
+    const original: DeliveryChoice = {
+      ...delivery(0.5, 0.3), aimTarget: { x: 0.3, z: -3.5 }, type: item.type,
+      bowlingArm: 'Right', overTheWicket: true, swing: item.swing, turn: 0.8,
+    };
+    const mirrored: DeliveryChoice = {
+      ...original, aimTarget: { x: -0.3, z: -3.5 }, bowlingArm: 'Left',
+      type: item.mirroredType, swing: -item.swing,
+    };
+    for (const progress of [0, 0.15, deliveryBounceProgress(item.type, original.aimTarget.z), 0.72, 1]) {
+      const point = sampleDeliveryPath(original, progress);
+      const mirrorPoint = sampleDeliveryPath(mirrored, progress);
+      assert.ok(Math.abs(point.x + mirrorPoint.x) < 1e-9, `${item.type} X mismatch at ${progress}`);
+      assert.ok(Math.abs(point.y - mirrorPoint.y) < 1e-9, `${item.type} Y mismatch at ${progress}`);
+      assert.ok(Math.abs(point.z - mirrorPoint.z) < 1e-9, `${item.type} Z mismatch at ${progress}`);
+    }
+  }
+});
+
 test('a yorker reaches the batter lower than a short delivery', () => {
   assert.ok(deliveryArrivalHeight(-8.2) < deliveryArrivalHeight(-2.2));
   assert.ok(deliveryArrivalHeight(-2.2) < deliveryArrivalHeight(0.5));
