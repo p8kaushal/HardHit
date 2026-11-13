@@ -24,6 +24,11 @@
 - **Scope:** replace random stat upgrades with a documented, deterministic mapping from batting/bowling performance to eligible stat gains; display the measured reason and avoid gains without qualifying performance.
 - [x] **Acceptance:** boundary performance maps to Power; wickets while bowling map to Accuracy; capped Power falls through to the next tied eligible stat; no-performance matches receive no attribute upgrade; progression does not use global randomness. The summary displays the measured reason. `npm test` passed 124 tests; build and `git diff --check` passed.
 
+### Completed bounded increment — progression summary browser check
+
+- **Scope:** assert in the strict-six browser scenario that a performance upgrade appears with its reason in the match summary.
+- [x] **Acceptance:** `node scripts/browser-match.mjs --bat-first --swing --loft --square --require-six` completed both innings and returned to the lobby; the player scored five sixes and the summary displayed `Power +2 (Now 52) · 6 boundary hits`. `npm test` passed 124 tests; build and `git diff --check` passed.
+
 ### Completed bounded increment — Phase 3 trajectory symmetry
 
 - **Scope:** add a deterministic unit regression comparing sampled mirror-image delivery paths across the full flight for pace swing and spin turn; no trajectory tuning.

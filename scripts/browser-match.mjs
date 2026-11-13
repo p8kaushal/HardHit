@@ -374,6 +374,13 @@ try {
       }
     }
     if (process.argv.includes('--require-six') && !six.count) throw new Error('No six was scored in this timing-sensitive run');
+    if (process.argv.includes('--require-six')) {
+      const progression = await page.$eval('#summary-progression-stat', el => el.textContent?.trim() || '');
+      if (!progression.includes(' · ') || !/(boundary hit|scoring shot|successful contact|wicket|delivery type)/i.test(progression)) {
+        throw new Error(`Performance upgrade reason is missing from the summary: ${progression}`);
+      }
+      console.log(`Progression summary shows its performance reason: ${progression}`);
+    }
     if (process.argv.includes('--require-four') && !six.fours) throw new Error('No four was recorded in the player scorecard');
     console.log(`Lofted batting recorded ${six.count} six(es), biggest ${six.biggest.toFixed(1)}m.`);
   }
