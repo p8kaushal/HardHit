@@ -1649,6 +1649,29 @@ test('shot physics keeps pace at low frame rates while bounding long stalls', ()
   assert.ok(stalled.position.x > 0.2 && stalled.position.x < 0.3);
 });
 
+test('fixed-step observer captures every simulated position without changing physics', () => {
+  const initial: BallState = {
+    position: { x: 0, y: 1, z: -8 }, velocity: { x: 1, y: 2, z: 12 },
+    hasBounced: false, reachedBoundary: false, stopped: false,
+  };
+  const plain = structuredClone(initial);
+  const observed = structuredClone(initial);
+  const points: Array<{ elapsed: number; position: BallState['position'] }> = [];
+  const accumulator = advanceBallFrame(plain, 0, 1 / 30);
+  const observedAccumulator = advanceBallFrame(observed, 0, 1 / 30, (state, stepSeconds) => {
+    const elapsed = (points.at(-1)?.elapsed ?? 0) + stepSeconds;
+    points.push({ elapsed, position: { ...state.position } });
+  });
+  assert.equal(points.length, 4);
+  assert.ok(points.every((point, index) => index === 0 || point.elapsed > points[index - 1].elapsed));
+  assert.deepEqual(observed, plain);
+  assert.equal(observedAccumulator, accumulator);
+
+  let stallSamples = 0;
+  advanceBallFrame(structuredClone(initial), 0, 0.5, () => stallSamples++);
+  assert.equal(stallSamples, 30, 'long-stall observer is bounded by the fixed-step catch-up cap');
+});
+
 test('rope crossing and bounce are resolved in their actual order within a physics step', () => {
   const nearRope = (height: number): BallState => ({
     position: { x: 64.95, y: height, z: 0 },

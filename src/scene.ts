@@ -4,6 +4,7 @@ import { CameraMode, DeliveryChoice, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
+import type { FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
@@ -68,6 +69,8 @@ export class GameScene {
   public shotReachedBoundary = false;
   public shotBoundaryOnFull = false;
   private ballPathPoints: BABYLON.Vector3[] = [];
+  private shotTrajectory: FieldingTrajectorySample[] = [];
+  private shotElapsedSeconds = 0;
   private shotCameraDirection: CameraVector = { x: 0, y: 0, z: 1 };
   
   constructor(canvasElementId: string) {
@@ -953,7 +956,13 @@ export class GameScene {
     try {
       if (!this.currentBallPos || !this.shotPhysics || !this.ballMesh) return;
 
-      this.physicsAccumulator = advanceBallFrame(this.shotPhysics, this.physicsAccumulator, this.engine.getDeltaTime() / 1000);
+      this.physicsAccumulator = advanceBallFrame(this.shotPhysics, this.physicsAccumulator, this.engine.getDeltaTime() / 1000, (state, stepSeconds) => {
+        this.shotElapsedSeconds += stepSeconds;
+        this.shotTrajectory.push({
+          timeSeconds: this.shotElapsedSeconds,
+          position: { ...state.position },
+        });
+      });
       globalAutoAssistConfig.hasBounced = this.shotPhysics.hasBounced;
       this.shotReachedBoundary = this.shotPhysics.reachedBoundary;
       this.shotBoundaryOnFull = this.shotPhysics.boundaryOnFull ?? false;
@@ -1020,6 +1029,11 @@ export class GameScene {
     this.ballPathPoints = [startPoint.add(new BABYLON.Vector3(0, BALL_VISUAL_OFFSET, 0))];
     this.currentBallPos = startPoint.clone();
     this.shotOrigin = startPoint.clone();
+    this.shotElapsedSeconds = 0;
+    this.shotTrajectory = [{
+      timeSeconds: 0,
+      position: { x: startPoint.x, y: startPoint.y, z: startPoint.z },
+    }];
     this.shotReachedBoundary = false;
     this.shotBoundaryOnFull = false;
     this.shotPhysics = { position: this.currentBallPos, velocity: currentVelocity, hasBounced: false, reachedBoundary: false, stopped: false };
@@ -1031,6 +1045,10 @@ export class GameScene {
   public getShotDistance(): number {
     if (!this.currentBallPos || !this.shotOrigin) return 0;
     return Math.hypot(this.currentBallPos.x - this.shotOrigin.x, this.currentBallPos.z - this.shotOrigin.z);
+  }
+
+  public getShotTrajectory(): FieldingTrajectorySample[] {
+    return this.shotTrajectory.map(sample => ({ ...sample, position: { ...sample.position } }));
   }
 
   public animateMissWicket(isWicket: boolean, continuingDelivery?: DeliveryChoice): void {

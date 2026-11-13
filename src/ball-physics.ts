@@ -10,7 +10,12 @@ export interface BallState {
 }
 
 /** Advance fixed simulation steps while bounding catch-up after a long stall. */
-export function advanceBallFrame(state: BallState, accumulator: number, elapsedSeconds: number): number {
+export function advanceBallFrame(
+  state: BallState,
+  accumulator: number,
+  elapsedSeconds: number,
+  onStep?: (state: Readonly<BallState>, stepSeconds: number) => void,
+): number {
   const step = 1 / 120;
   const elapsed = Number.isFinite(elapsedSeconds) ? Math.max(0, Math.min(elapsedSeconds, 0.25)) : 0;
   let remaining = Math.max(0, accumulator) + elapsed;
@@ -19,6 +24,7 @@ export function advanceBallFrame(state: BallState, accumulator: number, elapsedS
     stepBall(state, step);
     remaining = Math.max(0, remaining - step);
     steps++;
+    onStep?.(state, step);
     if (state.stopped || (state.reachedBoundary && (!state.boundaryOnFull || state.hasBounced))) break;
   }
   return remaining;
