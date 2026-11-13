@@ -4,9 +4,9 @@ import { deliveryContactPoint, getAimXFromLineType, sampleFrontFootLanding } fro
 
 // Unused constants removed
 
-function randomNormal(mean: number, stdDev: number): number {
-  const u1 = Math.random() || 0.0001;
-  const u2 = Math.random();
+function randomNormal(mean: number, stdDev: number, random: () => number): number {
+  const u1 = random() || 0.0001;
+  const u2 = random();
   const randStdNormal = Math.sqrt(-2.0 * Math.log(u1)) * Math.sin(2.0 * Math.PI * u2);
   return mean + stdDev * randStdNormal;
 }
@@ -18,29 +18,29 @@ function clamp(val: number, min: number, max: number): number {
 /**
  * Bot generates its 3D delivery parameters.
  */
-export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium' | 'Hard' = 'Medium', batterHand: 'RHB' | 'LHB' = 'RHB'): DeliveryChoice {
+export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium' | 'Hard' = 'Medium', batterHand: 'RHB' | 'LHB' = 'RHB', random: () => number = Math.random): DeliveryChoice {
   const bowling = bowler.stats.bowling;
   const pace = bowling.pace;
   const spinShare = bowling.spin / Math.max(1, bowling.spin + pace);
   const spinChance = clamp(0.12 + spinShare * 0.48, 0.12, 0.5);
   const swingChance = clamp(0.08 + bowling.swing / 250, 0.08, 0.42);
-  const usesSpin = Math.random() < spinChance;
-  const usesSwing = !usesSpin && Math.random() < swingChance;
+  const usesSpin = random() < spinChance;
+  const usesSwing = !usesSpin && random() < swingChance;
   const deliveryType: import('./types').DeliveryType = usesSpin
-    ? (Math.random() < 0.5 ? 'offspin' : 'legspin')
+    ? (random() < 0.5 ? 'offspin' : 'legspin')
     : pace > 70 ? 'fast' : (pace > 40 ? 'medium' : 'slow');
 
   const lines: import('./types').LineType[] = ['off', 'middle', 'leg'];
   const lengths: import('./types').LengthType[] = ['bouncer', 'short', 'good', 'full', 'yorker'];
 
-  let line = lines[Math.floor(Math.random() * lines.length)];
-  let length = lengths[Math.floor(Math.random() * lengths.length)];
+  let line = lines[Math.floor(random() * lines.length)];
+  let length = lengths[Math.floor(random() * lengths.length)];
   
-  if (difficulty === 'Hard' && Math.random() > 0.4) {
+  if (difficulty === 'Hard' && random() > 0.4) {
     line = 'off';
-    length = Math.random() > 0.5 ? 'good' : 'yorker';
-  } else if (difficulty === 'Medium' && Math.random() > 0.6) {
-    line = Math.random() > 0.5 ? 'off' : 'middle';
+    length = random() > 0.5 ? 'good' : 'yorker';
+  } else if (difficulty === 'Medium' && random() > 0.6) {
+    line = random() > 0.5 ? 'off' : 'middle';
     length = 'good';
   }
 
@@ -55,10 +55,10 @@ export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium
   else if (length === 'bouncer') aimZ = 0.5;
 
   const errorMargin = (100 - bowler.stats.bowling.accuracy) / 100;
-  const xWobble = (Math.random() - 0.5) * errorMargin;
-  const zWobble = (Math.random() - 0.5) * errorMargin * 2;
+  const xWobble = (random() - 0.5) * errorMargin;
+  const zWobble = (random() - 0.5) * errorMargin * 2;
 
-  const releaseTiming = 0.45 + (Math.random() * 0.1); 
+  const releaseTiming = 0.45 + (random() * 0.1);
 
   return {
     aimTarget: { x: baseAimX + xWobble, z: aimZ + zWobble },
@@ -66,12 +66,12 @@ export function botChooseDelivery(bowler: Player, difficulty: 'Rookie' | 'Medium
     length,
     type: deliveryType,
     releaseTiming,
-    pace: usesSpin ? 0.55 + Math.random() * 0.25 : pace / 100,
-    turn: usesSpin ? clamp((bowling.spin / 100) * (0.55 + Math.random() * 0.45), 0, 1) : 0,
-    swing: usesSwing ? (Math.random() < 0.5 ? -1 : 1) * clamp((bowling.swing / 100) * (0.5 + Math.random() * 0.5), 0, 1) : 0,
-    frontFootHeel: sampleFrontFootLanding(bowling.accuracy, usesSpin ? 0.65 : 0.5, Math.random()),
+    pace: usesSpin ? 0.55 + random() * 0.25 : pace / 100,
+    turn: usesSpin ? clamp((bowling.spin / 100) * (0.55 + random() * 0.45), 0, 1) : 0,
+    swing: usesSwing ? (random() < 0.5 ? -1 : 1) * clamp((bowling.swing / 100) * (0.5 + random() * 0.5), 0, 1) : 0,
+    frontFootHeel: sampleFrontFootLanding(bowling.accuracy, usesSpin ? 0.65 : 0.5, random()),
     bowlingArm: bowler.bowlingArm || 'Right',
-    overTheWicket: Math.random() > 0.3
+    overTheWicket: random() > 0.3
   };
 }
 
@@ -82,42 +82,43 @@ export function botChooseShot(
   batter: Player,
   _bowler: Player,
   delivery: DeliveryChoice,
-  difficulty: 'Rookie' | 'Medium' | 'Hard' = 'Medium'
+  difficulty: 'Rookie' | 'Medium' | 'Hard' = 'Medium',
+  random: () => number = Math.random
 ): ShotChoice {
   let shotType: ShotType = 'lofted';
   
   if (difficulty === 'Rookie') {
-    const rand = Math.random();
+    const rand = random();
     if (rand < 0.1) shotType = 'defensive';
     else if (rand < 0.2) shotType = 'grounded';
     else if (rand < 0.4) shotType = 'lofted';
     else shotType = 'power';
   } else if (difficulty === 'Medium') {
-    const rand = Math.random();
+    const rand = random();
     if (rand < 0.05) shotType = 'defensive';
     else if (rand < 0.1) shotType = 'grounded';
     else if (rand < 0.3) shotType = 'lofted';
     else shotType = 'power';
   } else {
     // Hard: Very aggressive
-    const rand = Math.random();
+    const rand = random();
     if (rand < 0.05) shotType = 'grounded';
     else if (rand < 0.35) shotType = 'lofted';
     else shotType = 'power';
   }
 
   // Aim direction (0-7 clock) based on ball line
-  let direction = Math.floor(Math.random() * 8);
+  let direction = Math.floor(random() * 8);
   const lineAtBatter = deliveryContactPoint(delivery).x;
   if (lineAtBatter > 0.3) {
     // Aim off side: zones 1, 2, 3
-    direction = [1, 2, 3][Math.floor(Math.random() * 3)];
+    direction = [1, 2, 3][Math.floor(random() * 3)];
   } else if (lineAtBatter < -0.3) {
     // Aim leg side: zones 5, 6, 7
-    direction = [5, 6, 7][Math.floor(Math.random() * 3)];
+    direction = [5, 6, 7][Math.floor(random() * 3)];
   } else {
     // Straight: zones 0, 4
-    direction = [0, 4, 1, 7][Math.floor(Math.random() * 4)];
+    direction = [0, 4, 1, 7][Math.floor(random() * 4)];
   }
 
   // Timing is normalised to the same 0..1 scale as player input. A zero
@@ -133,13 +134,13 @@ export function botChooseShot(
   }
   
   const arrivalFrame = 50;
-  const swingFrame = randomNormal(arrivalFrame, timingStdDev * 40);
+  const swingFrame = randomNormal(arrivalFrame, timingStdDev * 40, random);
   const timing = clamp(0.5 + (swingFrame - arrivalFrame) / 40, 0.15, 0.85);
   
   // Contact execution scales dynamically with batter Timing stat
   const timingStat = batter.stats.batting.timing;
   const contactStdDev = Math.max(0.02, 0.18 - (timingStat / 100) * 0.15);
-  const contactZone = clamp(randomNormal(0.5, contactStdDev), 0.15, 0.85);
+  const contactZone = clamp(randomNormal(0.5, contactStdDev, random), 0.15, 0.85);
 
   return {
     type: shotType,

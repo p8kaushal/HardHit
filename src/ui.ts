@@ -501,7 +501,8 @@ export class UIManager {
       this.controller.state.bot,
       this.controller.state.player,
       this.activeDelivery,
-      this.controller.state.bot.rank === 'Legend' ? 'Hard' : (this.controller.state.bot.rank === 'Gold' ? 'Medium' : 'Rookie')
+      this.controller.state.bot.rank === 'Legend' ? 'Hard' : (this.controller.state.bot.rank === 'Gold' ? 'Medium' : 'Rookie'),
+      this.controller.random
     );
 
     this.deliverBall3D();
@@ -1079,7 +1080,7 @@ export class UIManager {
       }
       
       // Auto trigger bot delivery
-      this.activeDelivery = botChooseDelivery(state.bot, this.controller.botDifficulty, innings.batter.batterHand || 'RHB');
+      this.activeDelivery = botChooseDelivery(state.bot, this.controller.botDifficulty, innings.batter.batterHand || 'RHB', this.controller.random);
       this.gameScene.setBowlerSide(this.activeDelivery.overTheWicket ?? true, this.activeDelivery.bowlingArm || 'Right');
       this.activeDelivery.batterPosition = { ...this.batterPosition };
       this.touchBattingControls.setLocked(false);

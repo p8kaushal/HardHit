@@ -173,14 +173,16 @@ export function createBotPlayer(difficulty: 'Rookie' | 'Medium' | 'Hard'): Playe
 export class MatchController {
   public state!: MatchState;
   public readonly botDifficulty: 'Rookie' | 'Medium' | 'Hard';
+  public readonly random: () => number;
   private transitionPending = false;
   private transitionGeneration = 0;
   private transitionOverlay: HTMLElement | null = null;
   private transitionTimer: number | null = null;
   private transitionCallbacks: Array<() => void> = [];
 
-  constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard') {
+  constructor(botDifficulty: 'Rookie' | 'Medium' | 'Hard', random: () => number = Math.random) {
     this.botDifficulty = botDifficulty;
+    this.random = random;
     globalAutoAssistConfig.isRookie = botDifficulty === 'Rookie';
     // A controller must start with valid state even if another scene still has
     // a ball in play. The active-match reset guard applies only to reset().

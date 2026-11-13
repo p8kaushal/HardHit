@@ -963,22 +963,17 @@ test('bot off-side deliveries use the batter handedness', () => {
 });
 
 test('seeded bot bowling uses bounded pace, spin and swing variety', () => {
-  const random = Math.random;
   const bowler = createBotPlayer('Medium');
   let seed = 0x51a7;
-  Math.random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
-  try {
-    const deliveries = Array.from({ length: 1000 }, () => botChooseDelivery(bowler, 'Medium', 'RHB'));
-    const spin = deliveries.filter(ball => ball.type === 'offspin' || ball.type === 'legspin');
-    const swinging = deliveries.filter(ball => Math.abs(ball.swing ?? 0) > 0);
-    assert.ok(spin.length >= 250 && spin.length <= 500, `unexpected spin share: ${spin.length}`);
-    assert.ok(deliveries.some(ball => ball.type === 'offspin') && deliveries.some(ball => ball.type === 'legspin'));
-    assert.ok(swinging.length >= 180 && swinging.length <= 400, `unexpected swing share: ${swinging.length}`);
-    assert.ok(swinging.some(ball => (ball.swing ?? 0) < 0) && swinging.some(ball => (ball.swing ?? 0) > 0));
-    assert.ok(deliveries.every(ball => Number.isFinite(ball.pace) && ball.pace! >= 0 && ball.pace! <= 1 && Number.isFinite(ball.turn) && ball.turn! >= 0 && ball.turn! <= 1));
-  } finally {
-    Math.random = random;
-  }
+  const seeded = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
+  const deliveries = Array.from({ length: 1000 }, () => botChooseDelivery(bowler, 'Medium', 'RHB', seeded));
+  const spin = deliveries.filter(ball => ball.type === 'offspin' || ball.type === 'legspin');
+  const swinging = deliveries.filter(ball => Math.abs(ball.swing ?? 0) > 0);
+  assert.ok(spin.length >= 250 && spin.length <= 500, `unexpected spin share: ${spin.length}`);
+  assert.ok(deliveries.some(ball => ball.type === 'offspin') && deliveries.some(ball => ball.type === 'legspin'));
+  assert.ok(swinging.length >= 180 && swinging.length <= 400, `unexpected swing share: ${swinging.length}`);
+  assert.ok(swinging.some(ball => (ball.swing ?? 0) < 0) && swinging.some(ball => (ball.swing ?? 0) > 0));
+  assert.ok(deliveries.every(ball => Number.isFinite(ball.pace) && ball.pace! >= 0 && ball.pace! <= 1 && Number.isFinite(ball.turn) && ball.turn! >= 0 && ball.turn! <= 1));
 });
 
 test('well-timed shots retain their selected direction on every bot tier', () => {
