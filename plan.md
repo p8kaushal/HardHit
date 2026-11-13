@@ -52,6 +52,12 @@ The pose reference harness accepts WebM input, so restrict the new annotator to 
 
 The annotator now rejects non-WebM filenames. Its browser check passed unsupported input, valid WebM annotation and export, and rejection of an unsupported replacement without leaving prior annotations exportable. This is an input-format check, not codec validation or pose accuracy evidence.
 
+### Current investigation — bat annotation overlay alignment
+
+Check whether the existing bat annotator's overlay has the same displayed bounds as the decoded video on portrait and landscape clips. Misaligned bounds would invalidate click coordinates despite schema-valid JSON. If reproduced, correct the layout, add a browser regression that asserts alignment and known clicked coordinates, and document that earlier synthetic clicks were not physical labels.
+
+The suspected mismatch did not reproduce: browser checks passed for local 1080×1920 portrait and 600×338 landscape clips, with overlay/frame bounds within one pixel and exported x/y matching the synthetic click. The alignment assertion is retained as a regression. These checks validate UI coordinate mapping at the tested viewport; they are not human annotations or physical bat accuracy evidence.
+
 ### New live feedback — 6:39 PM recording
 
 November 13 verification: partial torso calibration and prominent guidance are implemented; the camera browser regression passed, including missing-foot calibration, countdown, scrolling and short landscape mode-selector access. The mobile fixture needed an initial painted frame, and the selector needed to stack above shot controls. All 132 unit tests, production build, browser smoke, both practice modes, full matches in both orders, sudden death and rematch passed. Real-camera fidelity and the previously failed strict six scenario remain open.

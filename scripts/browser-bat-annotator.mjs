@@ -20,6 +20,11 @@ try {
   await (await page.$('#file')).uploadFile(clip);
   await page.click('#load');
   await page.waitForFunction(() => document.querySelector('#status').textContent.includes('Frame 0'));
+  const alignment = await page.evaluate(() => {
+    const frame = document.querySelector('#frame').getBoundingClientRect(), view = document.querySelector('#view').getBoundingClientRect();
+    return Math.max(Math.abs(frame.left - view.left), Math.abs(frame.top - view.top), Math.abs(frame.width - view.width), Math.abs(frame.height - view.height));
+  });
+  assert.ok(alignment < 1, `bat overlay must align with the decoded frame; difference ${alignment}px`);
   async function save(x) {
     const box = await (await page.$('#view')).boundingBox();
     for (let i = 0; i < 4; i++) await page.mouse.click(box.x + box.width * (x + i * .03), box.y + box.height * .5);
@@ -38,6 +43,7 @@ try {
   validateBatReference(result);
   assert.deepEqual(result.frames.map(frame => frame.frame), [0, 5]);
   assert.ok(Math.abs(result.frames[0].points[0].x - .4) < .01, 'replacement must retain the new annotation');
+  assert.ok(Math.abs(result.frames[0].points[0].y - .5) < .01, 'exported coordinates must match the clicked frame position');
   console.log('Bat annotator replacement and ordered export passed.');
 } finally {
   await browser?.close();
