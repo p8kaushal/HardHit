@@ -266,9 +266,11 @@ try {
         bot: inningsFor(replayed.state.bot.id),
       };
     });
-    const visible = await page.evaluate(() => ({
-      outcome: /DRAW|TIE/.test(document.querySelector('#summary-winner-title')?.textContent?.toUpperCase() ?? '') ? 'TIED' :
-        document.querySelector('#summary-winner-title')?.textContent?.toUpperCase().includes('WON') ? 'WON' : 'LOST',
+    const visible = await page.evaluate(() => {
+      const title = document.querySelector('#summary-winner-title')?.textContent?.toUpperCase() ?? '';
+      return {
+      title,
+      outcome: /DRAW|TIE/.test(title) ? 'TIED' : title.includes('BOT') ? 'LOST' : title.includes('YOU') ? 'WON' : 'UNKNOWN',
       player: {
         score: Number(document.querySelector('#summary-player-runs')?.textContent),
         wickets: Number(document.querySelector('#summary-player-wickets')?.textContent?.split('/')[0]),
@@ -279,7 +281,8 @@ try {
         wickets: Number(document.querySelector('#summary-bot-wickets')?.textContent?.split('/')[0]),
         legal: document.querySelectorAll('#summary-bot-tracker .mini-dot:not(.extra)').length,
       },
-    }));
+      };
+    });
     if (replay.status !== 'completed' || replay.recordedEvents !== replay.replayEvents || replay.outcome !== replay.expectedOutcome || replay.outcome !== visible.outcome) {
       throw new Error(`Persisted match replay result mismatch: replay=${JSON.stringify(replay)}, visible=${JSON.stringify(visible)}`);
     }
