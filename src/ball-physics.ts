@@ -49,12 +49,24 @@ export function stepBall(state: BallState, dt: number): void {
     ? (previous.y - BALL_RADIUS_METERS) / (previous.y - p.y)
     : previous.y <= BALL_RADIUS_METERS && p.y <= BALL_RADIUS_METERS ? 0 : Infinity;
   if (crossing >= 0 && crossing <= 1 && crossing < impact) {
-    p.x = previous.x + dx * crossing;
-    p.y = previous.y + (p.y - previous.y) * crossing;
-    p.z = previous.z + dz * crossing;
     state.reachedBoundary = true;
     state.boundaryOnFull = !state.hasBounced;
-    state.stopped = false;
+    if (state.hasBounced) {
+      p.x = previous.x + dx * crossing;
+      p.y = previous.y + (p.y - previous.y) * crossing;
+      p.z = previous.z + dz * crossing;
+      state.stopped = false;
+      return;
+    }
+  }
+
+  // For a six, carry ends at first ground contact. Interpolate within this
+  // physics step rather than measuring the overshoot after penetration.
+  if (state.reachedBoundary && state.boundaryOnFull && impact >= 0 && impact <= 1) {
+    p.x = previous.x + dx * impact;
+    p.y = BALL_RADIUS_METERS;
+    p.z = previous.z + dz * impact;
+    state.hasBounced = true;
     return;
   }
 
@@ -68,7 +80,7 @@ export function stepBall(state: BallState, dt: number): void {
     v.x *= friction;
     v.z *= friction;
   }
-  if (crossing >= 0 && crossing <= 1) {
+  if (!state.reachedBoundary && crossing >= 0 && crossing <= 1) {
     state.reachedBoundary = true;
     state.boundaryOnFull = false;
   }

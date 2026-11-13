@@ -95,6 +95,7 @@ serviceAccountKey*.json
 .gemini/
 
 # Project documentation to ignore
+handoff.md
 COMPLETED_FEATURES.md
 six-htting-contest-gdd.md
 GAME_CONTEXT_HANDOFF.md

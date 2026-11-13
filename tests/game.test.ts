@@ -1281,14 +1281,37 @@ test('rope crossing and bounce are resolved in their actual order within a physi
   const clearsRope = nearRope(BALL_RADIUS_METERS + 0.015);
   stepBall(clearsRope, 0.01);
   assert.equal(clearsRope.reachedBoundary, true);
-  assert.equal(clearsRope.hasBounced, false);
-  assert.equal(evaluateFinalOutcome(65, clearsRope.hasBounced, clearsRope.reachedBoundary), 6);
+  assert.equal(clearsRope.boundaryOnFull, true);
+  assert.equal(clearsRope.hasBounced, true, 'the ball lands beyond the rope in this same step');
+  assert.equal(evaluateFinalOutcome(65, !clearsRope.boundaryOnFull, clearsRope.reachedBoundary), 6);
 
   const landsFirst = nearRope(BALL_RADIUS_METERS + 0.005);
   stepBall(landsFirst, 0.01);
   assert.equal(landsFirst.reachedBoundary, true);
   assert.equal(landsFirst.hasBounced, true);
   assert.equal(evaluateFinalOutcome(65, landsFirst.hasBounced, landsFirst.reachedBoundary), 4);
+});
+
+test('six carry ends at interpolated first ground contact without truncating the rope step', () => {
+  const ball: BallState = {
+    position: { x: 64.95, y: 1, z: 0 },
+    velocity: { x: 30, y: -1, z: 0 },
+    hasBounced: false, reachedBoundary: false, stopped: false
+  };
+  const dt = 0.01;
+  const damp = frameIndependentDamping(BALL_AIR_DAMPING, dt);
+  stepBall(ball, dt);
+  assert.equal(ball.boundaryOnFull, true);
+  assert.ok(Math.abs(ball.position.x - (64.95 + 30 * damp * dt)) < 1e-12);
+  ball.position = { x: 70, y: BALL_RADIUS_METERS + 0.02, z: 2 };
+  ball.velocity = { x: 30, y: -4, z: -5 };
+  const vertical = -4 * damp - 9.81 * dt;
+  const fraction = 0.02 / (-vertical * dt);
+  stepBall(ball, dt);
+  assert.equal(ball.hasBounced, true);
+  assert.ok(Math.abs(ball.position.x - (70 + 30 * damp * dt * fraction)) < 1e-12);
+  assert.ok(Math.abs(ball.position.z - (2 - 5 * damp * dt * fraction)) < 1e-12);
+  assert.equal(ball.position.y, BALL_RADIUS_METERS);
 });
 
 test('physical ground contact uses a regulation-sized ball radius', () => {
