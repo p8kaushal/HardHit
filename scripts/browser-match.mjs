@@ -347,19 +347,23 @@ try {
       const fielding = markers.filter(marker => marker.getAttribute('data-team') === 'fielding');
       const roles = Object.fromEntries(['fielder', 'bowler', 'striker', 'non-striker'].map(role => [role, markers.filter(marker => marker.getAttribute('data-player-role') === role).length]));
       const colors = { batting: getComputedStyle(batting[0]).fill, fielding: getComputedStyle(fielding[0]).fill };
+      const shortLabels = markers.map(marker => marker.getAttribute('data-short-label'));
+      const radarPanel = document.querySelector('#field-radar');
+      const panelWidthBefore = radarPanel.getBoundingClientRect().width;
       const button = document.querySelector('#field-radar-toggle');
       button?.click();
       const expandedAfterClick = button?.getAttribute('aria-expanded');
       const bodyVisible = getComputedStyle(document.querySelector('#field-radar-body')).display !== 'none';
+      const panelWidthAfter = radarPanel.getBoundingClientRect().width;
       button?.click();
-      return { count: markers.length, batting: batting.length, fielding: fielding.length, roles, expanded, expandedAfterClick, bodyVisible, collapsedAgain: button?.getAttribute('aria-expanded'), colors,
-        labels: [...markers].every(marker => !!marker.getAttribute('aria-label') && !!marker.querySelector('title')?.textContent) && document.querySelectorAll('#field-radar-player-list li').length === 12,
+      return { count: markers.length, batting: batting.length, fielding: fielding.length, roles, expanded, expandedAfterClick, bodyVisible, collapsedAgain: button?.getAttribute('aria-expanded'), panelWidthBefore, panelWidthAfter, colors, shortLabels,
+        labels: [...markers].every(marker => !!marker.getAttribute('aria-label') && !!marker.querySelector('title')?.textContent && !!marker.querySelector('.field-radar-marker-label')?.textContent) && new Set(shortLabels).size === 12 && document.querySelectorAll('#field-radar-player-list li').length === 12,
         points: markers.map(marker => ({ role: marker.getAttribute('data-player-role'), team: marker.getAttribute('data-team'), transform: marker.getAttribute('transform') })) };
     });
     const expectedExpanded = compactFieldRadar ? 'false' : 'true';
     const expectedAfterClick = compactFieldRadar ? 'true' : 'false';
     const expectedVisibleAfterClick = compactFieldRadar;
-    if (radar.count !== 12 || radar.batting !== 2 || radar.fielding !== 10 || radar.roles.fielder !== 9 || radar.roles.bowler !== 1 || radar.roles.striker !== 1 || radar.roles['non-striker'] !== 1 || radar.expanded !== expectedExpanded || radar.expandedAfterClick !== expectedAfterClick || radar.bodyVisible !== expectedVisibleAfterClick || radar.collapsedAgain !== expectedExpanded || !radar.labels || radar.points.some(point => !point.transform) || radar.colors.batting !== 'rgb(53, 215, 244)' || radar.colors.fielding !== 'rgb(255, 196, 92)') {
+    if (radar.count !== 12 || radar.batting !== 2 || radar.fielding !== 10 || radar.roles.fielder !== 9 || radar.roles.bowler !== 1 || radar.roles.striker !== 1 || radar.roles['non-striker'] !== 1 || radar.expanded !== expectedExpanded || radar.expandedAfterClick !== expectedAfterClick || radar.bodyVisible !== expectedVisibleAfterClick || radar.collapsedAgain !== expectedExpanded || (compactFieldRadar && radar.panelWidthAfter <= radar.panelWidthBefore) || !radar.labels || radar.points.some(point => !point.transform) || radar.colors.batting !== 'rgb(53, 215, 244)' || radar.colors.fielding !== 'rgb(255, 196, 92)') {
       throw new Error(`Field radar did not show all players or accessible collapse behavior: ${JSON.stringify(radar)}`);
     }
     if (fieldPresetFixture === 'all') {

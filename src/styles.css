@@ -1479,7 +1479,7 @@ body {
   top: max(62px, calc(env(safe-area-inset-top) + 58px));
   right: max(12px, env(safe-area-inset-right));
   z-index: 16;
-  width: 158px;
+  width: 206px;
   padding: 7px;
   border: 1px solid rgba(224, 236, 240, .28);
   border-radius: 12px;
@@ -1492,7 +1492,7 @@ body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
-.field-radar-header { display: flex; align-items: center; justify-content: space-between; min-height: 23px; padding: 0 2px 5px; }
+.field-radar-header { display: flex; align-items: center; justify-content: space-between; min-height: 23px; padding: 0 2px 5px; letter-spacing: .1em; }
 .field-radar-header button {
   width: 25px;
   height: 23px;
@@ -1505,14 +1505,17 @@ body {
   pointer-events: auto;
 }
 .field-radar-map { display: block; width: 100%; aspect-ratio: 1; overflow: visible; }
+.field-radar-stands { fill: none; stroke: rgba(214, 226, 226, .25); stroke-width: 4; }
 .field-radar-outfield { fill: #174b31; stroke: #e8e7ce; stroke-width: 2.2; }
-.field-radar-inner-ring { fill: none; stroke: rgba(237, 240, 216, .4); stroke-width: .8; stroke-dasharray: 2 2; }
+.field-radar-inner-ring { fill: none; stroke: rgba(237, 240, 216, .36); stroke-width: .8; stroke-dasharray: 2 2; }
 .field-radar-pitch { fill: #a77e4e; stroke: #d7c5a1; stroke-width: .7; }
 .field-radar-crease { fill: none; stroke: #f3ecdb; stroke-width: 1; }
-.field-radar-marker { stroke: #0a1520; stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.field-radar-stumps { fill: none; stroke: #f7ebcc; stroke-width: 1.1; stroke-linecap: round; }
+.field-radar-marker { stroke: #0a1520; stroke-width: 1.25; vector-effect: non-scaling-stroke; }
 .field-radar-marker.team-batting { fill: var(--radar-batting); }
 .field-radar-marker.team-fielding { fill: var(--radar-fielding); }
 .field-radar-marker.role-striker { stroke: white; stroke-width: 2; }
+.field-radar-marker-label { fill: #10202a; stroke: none; font: 900 4px/1 system-ui, sans-serif; letter-spacing: -.1px; pointer-events: none; }
 .field-radar-marker { pointer-events: none; }
 .field-radar-legend { display: flex; justify-content: space-between; gap: 6px; padding: 5px 1px 0; color: #e8edf0; font-size: .55rem; letter-spacing: .01em; }
 .field-radar-legend > span { display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1574,7 +1577,7 @@ body {
     gap: 3px;
   }
 
-  .field-radar { width: 132px; right: max(8px, env(safe-area-inset-right)); }
+  .field-radar { width: 158px; right: max(8px, env(safe-area-inset-right)); }
   
   .btn-help-toggle {
     width: 22px;
@@ -1592,7 +1595,8 @@ body {
 }
 
 @media (orientation: landscape) and (max-height: 450px) {
-  .field-radar { top: max(54px, calc(env(safe-area-inset-top) + 50px)); width: 112px; padding: 5px; }
+  .field-radar { top: max(54px, calc(env(safe-area-inset-top) + 50px)); width: 126px; padding: 5px; }
+  .field-radar:not(.is-collapsed) { width: min(50vw, 188px); }
   .field-radar-header { min-height: 20px; padding-bottom: 3px; font-size: .58rem; }
   .field-radar-header button { width: 22px; height: 20px; }
   .field-radar-legend { padding-top: 3px; font-size: .5rem; }

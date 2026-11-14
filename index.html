@@ -391,15 +391,17 @@
 
       <aside id="field-radar" class="field-radar" aria-labelledby="field-radar-title">
         <div class="field-radar-header">
-          <span id="field-radar-title">FIELD RADAR</span>
-          <button id="field-radar-toggle" type="button" aria-expanded="true" aria-controls="field-radar-body" aria-label="Collapse field radar">−</button>
+          <span id="field-radar-title">GROUND MAP</span>
+          <button id="field-radar-toggle" type="button" aria-expanded="true" aria-controls="field-radar-body" aria-label="Collapse ground map">−</button>
         </div>
         <div id="field-radar-body" class="field-radar-body">
-          <svg id="field-radar-map" class="field-radar-map" viewBox="0 0 200 200" role="img" aria-label="Top-down stadium map, bowler end at top" aria-describedby="field-radar-player-list">
+          <svg id="field-radar-map" class="field-radar-map" viewBox="0 0 200 200" role="img" aria-label="Live top-down ground map. Bowler end at top; player initials mark each modeled player." aria-describedby="field-radar-player-list">
+            <circle class="field-radar-stands" cx="100" cy="100" r="96" />
             <circle class="field-radar-outfield" cx="100" cy="100" r="88" />
-            <circle class="field-radar-inner-ring" cx="100" cy="100" r="19" />
+            <circle class="field-radar-inner-ring" cx="100" cy="100" r="37" />
             <rect class="field-radar-pitch" x="96" y="84" width="8" height="32" rx="1" />
             <path class="field-radar-crease" d="M94 85h12 M94 115h12" />
+            <path class="field-radar-stumps" d="M97 83v3m3-3v3m3-3v3m-6 31v3m3-3v3m3-3v3" />
             <g id="field-radar-markers" aria-hidden="true"></g>
           </svg>
           <div class="field-radar-legend" aria-label="Team colors and player marker shapes">

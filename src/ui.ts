@@ -74,14 +74,14 @@ export class UIManager {
     if (window.matchMedia('(orientation: landscape) and (max-height: 360px)').matches) {
       radar.classList.add('is-collapsed');
       toggle.setAttribute('aria-expanded', 'false');
-      toggle.setAttribute('aria-label', 'Expand field radar');
+      toggle.setAttribute('aria-label', 'Expand ground map');
       toggle.textContent = '+';
     }
     toggle.addEventListener('click', () => {
       const expanded = toggle.getAttribute('aria-expanded') === 'true';
       radar.classList.toggle('is-collapsed', expanded);
       toggle.setAttribute('aria-expanded', String(!expanded));
-      toggle.setAttribute('aria-label', `${expanded ? 'Expand' : 'Collapse'} field radar`);
+      toggle.setAttribute('aria-label', `${expanded ? 'Expand' : 'Collapse'} ground map`);
       toggle.textContent = expanded ? '+' : '−';
       this.updateFieldRadar();
     });
@@ -94,17 +94,29 @@ export class UIManager {
     const markers = document.querySelector<SVGGElement>('#field-radar-markers');
     if (!markers) return;
     const innings = this.controller.getCurrentInnings();
+    const fielderLabels = {
+      keeper: { label: 'Wicketkeeper', shortLabel: 'WK' },
+      close: { label: 'Close fielder', shortLabel: 'CL' },
+      point: { label: 'Point', shortLabel: 'PT' },
+      cover: { label: 'Cover', shortLabel: 'CV' },
+      midOff: { label: 'Mid-off', shortLabel: 'MO' },
+      midOn: { label: 'Mid-on', shortLabel: 'MI' },
+      squareLeg: { label: 'Square leg', shortLabel: 'SL' },
+      fineLeg: { label: 'Fine leg', shortLabel: 'FL' },
+      longBoundary: { label: 'Long boundary', shortLabel: 'LB' },
+    } as const;
     const players: FieldRadarPlayer[] = this.gameScene.getFielderPositions().map(fielder => ({
       key: `fielder-${fielder.name}`,
-      label: `${fielder.name.replace(/[A-Z]/g, letter => ` ${letter.toLowerCase()}`)} · fielding team`,
+      label: `${fielderLabels[fielder.name].label} · fielding team`,
+      shortLabel: fielderLabels[fielder.name].shortLabel,
       role: 'fielder', team: 'fielding', x: fielder.position.x, z: fielder.position.z,
     }));
     const bowler = this.gameScene.getBowlerPosition();
     const striker = this.gameScene.getBatterPosition();
     players.push(
-      { key: 'bowler', label: `${innings.bowler.name} · bowler`, role: 'bowler', team: 'fielding', ...bowler },
-      { key: 'striker', label: `${innings.batter.name} · striker`, role: 'striker', team: 'batting', ...striker },
-      { key: 'non-striker', label: 'Non-striker · batting team', role: 'non-striker', team: 'batting', x: 0, z: 8.8 },
+      { key: 'bowler', label: `${innings.bowler.name} · bowler`, shortLabel: 'B', role: 'bowler', team: 'fielding', ...bowler },
+      { key: 'striker', label: `${innings.batter.name} · striker`, shortLabel: 'S', role: 'striker', team: 'batting', ...striker },
+      { key: 'non-striker', label: 'Non-striker · batting team · crease marker', shortLabel: 'N', role: 'non-striker', team: 'batting', x: 0, z: 8.8 },
     );
     renderFieldRadarMarkers(markers, players);
     const accessibleList = document.getElementById('field-radar-player-list');

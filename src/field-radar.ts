@@ -4,6 +4,7 @@ export type FieldRadarTeam = 'batting' | 'fielding';
 export interface FieldRadarPlayer {
   key: string;
   label: string;
+  shortLabel: string;
   role: FieldRadarRole;
   team: FieldRadarTeam;
   x: number;
@@ -56,9 +57,16 @@ function makePlayerMarker(player: FieldRadarPlayer): SVGGElement {
     group.append(shape);
   } else {
     const shape = svgElement<SVGCircleElement>('circle');
-    shape.setAttribute('r', player.role === 'striker' ? '6' : '4.5');
+    shape.setAttribute('r', player.role === 'striker' ? '6.4' : '5.4');
     group.append(shape);
   }
+
+  const shortLabel = svgElement<SVGTextElement>('text');
+  shortLabel.classList.add('field-radar-marker-label');
+  shortLabel.setAttribute('text-anchor', 'middle');
+  shortLabel.setAttribute('dominant-baseline', 'central');
+  shortLabel.textContent = player.shortLabel;
+  group.append(shortLabel);
 
   const title = svgElement<SVGTitleElement>('title');
   title.textContent = player.label;
@@ -84,9 +92,12 @@ export function renderFieldRadarMarkers(layer: SVGGElement, players: readonly Fi
     marker.classList.toggle('team-fielding', player.team === 'fielding');
     marker.dataset.playerRole = player.role;
     marker.dataset.team = player.team;
+    marker.dataset.shortLabel = player.shortLabel;
     marker.setAttribute('aria-label', player.label);
     const title = marker.querySelector('title');
     if (title) title.textContent = player.label;
+    const shortLabel = marker.querySelector('.field-radar-marker-label');
+    if (shortLabel) shortLabel.textContent = player.shortLabel;
     const point = fieldRadarPoint(player.x, player.z);
     marker.setAttribute('transform', `translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})`);
   }
