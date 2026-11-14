@@ -1020,10 +1020,12 @@ test('bot distribution simulation is reproducible, bounded and reports the right
   const first = runBotSimulation(80, undefined, 0x51a7);
   const second = runBotSimulation(80, undefined, 0x51a7);
   const withoutFielding = runBotSimulation(80, undefined, 0x51a7, { includeFielding: false });
+  const deepField = runBotSimulation(80, undefined, 0x51a7, { fieldPreset: 'deep' });
   assert.deepEqual(first, second);
   assert.ok(first.some(tier => tier.groundStops > 0), 'seeded scenario should exercise ground fielding');
   assert.ok(first.some(tier => tier.catches > 0), 'seeded scenario should exercise catches');
   assert.ok(first.some((tier, index) => tier.runs !== withoutFielding[index].runs || tier.wickets !== withoutFielding[index].wickets), 'fielding should change simulated outcomes');
+  assert.ok(first.some((tier, index) => tier.runs !== deepField[index].runs || tier.wickets !== deepField[index].wickets), 'the selected field preset should change simulated outcomes');
   for (const tier of first) {
     assert.equal(tier.overs, 80);
     assert.ok(tier.legalBalls <= 480);
@@ -1067,15 +1069,23 @@ test('fielding reachability rejects invalid profiles and unsorted trajectories',
 });
 
 test('default field layout mirrors by batter hand and stays inside the modeled field', () => {
-  const right = createDefaultFieldLayout('RHB');
-  const left = createDefaultFieldLayout('LHB');
-  assert.equal(right.length, 9);
-  assert.deepEqual(left.map(fielder => fielder.name), right.map(fielder => fielder.name));
-  right.forEach((fielder, index) => {
-    assert.ok(Math.hypot(fielder.position.x, fielder.position.z) < 65, `${fielder.name} is beyond the rope`);
-    assert.equal(left[index].position.x, -fielder.position.x, `${fielder.name} should mirror laterally`);
-    assert.equal(left[index].position.z, fielder.position.z, `${fielder.name} should keep its depth`);
-  });
+  for (const preset of ['attacking', 'balanced', 'deep'] as const) {
+    const right = createDefaultFieldLayout('RHB', preset);
+    const left = createDefaultFieldLayout('LHB', preset);
+    assert.equal(right.length, 9);
+    assert.deepEqual(left.map(fielder => fielder.name), right.map(fielder => fielder.name));
+    right.forEach((fielder, index) => {
+      assert.ok(Math.hypot(fielder.position.x, fielder.position.z) < 65, `${preset} ${fielder.name} is beyond the rope`);
+      assert.equal(left[index].position.x, -fielder.position.x, `${preset} ${fielder.name} should mirror laterally`);
+      assert.equal(left[index].position.z, fielder.position.z, `${preset} ${fielder.name} should keep its depth`);
+    });
+  }
+  const attacking = createDefaultFieldLayout('RHB', 'attacking').find(fielder => fielder.name === 'point')!;
+  const balanced = createDefaultFieldLayout('RHB', 'balanced').find(fielder => fielder.name === 'point')!;
+  const deep = createDefaultFieldLayout('RHB', 'deep').find(fielder => fielder.name === 'point')!;
+  assert.ok(Math.hypot(attacking.position.x, attacking.position.z) < Math.hypot(balanced.position.x, balanced.position.z));
+  assert.ok(Math.hypot(deep.position.x, deep.position.z) > Math.hypot(balanced.position.x, balanced.position.z));
+  assert.throws(() => createDefaultFieldLayout('RHB', 'unknown' as never), /Unknown field preset/);
 });
 
 test('fielder ratings map monotonically to bounded movement profiles', () => {
@@ -1207,12 +1217,13 @@ test('saved regular match events replay through controller adjudication', () => 
   game.setTossResult(game.state.player.id, 'bat');
   game.startMatch();
   for (let ball = 0; ball < 6; ball++) {
-    const result = game.recordBall(delivery(0.5), { direction: 2, type: ball === 0 ? 'lofted' : 'grounded', timing: 0.5, contactZone: 0.5 });
+    const result = game.recordBall(delivery(0.5), { direction: 2, type: ball === 0 ? 'lofted' : 'grounded', timing: 0.5, contactZone: 0.5 }, ball === 0 ? 'deep' : undefined);
     assert.equal(result.isWicket, false);
     if (ball === 0) game.finalizeBallOutcome(8, false, false, 'point');
     else game.finalizeBallOutcome(20 + ball, true, false, null, ball === 1 ? 0 : undefined);
   }
   assert.equal(game.state.events[0].caughtBy, 'point');
+  assert.equal(game.state.events[0].fieldPreset, 'deep');
   assert.equal(game.state.events[1].fieldedRuns, 0);
   game.state.currentInningsIndex = 1;
   for (let ball = 0; ball < 6; ball++) {

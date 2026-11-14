@@ -1,6 +1,6 @@
 import * as BABYLON from 'babylonjs';
 import { gameNow, isGamePaused, setGameTimeout } from './game-clock';
-import { CameraMode, DeliveryChoice, DeliveryType } from './types';
+import { CameraMode, DeliveryChoice, DeliveryType, FieldPreset } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
@@ -42,6 +42,7 @@ export class GameScene {
   private readonly fielderRoots = new Map<FieldingPosition['name'], BABYLON.TransformNode>();
   private readonly fielderProfiles = new Map<FieldingPosition['name'], FielderReachProfile>();
   private fieldingRatings = { agility: 50, reaction: 50, catching: 50, throwing: 50 };
+  private fieldPreset: FieldPreset = 'balanced';
   private shotFieldedBy: FieldingPosition['name'] | null = null;
   private shotCaughtBy: FieldingPosition['name'] | null = null;
 
@@ -458,7 +459,7 @@ export class GameScene {
 
   public setBatterHandedness(hand: 'RHB' | 'LHB'): void {
     this.batterHand = hand;
-    const layout = createDefaultFieldLayout(hand);
+    const layout = createDefaultFieldLayout(hand, this.fieldPreset);
     for (const fielder of layout) this.fielderRoots.get(fielder.name)?.position.set(fielder.position.x, 0, fielder.position.z);
     if (!this.batterRoot) return;
     
@@ -476,6 +477,17 @@ export class GameScene {
       name,
       position: { x: root.position.x, z: root.position.z },
     }));
+  }
+
+  public setFieldPreset(preset: FieldPreset): void {
+    const layout = createDefaultFieldLayout(this.batterHand, preset);
+    this.fieldPreset = preset;
+    for (const fielder of layout) this.fielderRoots.get(fielder.name)?.position.set(fielder.position.x, 0, fielder.position.z);
+    this.fielderProfiles.clear();
+  }
+
+  public getFieldPreset(): FieldPreset {
+    return this.fieldPreset;
   }
 
   public setFieldingRatings(agility: number, reaction: number, catching = 50, throwing = 50): void {
@@ -513,7 +525,7 @@ export class GameScene {
     const skin = new BABYLON.StandardMaterial('fielderSkin', this.scene);
     skin.diffuseColor = BABYLON.Color3.FromHexString('#b98260');
     skin.specularColor = BABYLON.Color3.Black();
-    for (const fielder of createDefaultFieldLayout(this.batterHand)) {
+    for (const fielder of createDefaultFieldLayout(this.batterHand, this.fieldPreset)) {
       const root = new BABYLON.TransformNode(`fielder_${fielder.name}`, this.scene);
       root.position.set(fielder.position.x, 0, fielder.position.z);
       const torso = BABYLON.MeshBuilder.CreateCylinder(`fielder_${fielder.name}_torso`, { height: 0.7, diameter: 0.42, tessellation: 8 }, this.scene);
@@ -1137,7 +1149,7 @@ export class GameScene {
     this.shotFieldedBy = null;
     this.shotCaughtBy = null;
     this.fielderProfiles.clear();
-    for (const fielder of createDefaultFieldLayout(this.batterHand)) {
+    for (const fielder of createDefaultFieldLayout(this.batterHand, this.fieldPreset)) {
       const root = this.fielderRoots.get(fielder.name);
       if (!root) continue;
       root.position.set(fielder.position.x, 0, fielder.position.z);

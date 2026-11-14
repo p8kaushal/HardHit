@@ -50,7 +50,7 @@ export function replayMatchRecord(record: MatchHistoryRecord): MatchController {
       throw new Error(`Replay participant mismatch at event ${event.sequence}`);
     }
 
-    const outcome = game.recordBall(event.delivery, event.shot);
+    const outcome = game.recordBall(event.delivery, event.shot, event.fieldPreset);
     assertSame({ missed: outcome.missed ?? false, isWicket: outcome.isWicket, wicketReason: outcome.wicketReason, isFreeHit: outcome.isFreeHit, isExtra: outcome.isExtra, extraType: outcome.extraType },
       { missed: event.missed, isWicket: event.caughtBy ? false : event.isWicket, wicketReason: event.caughtBy ? '' : event.wicketReason, isFreeHit: event.isFreeHit, isExtra: event.isExtra, extraType: event.extraType }, `decision ${event.sequence}`);
     if (event.flight) {
@@ -58,8 +58,8 @@ export function replayMatchRecord(record: MatchHistoryRecord): MatchController {
       assertSame(runs, event.runs, `flight score ${event.sequence}`);
     }
     const replayed = game.state.events[game.state.events.length - 1];
-    assertSame({ distance: replayed.distance, runs: replayed.runs, resolved: replayed.resolved, isWicket: replayed.isWicket, wicketReason: replayed.wicketReason },
-      { distance: event.distance, runs: event.runs, resolved: event.resolved, isWicket: event.isWicket, wicketReason: event.wicketReason }, `event ${event.sequence}`);
+    assertSame({ distance: replayed.distance, runs: replayed.runs, resolved: replayed.resolved, isWicket: replayed.isWicket, wicketReason: replayed.wicketReason, fieldPreset: replayed.fieldPreset },
+      { distance: event.distance, runs: event.runs, resolved: event.resolved, isWicket: event.isWicket, wicketReason: event.wicketReason, fieldPreset: event.fieldPreset }, `event ${event.sequence}`);
   }
 
   if (game.state.currentInningsIndex === 1 && game.getCurrentInnings().finished) {

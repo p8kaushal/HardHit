@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — selectable AI fielder layouts
+
+- **Scope:** add attacking, balanced and deep field plans for the player while bowling; plans must reposition AI-controlled fielders before each delivery and feed the selected positions into live interception, catches, throw estimates and seeded simulation. Bot bowling uses a consistent balanced policy. Record the field plan with each delivery for saved-match context.
+- [x] **Acceptance:** attacking, balanced and deep layouts each retain nine in-range fielders and mirror for both batting hands. Unit tests verify distinct depths and the seeded simulator confirms a selected deep field changes outcomes. `npm test` passed 138 tests; production build passed with the existing ~1.09 MB gzip Babylon chunk warning; `git diff --check` and browser-harness syntax check passed. `node scripts/browser-match.mjs --field-setting=all --verify-replay` selected every plan through the bowling UI, verified point-fielder positions (deep selected before delivery), completed both innings, and replayed all 14 saved events with field presets matching. Bot bowling uses balanced. The presets are coarse starting positions; no data-calibrated field strategy or runner model is established.
+
 ### Completed bounded increment — fielding-aware seeded bot simulation
 
 - **Scope:** run simulated batting trajectories against the same hand-mirrored fielder layout, rating-based reach/catch envelopes, rope ordering and return-throw run estimate used by live matches. Report ground stops and catches in the tier metrics so synthetic difficulty results include fielding effects.
@@ -118,7 +123,7 @@ Ordered execution and exit criteria are in `DELIVERY_PLAN.md`. The user approved
 - [ ] **Phase 2 — Rules:** tested no-ball, wide, free-hit, LBW/bowled and agreed contest/tie-break decisions; document limitations.
 - [ ] **Phase 3 — Bowling physics:** unified coordinates and delivery trajectory, side/hand symmetry, marker consistency and traceable calibration.
 - [ ] **Phase 4 — Batting and six flight:** spatial contact, shot timing, trajectory, boundary/landing distance and scoring fixtures.
-- [ ] **Phase 5 — Offline opponents and fielding:** varied fair bots, AI-controlled supporting players, field settings, rating-based fielding and catches, automated running, and transparent teammate progression tied to player performance.
+- [ ] **Phase 5 — Offline opponents and fielding:** varied fair bots, AI-controlled supporting players, calibrated field strategy beyond the three starting presets, rating-based fielding/catches, actual automated running, and transparent teammate progression tied to player performance.
 - [ ] **Phase 6 — Presentation and performance:** broadcast UI/cameras, animation, licensed audio, accessibility and actual-device profiling.
 - [ ] **Phase 7 — Real-player 1v1:** authoritative private matches, event protocol, latency, reconnect, integrity and two-client testing.
 - [ ] **Phase 8 — Release:** CI, staging, monitoring, deployment target, rollback and release verification.
@@ -203,7 +208,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [x] Document current contest scoring, modeled cricket decisions and known simplifications against MCC laws and ICC T20I free-hit conditions.
 - [ ] Expand decision-table tests and implementation for both hands, offered/no shot, bat/pad order and unmodeled faults; compare each against the chosen playing conditions.
 - [x] Identify non-boundary runs as distance estimates in the shot result.
-- [ ] Design fielding and running before claiming realistic non-boundary scoring.
+- [ ] Model batters crossing between wickets, safe completion and run-out risk before claiming realistic non-boundary scoring; the current return-throw formula remains a provisional estimate.
 - [ ] Consolidate authored delivery, contact, shot flight and wicket projection around shared coordinates, time, units and sampled inputs; eliminate competing legacy distance paths where safe.
 - [ ] Build traceable calibration fixtures for pace, bounce, swing, spin, contact speed, launch angle and six carry, including symmetry and frame-rate checks; document assumptions and confidence.
 - [ ] Model landing/obstructions or label estimated unobstructed carry, and review hard distance caps and boundary geometry.

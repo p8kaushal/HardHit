@@ -1,7 +1,7 @@
 import { createBotPlayer } from './game';
 import { botChooseDelivery, botChooseShot } from './bot';
 import { evaluateWicket, checkExtraBall, resolveMissedDelivery, deliveryContactPoint, deliveryVelocityAtCrease, battingAssistanceMultiplier, shotFlightQuality, calculateShotTrajectory, calculateShotDistance, evaluateFinalOutcome } from './formula';
-import type { DeliveryType } from './types';
+import type { DeliveryType, FieldPreset } from './types';
 import { SeededRandom } from './random';
 import { stepBall, type BallState } from './ball-physics';
 import { createDefaultFieldLayout, estimateRunsBeforeReturnThrow, FIELDING_MAX_RUNS, FIELDING_SECONDS_PER_RUN, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, findEarliestFieldingEvent, isCatchDismissalAllowed, type RatedFielder } from './fielding';
@@ -29,6 +29,7 @@ export interface BotSimulationResult {
 export interface BotSimulationOptions {
   /** Test/control comparison; production simulation includes fielders by default. */
   includeFielding?: boolean;
+  fieldPreset?: FieldPreset;
 }
 
 /** Synthetic seeded bot scoring simulation using the production shot-flight physics. */
@@ -54,7 +55,7 @@ export function runBotSimulation(
       const hand = over % 2 === 0 ? 'RHB' : 'LHB';
       batter.batterHand = hand;
       const fieldingStats = bowler.stats.fielding ?? { agility: 50, reaction: 50, catching: 50, throwing: 50 };
-      const fielders: RatedFielder[] = options.includeFielding === false ? [] : createDefaultFieldLayout(hand).map(fielder => ({
+      const fielders: RatedFielder[] = options.includeFielding === false ? [] : createDefaultFieldLayout(hand, options.fieldPreset ?? 'balanced').map(fielder => ({
         name: fielder.name,
         profile: fielderReachProfileFromRatings(fielder.position, fieldingStats.agility, fieldingStats.reaction),
         catching: fieldingStats.catching,

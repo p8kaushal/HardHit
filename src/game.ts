@@ -1,4 +1,4 @@
-import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
+import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, FieldPreset, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
 import { battingAssistanceMultiplier, evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, deliveryContactPoint, deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 import { SeededRandom } from './random';
@@ -312,7 +312,7 @@ export class MatchController {
     globalAutoAssistConfig.bowlerArm = innings.bowler.bowlingArm || 'Right';
   }
 
-  public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null): BallOutcome {
+  public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null, fieldPreset?: FieldPreset): BallOutcome {
     const innings = this.getCurrentInnings();
     if (this.state.status !== 'playing' || !innings || innings.finished) {
       throw new Error('Cannot record a delivery after the innings has finished');
@@ -430,6 +430,7 @@ export class MatchController {
       isExtra: extra.isExtra,
       extraType: extra.type,
       distance,
+      ...(fieldPreset ? { fieldPreset } : {}),
       ...(!pendingFlight ? { ...(outcome.runs === undefined ? {} : { runs: outcome.runs }), resolved: true } : { resolved: false }),
     });
 

@@ -1,6 +1,6 @@
 import { MatchController, globalAutoAssistConfig, initBattingDelivery, inningsBallLimit, isPendingShotOutcome } from './game';
 import { GameScene } from './scene';
-import { BallOutcome, DeliveryChoice, MatchState, Player, ShotChoice, ShotType } from './types';
+import { BallOutcome, DeliveryChoice, FieldPreset, MatchState, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
 import { BATTER_CONTACT_Z, batterContactProgress, battingAssistanceMultiplier, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryHitsPad, deliveryPitchPoint, deliveryVelocityAtCrease, shotFlightQuality, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, calculateBounceTarget, sampleFrontFootLanding } from './formula';
 import { moveBatter, type BatterPosition } from './batter-position';
@@ -71,6 +71,8 @@ export class UIManager {
     this.batterPosition = { x: 0, z: 0 };
     this.batterPositionLocked = false;
     this.controller = controller;
+    this.gameScene.setFieldPreset('balanced');
+    this.updateFieldPresetButtons('balanced');
   }
 
   constructor(controller: MatchController) {
@@ -171,6 +173,14 @@ export class UIManager {
           option.classList.toggle('active', selected);
           option.setAttribute('aria-pressed', String(selected));
         });
+      });
+    });
+    document.querySelectorAll<HTMLButtonElement>('#field-setting-group button').forEach(button => {
+      button.addEventListener('click', () => {
+        if (this.isBallActive || globalAutoAssistConfig.isDeliveryActive) return;
+        const preset = button.dataset.fieldPreset as FieldPreset;
+        this.gameScene.setFieldPreset(preset);
+        this.updateFieldPresetButtons(preset);
       });
     });
     const bowlTypeButtons = document.querySelectorAll('#bowl-type-group .btn');
@@ -387,6 +397,14 @@ export class UIManager {
       marker.style.top = `${Math.max(0, Math.min(100, (target.z + 8.2) / 8.7 * 100))}%`;
     }
     this.keyboardInputManager.updateFeedbackOverlay();
+  }
+
+  private updateFieldPresetButtons(preset: FieldPreset): void {
+    document.querySelectorAll<HTMLButtonElement>('#field-setting-group button').forEach(button => {
+      const selected = button.dataset.fieldPreset === preset;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
   }
 
   private movePlayerBatter(direction: string): void {
@@ -846,7 +864,7 @@ export class UIManager {
     // Evaluate outcome
     if (!this.activeDelivery) return;
     
-    const outcome = this.controller.recordBall(this.activeDelivery, this.activeShot);
+    const outcome = this.controller.recordBall(this.activeDelivery, this.activeShot, this.gameScene.getFieldPreset?.() ?? 'balanced');
     this.updateHUD();
 
     this.activeDelivery = null;
@@ -1095,6 +1113,9 @@ export class UIManager {
         controlBowling.classList.add('hidden', 'panel-hidden');
       }
       
+      // Bot opponents use the neutral field policy until measured strategy is defined.
+      this.gameScene.setFieldPreset('balanced');
+      this.updateFieldPresetButtons('balanced');
       // Auto trigger bot delivery
       this.activeDelivery = botChooseDelivery(state.bot, this.controller.botDifficulty, innings.batter.batterHand || 'RHB', this.controller.random);
       this.gameScene.setBowlerSide(this.activeDelivery.overTheWicket ?? true, this.activeDelivery.bowlingArm || 'Right');

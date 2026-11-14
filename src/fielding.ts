@@ -1,3 +1,5 @@
+import type { FieldPreset } from './types';
+
 export interface FieldingTrajectorySample {
   timeSeconds: number;
   position: { x: number; y: number; z: number };
@@ -37,12 +39,30 @@ const DEFAULT_FIELD_LAYOUT: ReadonlyArray<FieldingPosition> = [
   { name: 'longBoundary', position: { x: -12, z: 47 } },
 ];
 
+const FIELD_PRESET_POSITIONS: Record<FieldPreset, Partial<Record<FielderPositionName, { x: number; z: number }>>> = {
+  balanced: {},
+  attacking: {
+    close: { x: -3, z: -12 }, point: { x: 19, z: -7 }, cover: { x: 23, z: 12 },
+    midOff: { x: -14, z: 22 }, midOn: { x: 14, z: 22 }, squareLeg: { x: -18, z: -14 },
+    fineLeg: { x: 17, z: -28 }, longBoundary: { x: -10, z: 38 },
+  },
+  deep: {
+    close: { x: -5, z: -17 }, point: { x: 33, z: -10 }, cover: { x: 37, z: 18 },
+    midOff: { x: -23, z: 31 }, midOn: { x: 23, z: 31 }, squareLeg: { x: -30, z: -23 },
+    fineLeg: { x: 25, z: -42 }, longBoundary: { x: -12, z: 55 },
+  },
+};
+
 /** Provisional starting positions mirrored around the pitch for batter handedness. */
-export function createDefaultFieldLayout(hand: 'RHB' | 'LHB' = 'RHB'): FieldingPosition[] {
+export function createDefaultFieldLayout(hand: 'RHB' | 'LHB' = 'RHB', preset: FieldPreset = 'balanced'): FieldingPosition[] {
+  if (!(preset in FIELD_PRESET_POSITIONS)) throw new Error('Unknown field preset');
   const mirror = hand === 'RHB' ? 1 : -1;
   return DEFAULT_FIELD_LAYOUT.map(fielder => ({
     name: fielder.name,
-    position: { x: fielder.position.x * mirror, z: fielder.position.z },
+    position: {
+      x: (FIELD_PRESET_POSITIONS[preset][fielder.name]?.x ?? fielder.position.x) * mirror,
+      z: FIELD_PRESET_POSITIONS[preset][fielder.name]?.z ?? fielder.position.z,
+    },
   }));
 }
 

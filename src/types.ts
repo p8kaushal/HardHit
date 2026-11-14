@@ -43,6 +43,7 @@ export interface Player {
 export type LineType = 'off' | 'middle' | 'leg';
 export type LengthType = 'bouncer' | 'short' | 'good' | 'full' | 'yorker';
 export type DeliveryType = 'fast' | 'medium' | 'slow' | 'offspin' | 'legspin';
+export type FieldPreset = 'attacking' | 'balanced' | 'deep';
 
 export interface Vector3D {
   x: number;
@@ -163,6 +164,7 @@ export interface MatchEvent {
   flight?: { hasBounced: boolean; reachedBoundary?: boolean };
   caughtBy?: string;
   fieldedRuns?: number;
+  fieldPreset?: FieldPreset;
 }
 
 export interface InputIntent {

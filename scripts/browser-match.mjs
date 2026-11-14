@@ -29,6 +29,8 @@ try {
   const fieldingFixture = process.argv.includes('--require-fielding');
   const catchFixture = process.argv.includes('--require-catch');
   const verifyReplay = process.argv.includes('--verify-replay');
+  const fieldPresetFixture = process.argv.find(argument => argument.startsWith('--field-setting='))?.split('=')[1];
+  if (fieldPresetFixture && !['attacking', 'balanced', 'deep', 'all'].includes(fieldPresetFixture)) throw new Error(`Unknown field setting: ${fieldPresetFixture}`);
   if ([botBatsFast, botBatsSpin, fixtureWide].filter(Boolean).length > 1) throw new Error('Choose only one bot batting delivery override');
   const pauseFlight = process.argv.includes('--pause-flight') || pauseVisibility || pauseRotation;
   if (pauseRotation && pauseVisibility) throw new Error('Choose either --pause-rotation or --pause-visibility');
@@ -50,13 +52,29 @@ try {
       }, { timeout: 5000 }, portrait);
     });
   }
-  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture }) => {
+  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, fieldPresetFixture }) => {
     const { GameScene } = await import('/src/scene.ts');
     const { UIManager } = await import('/src/ui.ts');
     const { globalAutoAssistConfig } = await import('/src/game.ts');
     const { MatchController } = await import('/src/game.ts');
     const { setGamePaused, isGamePaused } = await import('/src/game-clock.ts');
     const { deliveryContactPoint, BALL_RADIUS_METERS } = await import('/src/formula.ts');
+    if (fieldPresetFixture) {
+      const startBowling = UIManager.prototype.startUserBowlingDelivery;
+      UIManager.prototype.startUserBowlingDelivery = function (...args) {
+        if (!window.__fieldPresetSelected) {
+          const presets = fieldPresetFixture === 'all' ? ['attacking', 'balanced', 'deep'] : [fieldPresetFixture];
+          for (const preset of presets) {
+            const button = document.querySelector(`[data-field-preset="${preset}"]`);
+            if (!button) throw new Error(`Missing ${preset} field setting button`);
+            button.click();
+            (window.__fieldPresetCycle ??= []).push({ preset, selected: button.getAttribute('aria-pressed') === 'true', positions: this.gameScene.getFielderPositions() });
+          }
+          window.__fieldPresetSelected = document.querySelector(`[data-field-preset="${presets.at(-1)}"]`)?.getAttribute('aria-pressed') === 'true';
+        }
+        return startBowling.apply(this, args);
+      };
+    }
     const animateDelivery = GameScene.prototype.animateDelivery;
     const endDeliveryCycle = GameScene.prototype.endDeliveryCycle;
     const getShotFielder = GameScene.prototype.getShotFielder;
@@ -72,14 +90,19 @@ try {
     };
     const deliverBall3D = UIManager.prototype.deliverBall3D;
     UIManager.prototype.deliverBall3D = function (...args) {
-      window.__fielderSceneCheck = {
+      const playerIsBowling = this.controller.getCurrentInnings().batter.id !== this.controller.state.player.id;
+      const fieldCheck = {
+        playerIsBowling,
+        hand: this.controller.getCurrentInnings().batter.batterHand || 'RHB',
+        preset: this.gameScene.getFieldPreset(),
         positions: this.gameScene.getFielderPositions(),
         meshes: this.gameScene.scene.meshes.filter(mesh => mesh.name.startsWith('fielder_')).map(mesh => ({
           pickable: mesh.isPickable,
           visible: mesh.isVisible && mesh.isEnabled(),
         })),
       };
-      const playerIsBowling = this.controller.getCurrentInnings().batter.id !== this.controller.state.player.id;
+      window.__fielderSceneCheck = fieldCheck;
+      (window.__fielderSceneChecks ??= []).push(fieldCheck);
       if (playerIsBowling && this.activeDelivery) {
         if (botBatsFast) Object.assign(this.activeDelivery, { type: 'fast', pace: 0.95, turn: 0, swing: 0 });
         if (botBatsSpin) Object.assign(this.activeDelivery, { type: 'legspin', pace: 0.65, turn: 0.9, swing: 0 });
@@ -99,6 +122,7 @@ try {
     window.__matchContacts = [];
     window.__playerShotTrace = [];
     window.__matchReplay = [];
+    window.__fielderSceneChecks = [];
     let playerBatting = false;
     let playerController;
     GameScene.prototype.getShotFielder = function (...args) {
@@ -118,9 +142,9 @@ try {
     };
     window.__flightPause = null;
     const recordBall = MatchController.prototype.recordBall;
-    MatchController.prototype.recordBall = function (delivery, shot) {
+    MatchController.prototype.recordBall = function (delivery, shot, fieldPreset) {
       const contact = window.__matchContacts.at(-1);
-      const result = recordBall.call(this, delivery, shot);
+      const result = recordBall.call(this, delivery, shot, fieldPreset);
       window.__matchReplay.push({
         batter: this.getCurrentInnings().batter.id,
         delivery: structuredClone(delivery),
@@ -130,6 +154,7 @@ try {
         wicketReason: result.wicketReason,
         extra: result.extraType,
         freeHit: result.isFreeHit,
+        fieldPreset,
         estimatedDistance: result.distance,
         resolved: false,
       });
@@ -229,7 +254,7 @@ try {
         arrived();
       }, ...rest);
     };
-  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture });
+  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, fieldPresetFixture });
   if (process.argv.includes('--force-tie')) {
     // Test-only fixture: make regular-innings deliveries legal dots so the
     // real UI must play both sudden-death innings. Production code is unchanged.
@@ -326,6 +351,7 @@ try {
         expectedOutcome: record.outcome,
         recordedEvents: record.events.length,
         replayEvents: replayed.state.events.length,
+        fieldPresetsMatch: record.events.every((event, index) => event.fieldPreset === replayed.state.events[index]?.fieldPreset),
         status: replayed.state.status,
         outcome: replayed.state.winnerId === replayed.state.player.id ? 'WON' : replayed.state.winnerId === replayed.state.bot.id ? 'LOST' : 'TIED',
         player: inningsFor(replayed.state.player.id),
@@ -349,7 +375,7 @@ try {
       },
       };
     });
-    if (replay.status !== 'completed' || replay.recordedEvents !== replay.replayEvents || replay.outcome !== replay.expectedOutcome || replay.outcome !== visible.outcome) {
+    if (replay.status !== 'completed' || replay.recordedEvents !== replay.replayEvents || !replay.fieldPresetsMatch || replay.outcome !== replay.expectedOutcome || replay.outcome !== visible.outcome) {
       throw new Error(`Persisted match replay result mismatch: replay=${JSON.stringify(replay)}, visible=${JSON.stringify(visible)}`);
     }
     for (const role of ['player', 'bot']) {
@@ -376,6 +402,26 @@ try {
     throw new Error(`Visible default fielder setup is incomplete: ${JSON.stringify(fielders)}`);
   }
   console.log(`Visible fielding setup has ${fielders.positions.length} players in range with ${fielders.meshes.length} enabled, non-pickable meshes.`);
+  if (fieldPresetFixture) {
+    const fieldingSetups = await page.evaluate(() => ({ selected: window.__fieldPresetSelected, checks: window.__fielderSceneChecks, cycle: window.__fieldPresetCycle ?? [] }));
+    const requestedPresets = fieldPresetFixture === 'all' ? ['attacking', 'balanced', 'deep'] : [fieldPresetFixture];
+    const setup = fieldingSetups.checks.find(check => check.playerIsBowling && check.preset === requestedPresets.at(-1));
+    const xSign = setup?.hand === 'LHB' ? -1 : 1;
+    for (const preset of requestedPresets) {
+      const selection = fieldingSetups.cycle.find(item => item.preset === preset);
+      const point = selection?.positions.find(fielder => fielder.name === 'point');
+      const expectedX = preset === 'attacking' ? 19 : preset === 'deep' ? 33 : 25;
+      const expectedZ = preset === 'attacking' ? -7 : preset === 'deep' ? -10 : -6;
+      if (!selection?.selected || !point || point.position.x !== expectedX * xSign || point.position.z !== expectedZ) {
+        throw new Error(`Selected ${preset} field did not reach live fielder positions: ${JSON.stringify({ fieldingSetups, preset })}`);
+      }
+    }
+    const point = setup?.positions.find(fielder => fielder.name === 'point');
+    if (!fieldingSetups.selected || !setup || !point) {
+      throw new Error(`Selected field setting did not reach live fielder positions: ${JSON.stringify({ fieldingSetups, fieldPresetFixture })}`);
+    }
+    console.log(`Bowler selected ${requestedPresets.join(', ')} field plans; live positions matched each and replay retained the final ${setup.preset} setting.`);
+  }
   // The sudden-death fixture intentionally records no shot in the regular innings.
   const requireRecordedShot = !process.argv.includes('--force-tie');
   if (contacts.length < 6 || contacts.some(contact => contact.error >= 1e-6 || !contact.swung || !contact.recorded || (requireRecordedShot && !contact.shot))) throw new Error(`Bowling contact mismatch: ${JSON.stringify(contacts)}`);
