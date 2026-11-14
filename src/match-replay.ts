@@ -50,12 +50,14 @@ export function replayMatchRecord(record: MatchHistoryRecord): MatchController {
       throw new Error(`Replay participant mismatch at event ${event.sequence}`);
     }
 
-    const outcome = game.recordBall(event.delivery, event.shot, event.fieldPreset);
+    const contactModel = event.contactModel ?? 'legacy-timing';
+    const outcome = game.recordBall(event.delivery, event.shot, event.fieldPreset, contactModel);
     const expectedDecisionReason = event.runOutBy && event.extraType === 'noball'
       ? 'Front-foot no-ball! (Free hit next)'
       : event.caughtBy || event.runOutBy ? '' : event.wicketReason;
-    assertSame({ missed: outcome.missed ?? false, isWicket: outcome.isWicket, wicketReason: outcome.wicketReason, isFreeHit: outcome.isFreeHit, isExtra: outcome.isExtra, extraType: outcome.extraType },
-      { missed: event.missed, isWicket: event.caughtBy || event.runOutBy ? false : event.isWicket, wicketReason: expectedDecisionReason, isFreeHit: event.isFreeHit, isExtra: event.isExtra, extraType: event.extraType }, `decision ${event.sequence}`);
+    const replayedDecision = game.state.events[game.state.events.length - 1];
+    assertSame({ missed: outcome.missed ?? false, isWicket: outcome.isWicket, wicketReason: outcome.wicketReason, isFreeHit: outcome.isFreeHit, isExtra: outcome.isExtra, extraType: outcome.extraType, ...(contactModel === 'swept-blade-v1' ? { batContact: replayedDecision.batContact } : {}) },
+      { missed: event.missed, isWicket: event.caughtBy || event.runOutBy ? false : event.isWicket, wicketReason: expectedDecisionReason, isFreeHit: event.isFreeHit, isExtra: event.isExtra, extraType: event.extraType, ...(contactModel === 'swept-blade-v1' ? { batContact: event.batContact } : {}) }, `decision ${event.sequence}`);
     if (event.flight) {
       const runs = game.finalizeBallOutcome(event.distance, event.flight.hasBounced, event.flight.reachedBoundary, event.caughtBy, event.fieldedRuns, event.runOutBy, event.physicsEvents);
       assertSame(runs, event.runs, `flight score ${event.sequence}`);

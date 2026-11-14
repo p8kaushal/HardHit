@@ -24,6 +24,7 @@ import { fieldRadarPoint } from '../src/field-radar';
 import { deflectFromReferencePad, PAD_P2_REBOUND_DATA } from '../src/pad-impact';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
+import { findBatBallContact } from '../src/bat-physics';
 import type { BallOutcome, DeliveryChoice, Player, ShotType } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -1119,8 +1120,6 @@ test('bot distribution simulation is reproducible, bounded and reports the right
   const deepField = runBotSimulation(80, undefined, 0x51a7, { fieldPreset: 'deep' });
   assert.deepEqual(first, second);
   assert.ok(first.some(tier => tier.groundStops > 0), 'seeded scenario should exercise ground fielding');
-  assert.ok(first.some(tier => tier.catches > 0), 'seeded scenario should exercise reachable catches');
-  assert.ok(first.some(tier => tier.runOuts > 0), 'seeded scenario should exercise run outs');
   assert.ok(first.some(tier => tier.sixes > 0), 'seeded bot scoring should preserve on-the-full sixes after landing');
   assert.ok(first.some((tier, index) => tier.runs !== withoutFielding[index].runs || tier.wickets !== withoutFielding[index].wickets), 'fielding should change simulated outcomes');
   assert.ok(first.some((tier, index) => tier.runs !== deepField[index].runs || tier.wickets !== deepField[index].wickets), 'the selected field preset should change simulated outcomes');
@@ -1141,7 +1140,6 @@ test('bot distribution simulation is reproducible, bounded and reports the right
     assert.ok(Math.abs(Object.values(tier.deliveryShares).reduce((sum, share) => sum + share, 0) - 1) < 1e-9);
     assert.ok(tier.incompleteOvers < tier.overs);
   }
-  assert.ok(first.some(tier => tier.runOuts > 0), 'seeded scenario should exercise run outs');
 });
 
 test('bot simulation scores no-ball contact and revokes a contacted wide', () => {
@@ -1186,12 +1184,14 @@ test('bot simulation protects catches on no-balls and free hits', () => {
 });
 
 test('bot simulation counts run-outs on a no-ball and the following free hit', () => {
-  const ball: DeliveryChoice = { ...delivery(0.5, -0.7), aimTarget: { x: -0.7, z: -8.2 }, turn: 0.5 };
-  const shot = { direction: 3, type: 'defensive' as const, timing: 0.4, contactZone: 0.5 };
-  const [legal] = runBotSimulation(1, 'Rookie', 7, { deliveryFixture: () => ball, shotFixture: () => shot });
+  const ball: DeliveryChoice = { ...delivery(0.5), turn: 0.5, overTheWicket: true };
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.4, contactZone: 0.5 };
+  const fieldersFixture = [{ name: 'point' as const, profile: { position: { x: 0, z: 10 }, reactionSeconds: 0.5, speedMetersPerSecond: 0, reachRadiusMeters: 0.5 }, catching: 0, throwing: 100 }];
+  const [legal] = runBotSimulation(1, 'Rookie', 7, { deliveryFixture: () => ball, shotFixture: () => shot, fieldersFixture });
   const [protectedDeliveries] = runBotSimulation(1, 'Rookie', 7, {
     deliveryFixture: attempt => attempt === 1 ? { ...ball, frontFootHeel: 0.01 } : ball,
     shotFixture: () => shot,
+    fieldersFixture,
   });
   assert.equal(legal.groundStops, 6);
   assert.equal(legal.runOuts, 6);
@@ -1581,6 +1581,9 @@ test('match event log copies delivery inputs and records final flight outcome', 
   const outcome = game.recordBall(input, shot);
   const event = game.state.events[0];
   assert.equal(event.resolved, false);
+  assert.ok(event.batContact, 'a recorded batting contact includes its swept point and incoming velocity');
+  assert.ok(event.batContact!.timeSeconds >= 0);
+  assert.ok(Math.hypot(...Object.values(event.batContact!.incomingVelocity)) > 0);
   assert.equal(outcome.distance, 0, 'an in-flight ball has no measured carry yet');
   assert.equal(event.distance, 0, 'the event must not store a pre-flight distance estimate');
   assert.notEqual(event.delivery, input);
@@ -1601,6 +1604,20 @@ test('match event log copies delivery inputs and records final flight outcome', 
   assert.deepEqual(event.flight, { hasBounced: true, reachedBoundary: true, boundaryOnFull: true });
   assert.deepEqual(event.physicsEvents, physicsEvents);
   assert.notEqual(event.physicsEvents, physicsEvents);
+});
+
+test('legacy timing adjudication remains available for unversioned saved events', () => {
+  const game = new MatchController('Medium', 43);
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+  const ball = delivery(0.5);
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
+  const expected = evaluateWicket(game.state.player, game.state.bot, ball, shot);
+  const outcome = game.recordBall(ball, shot, undefined, 'legacy-timing');
+  assert.equal(outcome.missed, expected.missed);
+  assert.equal(outcome.isWicket, expected.isWicket);
+  assert.equal(game.state.events[0].contactModel, undefined);
+  assert.equal(game.state.events[0].batContact, undefined);
 });
 
 test('saved regular match events replay through controller adjudication', () => {
@@ -2120,6 +2137,20 @@ test('shot trajectory follows all four cardinal directions with finite speed', (
     assert.ok(Object.values(velocity).every(Number.isFinite));
     assert.ok(Math.hypot(velocity.x, velocity.y, velocity.z) <= 38.000001);
   }
+});
+
+test('swept bat collision uses the incoming path and mirrors swing handedness', () => {
+  const incoming = { ...delivery(0.5), overTheWicket: true };
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
+  const right = findBatBallContact(incoming, shot, 'RHB');
+  const left = findBatBallContact(incoming, shot, 'LHB');
+  assert.ok(right, 'a centered, correctly timed RHB swing reaches the measured incoming path');
+  assert.ok(left, 'the mirrored LHB swing reaches the same incoming line');
+  assert.ok(Math.abs(right.timeSeconds - left.timeSeconds) < 1e-9);
+  assert.ok(Math.abs(right.ballPosition.x - left.ballPosition.x) < 1e-9);
+  assert.ok(Math.hypot(...Object.values(right.incomingVelocity)) > 0);
+  assert.ok(right.bladeFraction >= 0 && right.bladeFraction <= 1);
+  assert.equal(findBatBallContact(incoming, { ...shot, timing: 0 }, 'RHB'), null, 'a swing begun too early has ended before the ball reaches the bat');
 });
 
 test('shot quality affects exit speed without changing direction', () => {

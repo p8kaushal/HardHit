@@ -1,8 +1,9 @@
-import { Player, MatchState, Innings, BallOutcome, BallPhysicsEvent, DeliveryChoice, FieldPreset, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
+import { Player, MatchState, Innings, BallOutcome, BallPhysicsEvent, BatBallContactEvent, DeliveryChoice, FieldPreset, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
 import { battingAssistanceMultiplier, evaluateWicket, resolveMissedDelivery, resolveDeliveryExtra, deliveryContactPoint, deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 import { SeededRandom } from './random';
 import { isCatchDismissalAllowed } from './fielding';
+import { findBatBallContact } from './bat-physics';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
 
@@ -312,7 +313,7 @@ export class MatchController {
     globalAutoAssistConfig.bowlerArm = innings.bowler.bowlingArm || 'Right';
   }
 
-  public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null, fieldPreset?: FieldPreset): BallOutcome {
+  public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null, fieldPreset?: FieldPreset, contactModel: 'swept-blade-v1' | 'legacy-timing' = 'swept-blade-v1'): BallOutcome {
     const innings = this.getCurrentInnings();
     if (this.state.status !== 'playing' || !innings || innings.finished) {
       throw new Error('Cannot record a delivery after the innings has finished');
@@ -343,7 +344,10 @@ export class MatchController {
     const assistMultiplier = battingAssistanceMultiplier(innings.batter, innings.bowler, this.botDifficulty);
 
     const wicketResult = shot ? evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier) : null;
-    if (wicketResult) missed = wicketResult.missed ?? false;
+    const batContact: BatBallContactEvent | null = shot
+      ? findBatBallContact(delivery, shot, innings.batter.batterHand || 'RHB', assistMultiplier)
+      : null;
+    if (wicketResult) missed = contactModel === 'legacy-timing' ? (wicketResult.missed ?? false) : !batContact;
     const relativeLine = deliveryContactPoint(delivery).x - (delivery.batterPosition?.x ?? 0);
     if (shot && Math.abs(relativeLine) > 1.25) missed = true;
     const extra = resolveDeliveryExtra(delivery, innings.batter.batterHand || 'RHB', !!shot && !missed);
@@ -368,8 +372,17 @@ export class MatchController {
       distance = 0;
       console.log(`[GAME EVENT] Missed delivery. Ball number ${ballNumber}`);
     } else if (shot && wicketResult && extra.type !== 'wide') {
-      isWicket = wicketResult.isWicket;
-      wicketReason = extra.type === 'noball' ? 'Front-foot no-ball! (Free hit next)' : wicketResult.reason;
+      if (contactModel === 'legacy-timing') {
+        isWicket = wicketResult.isWicket;
+        wicketReason = extra.type === 'noball' ? 'Front-foot no-ball! (Free hit next)' : wicketResult.reason;
+      } else if (!batContact) {
+        const dismissal = isFreeHit ? null : resolveMissedDelivery(delivery, innings.batter.batterHand || 'RHB', true);
+        isWicket = dismissal !== null;
+        wicketReason = dismissal === 'lbw' ? 'LBW' : dismissal === 'bowled' ? 'Bowled' : 'Missed delivery!';
+      } else {
+        isWicket = false;
+        wicketReason = extra.type === 'noball' ? 'Front-foot no-ball! (Free hit next)' : '';
+      }
       
       if (!isWicket && !missed) {
         // The shot is still airborne. Keep distance unset/zero until the physical flight resolves.
@@ -414,6 +427,8 @@ export class MatchController {
       bowlerId: innings.bowler.id,
       delivery: { ...delivery, aimTarget: { ...delivery.aimTarget }, ...(delivery.batterPosition ? { batterPosition: { ...delivery.batterPosition } } : {}) },
       shot: shot ? { ...shot } : null,
+      ...(contactModel === 'swept-blade-v1' ? { contactModel } : {}),
+      ...(contactModel === 'swept-blade-v1' && batContact ? { batContact: { ...batContact, ballPosition: { ...batContact.ballPosition }, incomingVelocity: { ...batContact.incomingVelocity }, bladePosition: { ...batContact.bladePosition } } } : {}),
       missed,
       isWicket,
       wicketReason,

@@ -7,6 +7,7 @@ import { advanceBallFrame, type BallState } from './ball-physics';
 import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_MAX_RECOVERY_SECONDS, FIELDING_RUNNER_PICKUP_DELAY_SECONDS, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, sampleAutomatedRunners, sampleAutomatedReturn, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 import { deflectFromReferencePad } from './pad-impact';
+import { batPivotLocalPosition } from './bat-physics';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
 const BALL_VISUAL_RADIUS = 0.075;
@@ -456,9 +457,10 @@ export class GameScene {
     });
     const batPivot = new BABYLON.TransformNode('batPivot', this.scene);
     batPivot.parent = batter;
-    batPivot.position.set(0.30, 0.91, 0.40);
-    batPivot.rotation.z = -0.2;
-    const bat = box('batMesh', batPivot, batWood, 0, -0.43, 0, 0.22, 0.64, 0.065);
+    const batPivotPosition = batPivotLocalPosition(this.batterHand);
+    batPivot.position.set(batPivotPosition.x, batPivotPosition.y, batPivotPosition.z);
+    batPivot.rotation.z = 0.2;
+    const bat = box('batMesh', batPivot, batWood, 0, -0.43, 0, 0.041, 0.64, 0.108);
     bat.rotation.y = Math.PI / 2;
     limb('batHandle', batPivot, grip, 0, -0.03, 0, 0.27, 0.05);
     this.batMesh = bat;
@@ -493,6 +495,9 @@ export class GameScene {
 
   public setBatterHandedness(hand: 'RHB' | 'LHB'): void {
     this.batterHand = hand;
+    const batPivotPosition = batPivotLocalPosition(hand);
+    this.batPivot?.position.set(batPivotPosition.x, batPivotPosition.y, batPivotPosition.z);
+    if (this.batPivot) this.batPivot.rotation.z = hand === 'RHB' ? 0.2 : -0.2;
     const layout = createDefaultFieldLayout(hand, this.fieldPreset);
     for (const fielder of layout) this.fielderRoots.get(fielder.name)?.position.set(fielder.position.x, 0, fielder.position.z);
     if (!this.batterRoot) return;
@@ -986,17 +991,12 @@ export class GameScene {
   public animateBatterSwing(_directionAngle: number, successCallback: () => void): void {
     if (this.batPivot && this.batterRoot) {
       const batter = this.batterRoot;
-      const stance = this.batterStanceAngle();
       const pivot = this.batPivot;
       this.scene.stopAnimation(pivot);
       this.scene.stopAnimation(batter);
-      const bodySwing = BABYLON.Animation.CreateAndStartAnimation(
-        'batterBodySwing', batter, 'rotation.y', 60, 12, stance, stance + 0.45,
-        BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
-      );
-      bodySwing?.onAnimationEndObservable.add(() => { batter.rotation.y = stance; });
       const swing = new BABYLON.Animation('batSwing', 'rotation.z', 60, BABYLON.Animation.ANIMATIONTYPE_FLOAT);
-      swing.setKeys([{ frame: 0, value: -0.2 }, { frame: 4, value: -1.4 }, { frame: 10, value: 1.1 }, { frame: 18, value: -0.2 }]);
+      const handMirror = this.batterHand === 'RHB' ? -1 : 1;
+      swing.setKeys([{ frame: 0, value: -0.2 * handMirror }, { frame: 4, value: -1.4 * handMirror }, { frame: 10, value: 1.1 * handMirror }, { frame: 18, value: -0.2 * handMirror }]);
       this.scene.beginDirectAnimation(pivot, [swing], 0, 18, false, 1, () => {
         successCallback();
       });

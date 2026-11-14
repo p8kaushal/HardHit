@@ -6,11 +6,15 @@
 2. **Secondary: batting view.** Resolve keeper occlusion of the pitch from the batting camera, preserving the keeper's useful on-field/map representation.
 3. **Secondary: auto-run control.** Add a player choice, enabled by default; when disabled, expose run/continue decisions tied to the ball and return timeline. Bot decisions remain automatic.
 
-### In progress — share ordered outgoing ball events with scoring and replay
+### Completed bounded increment — swept bat/ball contact and replay versioning
 
-- **Finding:** the fixed-step solver knew the within-step order of first bounce and rope crossing but retained only summary booleans. Saved events and replay therefore could not inspect or preserve the physical order that determines a four versus six.
-- **Scope:** emit timestamped SI events for first ground contact, rope crossing and rest from the existing 120 Hz solver; persist them with the resolved delivery; make final scoring and saved replay derive bounce/rope ordering from the event sequence. Do not alter flight coefficients or claim full trajectory replay yet.
-- **Acceptance:** tests verify exact rope position, strictly ordered crossing/contact times in both orders, and event-derived scoring despite contradictory summary flags. Browser match verifies saved-event replay against both scorecards. `npm test` passed 158 tests; `npm run build` passed with the existing Babylon bundle warning; browser syntax and `git diff --check` passed. A two-innings browser run replayed 12 events and matched 24–17 scorecards. The record currently stores discrete contact/boundary/rest events, not every integration sample, incoming delivery, bat collision, catch contact or full deterministic resimulation.
+- **Finding:** timing-window-only contact allowed a hit without geometric overlap. Incoming visuals, wicket decisions and shot resolution therefore disagreed about whether the bat physically reached the ball.
+- **Scope:** sweep the modeled finite bat blade against `sampleDeliveryPath` at 1,200 Hz, including regulation ball radius, blade width/length, both batting hands and explicit assistance timing transformation. Record the earliest SI contact position/time, blade fraction and incoming velocity; align the rendered bat pivot/swing with the collision pose. Keep launch response coefficients unchanged. Tag new events `swept-blade-v1`; unversioned history replays with legacy timing adjudication.
+- **Acceptance:** `npm test` passed 160/160, including mirrored-hand contact, timing miss, SI contact event and legacy event behavior. `npm run build` passed (existing Babylon bundle-size warning). `git diff --check` passed. `node scripts/browser-match.mjs --bat-first --swing --loft --trace-shots --verify-replay` completed both innings and replayed 13 events against scorecards (player 4/1, bot 11/0); a clean geometric miss was adjudicated as a miss. This is a deterministic geometric approximation, not measured bat-face/impact physics: collision samples a blade segment with a width radius, and outgoing launch still uses the existing shot response.
+
+### Next priority — derive outgoing motion from physical contact
+
+Use the recorded contact point, incoming velocity and blade location to build a bounded collision response for exit velocity, elevation, direction and spin. First find suitable measured bat/ball evidence and document uncertainty; preserve the existing launch model as a clearly identified fallback until validated. Keep the strict straight-shot six fixture, diagnose with contact-derived traces and never tune against a single seed.
 
 ### Completed bounded increment — replace pre-flight distance with resolved physical carry
 

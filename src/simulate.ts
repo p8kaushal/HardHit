@@ -1,10 +1,11 @@
 import { createBotPlayer } from './game';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { evaluateWicket, checkExtraBall, resolveDeliveryExtra, deliveryContactPoint, deliveryVelocityAtCrease, battingAssistanceMultiplier, shotFlightQuality, calculateShotTrajectory, calculateShotDistance, evaluateFinalOutcome } from './formula';
+import { resolveMissedDelivery, checkExtraBall, resolveDeliveryExtra, deliveryContactPoint, deliveryVelocityAtCrease, battingAssistanceMultiplier, shotFlightQuality, calculateShotTrajectory, calculateShotDistance, evaluateFinalOutcome } from './formula';
 import type { DeliveryChoice, DeliveryType, FieldPreset, ShotChoice } from './types';
 import { SeededRandom } from './random';
 import { stepBall, type BallState } from './ball-physics';
 import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_MAX_RECOVERY_SECONDS, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, isCatchDismissalAllowed, type RatedFielder } from './fielding';
+import { findBatBallContact } from './bat-physics';
 
 export interface BotSimulationResult {
   tier: 'Rookie' | 'Medium' | 'Hard';
@@ -81,8 +82,8 @@ export function runBotSimulation(
         const delivery = options.deliveryFixture?.(attempts) ?? botChooseDelivery(bowler, tier, hand, random);
         deliveryCounts[delivery.type]++;
         const shot = options.shotFixture?.(attempts) ?? botChooseShot(batter, bowler, delivery, 'Rookie', random);
-        const result = evaluateWicket(batter, bowler, delivery, shot);
-        const missed = result.missed ?? false;
+        const batContact = findBatBallContact(delivery, shot, hand);
+        const missed = !batContact;
         const provisionalExtra = checkExtraBall(delivery, hand);
         const extra = resolveDeliveryExtra(delivery, hand, !missed);
         if (provisionalExtra.type === 'wide' && !extra.isExtra) contactedWides++;
@@ -94,7 +95,8 @@ export function runBotSimulation(
           freeHit = freeHit || extra.type === 'noball';
           if (extra.type === 'wide') continue;
         }
-        const isWicket = result.isWicket && !protectedDelivery;
+        const dismissal = missed ? resolveMissedDelivery(delivery, hand, true) : null;
+        const isWicket = dismissal !== null && !protectedDelivery;
         if (isWicket) wickets++;
         else if (!missed) {
           const quality = shotFlightQuality(shot, delivery, battingAssistanceMultiplier(batter, bowler, 'Rookie'));

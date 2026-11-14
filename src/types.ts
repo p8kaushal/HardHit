@@ -103,6 +103,15 @@ export interface BallPhysicsEvent {
   boundaryOnFull?: boolean;
 }
 
+/** Earliest swept sphere/blade overlap for a batting stroke, in SI units. */
+export interface BatBallContactEvent {
+  timeSeconds: number;
+  ballPosition: Vector3D;
+  incomingVelocity: Vector3D;
+  bladePosition: Vector3D;
+  bladeFraction: number;
+}
+
 export interface Innings {
   batter: Player;
   bowler: Player;
@@ -164,6 +173,9 @@ export interface MatchEvent {
   bowlerId: string;
   delivery: DeliveryChoice;
   shot: ShotChoice | null;
+  /** Absent on historical records; present to select the deterministic contact adjudicator. */
+  contactModel?: 'swept-blade-v1';
+  batContact?: BatBallContactEvent;
   missed: boolean;
   isWicket: boolean;
   wicketReason: string;
