@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — repeated-run turning delay
+
+- **Scope:** introduce an explicitly provisional delay between completed crossings, derived from a small-sample run-a-three total rather than treating the study's 10 m turn interval as stationary time. Preserve single-run speed and three-run cap.
+- [x] **Acceptance:** fixtures verify single, second and third crossing boundaries, safe turn pauses, run-out timing, symmetry and zero/three-run limits. `npm test` passed 149 tests; production build passed with the existing Babylon warning. The field-setting browser match produced a keeper run-out, completed both innings and replayed 12 events against the scorecards. The 0.8-second pause is derived from a small-study total, not a measured stationary turn; individual running, grounding and throw calibration remain open.
+
 ### Completed bounded increment — stop automated runners at the run limit
 
 - **Finding:** the run count is capped at three, but runner positions continue cycling after three completed crossings, so a sufficiently late fielding event can produce a run-out after running should have stopped. A configured zero-run limit has the same inconsistency.

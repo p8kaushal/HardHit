@@ -5,7 +5,7 @@ import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchContro
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
-import { createDefaultFieldLayout, decideAutomatedRuns, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, fielderReachProfileFromRatings, findEarliestFieldingEvent, findEarliestInterception, fielderThrowSpeedFromRating, hasFielderReacted, isCatchDismissalAllowed, moveFielderTowardBall, RUNNER_CREASE_TO_CREASE_METERS } from '../src/fielding';
+import { createDefaultFieldLayout, decideAutomatedRuns, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, FIELDING_RUNNER_TURN_DELAY_SECONDS, fielderReachProfileFromRatings, findEarliestFieldingEvent, findEarliestInterception, fielderThrowSpeedFromRating, hasFielderReacted, isCatchDismissalAllowed, moveFielderTowardBall, RUNNER_CREASE_TO_CREASE_METERS } from '../src/fielding';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
@@ -1251,7 +1251,7 @@ test('automated runners complete crossings or are run out at the threatened wick
   assert.equal(oneSafeRun.runs, 1);
   assert.equal(oneSafeRun.runOut, false);
 
-  const runOutAfterOne = decideAutomatedRuns(4, quickThrowAtStriker, 20);
+  const runOutAfterOne = decideAutomatedRuns(4.5, quickThrowAtStriker, 20);
   assert.equal(runOutAfterOne.runs, 1, 'a run completed before the wicket is broken still counts');
   assert.equal(runOutAfterOne.runOut, true);
   assert.equal(runOutAfterOne.threatenedEnd, 'striker');
@@ -1268,11 +1268,12 @@ test('automated runners complete crossings or are run out at the threatened wick
 test('automated runners stop safely after their configured run limit', () => {
   const crossing = RUNNER_CREASE_TO_CREASE_METERS / FIELDING_RUNNER_SPEED_METERS_PER_SECOND;
   const wicket = { x: 0, z: -10 };
-  const beforeThird = decideAutomatedRuns(3 * crossing - 1, wicket, 20);
+  const thirdTime = 3 * crossing + 2 * FIELDING_RUNNER_TURN_DELAY_SECONDS;
+  const beforeThird = decideAutomatedRuns(thirdTime - 1, wicket, 20);
   assert.equal(beforeThird.runs, 2);
   assert.equal(beforeThird.runOut, true);
-  const thirdCompleted = decideAutomatedRuns(3 * crossing, wicket, 20);
-  const longAfterThird = decideAutomatedRuns(3 * crossing + crossing / 2, wicket, 20);
+  const thirdCompleted = decideAutomatedRuns(thirdTime + 1e-6, wicket, 20);
+  const longAfterThird = decideAutomatedRuns(thirdTime + crossing / 2, wicket, 20);
   for (const decision of [thirdCompleted, longAfterThird]) {
     assert.equal(decision.runs, 3);
     assert.equal(decision.runOut, false);
@@ -1284,6 +1285,25 @@ test('automated runners stop safely after their configured run limit', () => {
   assert.equal(zeroRuns.runOut, false);
   assert.equal(zeroRuns.strikerPositionZ, BATTER_CREASE_Z);
   assert.equal(zeroRuns.nonStrikerPositionZ, -BATTER_CREASE_Z);
+});
+
+test('repeated runs wait at the crease between completed crossings', () => {
+  const crossing = RUNNER_CREASE_TO_CREASE_METERS / FIELDING_RUNNER_SPEED_METERS_PER_SECOND;
+  const pause = FIELDING_RUNNER_TURN_DELAY_SECONDS;
+  const wicket = { x: 0, z: -10 };
+  const justBefore = decideAutomatedRuns(crossing - 0.01, wicket, 20, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, 0);
+  const turning = decideAutomatedRuns(crossing + pause / 2, wicket, 20, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, 0);
+  const justAfter = decideAutomatedRuns(crossing + pause + 0.01, wicket, 20, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, 0);
+  assert.equal(justBefore.runs, 0);
+  assert.equal(turning.runs, 1);
+  assert.equal(turning.runOut, false);
+  assert.equal(Math.abs(turning.strikerPositionZ), Math.abs(BATTER_CREASE_Z));
+  assert.ok(Math.abs(justAfter.strikerPositionZ) < Math.abs(BATTER_CREASE_Z));
+  for (const [count, seconds] of [[2, 2 * crossing + pause], [3, 3 * crossing + 2 * pause]] as const) {
+    assert.equal(decideAutomatedRuns(seconds - 1e-5, wicket, 20, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, 0).runs, count - 1);
+    assert.equal(decideAutomatedRuns(seconds + 1e-5, wicket, 20, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, 0).runs, count);
+  }
+  assert.throws(() => decideAutomatedRuns(1, wicket, 20, 6.25, 0.7, 3, -0.1), /Invalid automated run decision/);
 });
 
 test('automated runner path starts and regains safety at the modeled popping creases', () => {

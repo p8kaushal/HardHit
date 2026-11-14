@@ -25,6 +25,9 @@ export const FIELDING_MAX_RUNS = 3;
 // the endpoints below use the scene's 17.6 m popping-crease separation.
 export const FIELDING_RUNNER_SPEED_METERS_PER_SECOND = 6.25;
 export const FIELDING_RUNNER_PICKUP_DELAY_SECONDS = 0.7;
+// Approximate extra time per turn from run-a-three total, not the study's
+// measured 10 m turn interval, which already includes running on both sides.
+export const FIELDING_RUNNER_TURN_DELAY_SECONDS = 0.8;
 export const RUNNER_CREASE_TO_CREASE_METERS = Math.abs(BATTER_CREASE_Z) * 2;
 
 /** A caught ball dismisses only when the delivery's modeled protections allow it. */
@@ -173,10 +176,11 @@ export function decideAutomatedRuns(
   runnerSpeedMetersPerSecond = FIELDING_RUNNER_SPEED_METERS_PER_SECOND,
   pickupDelaySeconds = FIELDING_RUNNER_PICKUP_DELAY_SECONDS,
   maximumRuns = FIELDING_MAX_RUNS,
+  turnDelaySeconds = FIELDING_RUNNER_TURN_DELAY_SECONDS,
 ): AutomatedRunDecision {
-  if (![flightSeconds, fielderPosition.x, fielderPosition.z, throwSpeedMetersPerSecond, runnerSpeedMetersPerSecond, pickupDelaySeconds, maximumRuns].every(Number.isFinite) ||
+  if (![flightSeconds, fielderPosition.x, fielderPosition.z, throwSpeedMetersPerSecond, runnerSpeedMetersPerSecond, pickupDelaySeconds, maximumRuns, turnDelaySeconds].every(Number.isFinite) ||
       flightSeconds < 0 || throwSpeedMetersPerSecond <= 0 || runnerSpeedMetersPerSecond <= 0 || pickupDelaySeconds < 0 ||
-      !Number.isInteger(maximumRuns) || maximumRuns < 0) {
+      !Number.isInteger(maximumRuns) || maximumRuns < 0 || turnDelaySeconds < 0) {
     throw new Error('Invalid automated run decision input');
   }
 
@@ -188,19 +192,25 @@ export function decideAutomatedRuns(
   const throwDistance = Math.min(distanceToStriker, distanceToNonStriker);
   const throwArrivalSeconds = pickupDelaySeconds + throwDistance / throwSpeedMetersPerSecond;
 
-  // Once the configured maximum is complete, both runners stay safe at their
-  // creases instead of starting another crossing that can no longer score.
-  const progress = runnerDistanceFromStartingCrease(Math.min(
-    maximumRuns * RUNNER_CREASE_TO_CREASE_METERS,
-    runnerSpeedMetersPerSecond * flightSeconds,
-  ));
+  const crossingSeconds = RUNNER_CREASE_TO_CREASE_METERS / runnerSpeedMetersPerSecond;
+  const runnerAt = (timeSeconds: number) => {
+    const cycle = crossingSeconds + turnDelaySeconds;
+    const completedCycles = Math.floor(timeSeconds / cycle);
+    const withinCycle = timeSeconds - completedCycles * cycle;
+    const completed = Math.min(maximumRuns, completedCycles + (withinCycle >= crossingSeconds ? 1 : 0));
+    const distance = Math.min(maximumRuns * RUNNER_CREASE_TO_CREASE_METERS,
+      completedCycles * RUNNER_CREASE_TO_CREASE_METERS + Math.min(withinCycle, crossingSeconds) * runnerSpeedMetersPerSecond);
+    return { completed, progress: runnerDistanceFromStartingCrease(distance) };
+  };
+  // Runners wait at the crease between crossings and after the configured cap.
+  const progress = runnerAt(flightSeconds).progress;
   const strikerPositionZ = BATTER_CREASE_Z + progress;
   const nonStrikerPositionZ = -BATTER_CREASE_Z - progress;
   const targetCreaseZ = threatenedEnd === 'striker' ? BATTER_CREASE_Z : -BATTER_CREASE_Z;
   const nearestRunnerDistance = Math.min(Math.abs(strikerPositionZ - targetCreaseZ), Math.abs(nonStrikerPositionZ - targetCreaseZ));
   const runnerArrivalSeconds = nearestRunnerDistance / runnerSpeedMetersPerSecond;
   const runOut = flightSeconds > 0 && runnerArrivalSeconds > throwArrivalSeconds + 1e-10;
-  const runs = Math.min(maximumRuns, Math.floor((flightSeconds + throwArrivalSeconds) * runnerSpeedMetersPerSecond / RUNNER_CREASE_TO_CREASE_METERS));
+  const runs = runnerAt(flightSeconds + throwArrivalSeconds).completed;
 
   return { runs, runOut, threatenedEnd, strikerPositionZ, nonStrikerPositionZ, throwArrivalSeconds, runnerArrivalSeconds };
 }
