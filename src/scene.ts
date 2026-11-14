@@ -4,7 +4,7 @@ import { CameraMode, DeliveryChoice, DeliveryType, FieldPreset } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
-import { createDefaultFieldLayout, decideAutomatedRuns, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, hasFielderReacted, moveFielderTowardBall, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
+import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
@@ -1061,23 +1061,17 @@ export class GameScene {
         });
         if (state.reachedBoundary) return false;
         for (const [name, profile] of this.fielderProfiles) {
-          if (!hasFielderReacted(profile, this.shotElapsedSeconds)) continue;
           const root = this.fielderRoots.get(name);
           if (!root) continue;
-          const next = moveFielderTowardBall(
-            { x: root.position.x, z: root.position.z },
-            { x: state.position.x, z: state.position.z },
-            profile.speedMetersPerSecond,
-            stepSeconds,
-          );
-          root.position.x = next.x;
-          root.position.z = next.z;
-          const gap = Math.hypot(state.position.x - next.x, state.position.z - next.z);
-          if (!state.hasBounced && state.position.y > 1.2 && state.position.y <= 1.65 + this.fieldingRatings.catching * 0.015 && gap <= profile.reachRadiusMeters) {
+          const next = advanceFielder({ x: root.position.x, z: root.position.z }, profile, this.fieldingRatings.catching,
+            { timeSeconds: this.shotElapsedSeconds, position: state.position, hasBounced: state.hasBounced, reachedBoundary: state.reachedBoundary }, stepSeconds);
+          root.position.x = next.position.x;
+          root.position.z = next.position.z;
+          if (next.kind === 'catch') {
             this.shotCaughtBy = name;
             return true;
           }
-          if (state.hasBounced && state.position.y <= 1.2 && gap <= profile.reachRadiusMeters) {
+          if (next.kind === 'ground_stop') {
             this.shotFieldedBy = name;
             return true;
           }

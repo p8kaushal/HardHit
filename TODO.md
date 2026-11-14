@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — unify live and simulated fielder movement
+
+- **Finding:** live fielders chase successive ball positions after reacting; the bot simulator tests a straight-line reach envelope from the starting position. A changing trajectory can therefore produce different catches and stops for identical inputs.
+- [x] **Acceptance:** live and simulated fielders now use the same per-step reaction, chase and interception logic. Fixtures cover a direction change that the old envelope falsely allowed, reaction, catches, ground stops, protected deliveries and rope precedence. `npm test` passed 150 tests and the production build passed with the existing Babylon bundle warning. Separate browser matches verified an all-preset keeper run-out and a controlled point catch, each replaying 12 events against the scorecards. The corrected 80-over-per-tier seeded sample has no catches with default layouts; investigate independently before using bot distributions for tuning or fairness claims.
+
 ### Completed bounded increment — repeated-run turning delay
 
 - **Scope:** introduce an explicitly provisional delay between completed crossings, derived from a small-sample run-a-three total rather than treating the study's 10 m turn interval as stationary time. Preserve single-run speed and three-run cap.

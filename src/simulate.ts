@@ -39,6 +39,8 @@ export interface BotSimulationOptions {
   /** Deterministic delivery and shot fixtures for simulation verification. */
   deliveryFixture?: (attempt: number) => DeliveryChoice;
   shotFixture?: (attempt: number) => ShotChoice;
+  /** Override starting fielders for deterministic interception fixtures. */
+  fieldersFixture?: readonly RatedFielder[];
 }
 
 /** Synthetic seeded bot scoring simulation using the production shot-flight physics. */
@@ -64,7 +66,7 @@ export function runBotSimulation(
       const hand = over % 2 === 0 ? 'RHB' : 'LHB';
       batter.batterHand = hand;
       const fieldingStats = bowler.stats.fielding ?? { agility: 50, reaction: 50, catching: 50, throwing: 50 };
-      const fielders: RatedFielder[] = options.includeFielding === false ? [] : createDefaultFieldLayout(hand, options.fieldPreset ?? 'balanced').map(fielder => ({
+      const fielders: readonly RatedFielder[] = options.includeFielding === false ? [] : options.fieldersFixture ?? createDefaultFieldLayout(hand, options.fieldPreset ?? 'balanced').map(fielder => ({
         name: fielder.name,
         profile: fielderReachProfileFromRatings(fielder.position, fieldingStats.agility, fieldingStats.reaction),
         catching: fieldingStats.catching,

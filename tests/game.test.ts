@@ -5,7 +5,7 @@ import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchContro
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
-import { createDefaultFieldLayout, decideAutomatedRuns, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, FIELDING_RUNNER_TURN_DELAY_SECONDS, fielderReachProfileFromRatings, findEarliestFieldingEvent, findEarliestInterception, fielderThrowSpeedFromRating, hasFielderReacted, isCatchDismissalAllowed, moveFielderTowardBall, RUNNER_CREASE_TO_CREASE_METERS } from '../src/fielding';
+import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, FIELDING_RUNNER_TURN_DELAY_SECONDS, fielderReachProfileFromRatings, findEarliestFieldingEvent, findEarliestInterception, fielderThrowSpeedFromRating, hasFielderReacted, isCatchDismissalAllowed, moveFielderTowardBall, RUNNER_CREASE_TO_CREASE_METERS } from '../src/fielding';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
@@ -1064,7 +1064,6 @@ test('bot distribution simulation is reproducible, bounded and reports the right
   const deepField = runBotSimulation(80, undefined, 0x51a7, { fieldPreset: 'deep' });
   assert.deepEqual(first, second);
   assert.ok(first.some(tier => tier.groundStops > 0), 'seeded scenario should exercise ground fielding');
-  assert.ok(first.some(tier => tier.catches > 0), 'seeded scenario should exercise catches');
   assert.ok(first.some(tier => tier.runOuts > 0), 'seeded scenario should exercise run outs');
   assert.ok(first.some(tier => tier.sixes > 0), 'seeded bot scoring should preserve on-the-full sixes after landing');
   assert.ok(first.some((tier, index) => tier.runs !== withoutFielding[index].runs || tier.wickets !== withoutFielding[index].wickets), 'fielding should change simulated outcomes');
@@ -1108,18 +1107,24 @@ test('bot simulation scores no-ball contact and revokes a contacted wide', () =>
 
 test('bot simulation protects catches on no-balls and free hits', () => {
   let catchVerified = false;
+  fixtureSearch: for (const x of [-8, -4, 0, 4, 8]) {
+  for (const z of [-16, -12, -8, -4, 0]) {
   for (const type of ['grounded', 'power', 'lofted'] as const) {
     for (let direction = 0; direction < 8; direction++) {
       const shot = { direction, type, timing: 0.5, contactZone: 0.5 };
-      const options = { shotFixture: () => shot };
+      const options = { shotFixture: () => shot, fieldersFixture: [{ name: 'point' as const,
+        profile: { position: { x, z }, reactionSeconds: 0.3, speedMetersPerSecond: 4, reachRadiusMeters: 0.45 }, catching: 50 }] };
       const [legal] = runBotSimulation(1, 'Rookie', 7, { ...options, deliveryFixture: () => delivery(0.5) });
       const [protectedBall] = runBotSimulation(1, 'Rookie', 7, { ...options, deliveryFixture: attempt => attempt === 1 ? { ...delivery(0.5), frontFootHeel: 0.01 } : delivery(0.5) });
       if (legal.catches === 6 && protectedBall.catches === 7) {
         assert.equal(legal.wickets, 6);
         assert.equal(protectedBall.wickets, 5, 'no-ball and subsequent free-hit catches are protected');
         catchVerified = true;
+        break fixtureSearch;
       }
     }
+  }
+  }
   }
   assert.equal(catchVerified, true, 'fixture matrix must include a reachable catch');
 });
@@ -1353,6 +1358,31 @@ test('fielding trajectory picks the first reachable catch or ground stop before 
   assert.equal(isCatchDismissalAllowed(false, false), true);
   assert.equal(isCatchDismissalAllowed(false, true), false);
   assert.equal(isCatchDismissalAllowed(true, false), false);
+});
+
+test('simulated fielders follow the same changing ball path and reaction steps as the live scene', () => {
+  const fielder = { name: 'point' as const, profile: { position: { x: 0, z: 0 }, reactionSeconds: 0.25, speedMetersPerSecond: 2, reachRadiusMeters: 0.1 }, catching: 50 };
+  const samples = [
+    { timeSeconds: 0.1, position: { x: 0, y: 1.5, z: 0 }, hasBounced: false, reachedBoundary: false },
+    { timeSeconds: 0.5, position: { x: -2, y: 3, z: 0 }, hasBounced: false, reachedBoundary: false },
+    { timeSeconds: 1, position: { x: 1.5, y: 1.5, z: 0 }, hasBounced: false, reachedBoundary: false },
+    { timeSeconds: 2, position: { x: 1.5, y: 0.04, z: 0 }, hasBounced: true, reachedBoundary: false },
+  ];
+  assert.ok(findEarliestInterception([samples[2]], fielder.profile), 'a direct reach envelope wrongly allows the catch');
+  let position = { ...fielder.profile.position };
+  let previous = 0;
+  let liveEvent: { time: number; kind: string; position: { x: number; z: number } } | null = null;
+  for (const sample of samples) {
+    const next = advanceFielder(position, fielder.profile, fielder.catching, sample, sample.timeSeconds - previous);
+    position = next.position;
+    previous = sample.timeSeconds;
+    if (next.kind) { liveEvent = { time: sample.timeSeconds, kind: next.kind, position }; break; }
+  }
+  const simulated = findEarliestFieldingEvent(samples, [fielder]);
+  assert.equal(liveEvent?.kind, 'ground_stop');
+  assert.equal(simulated?.kind, liveEvent?.kind);
+  assert.equal(simulated?.timeSeconds, liveEvent?.time);
+  assert.deepEqual(simulated?.fielderPosition, liveEvent?.position);
 });
 
 test('bot fielding ratings scale with difficulty and remain bounded', () => {

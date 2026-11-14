@@ -142,6 +142,21 @@ export function hasFielderReacted(profile: FielderReachProfile, elapsedSeconds: 
   return elapsedSeconds + 1e-10 >= profile.reactionSeconds;
 }
 
+/** Advance the same fielder chase and interception used by scene and simulation. */
+export function advanceFielder(
+  current: { x: number; z: number }, profile: FielderReachProfile, catching: number,
+  sample: FieldingTrajectoryState, stepSeconds: number,
+): { position: { x: number; z: number }; kind: 'catch' | 'ground_stop' | null } {
+  if (!Number.isFinite(catching) || catching < 0 || catching > 100) throw new Error('Catching rating must be between 0 and 100');
+  if (sample.reachedBoundary || !hasFielderReacted(profile, sample.timeSeconds)) return { position: { ...current }, kind: null };
+  const position = moveFielderTowardBall(current, sample.position, profile.speedMetersPerSecond, stepSeconds);
+  const gap = Math.hypot(sample.position.x - position.x, sample.position.z - position.z);
+  if (gap > profile.reachRadiusMeters) return { position, kind: null };
+  if (!sample.hasBounced && sample.position.y > 1.2 && sample.position.y <= 1.65 + catching * 0.015) return { position, kind: 'catch' };
+  if (sample.hasBounced && sample.position.y <= 1.2) return { position, kind: 'ground_stop' };
+  return { position, kind: null };
+}
+
 /** Map the provisional 0–100 throwing skill to return-throw speed in m/s. */
 export function fielderThrowSpeedFromRating(throwing: number): number {
   if (!Number.isFinite(throwing) || throwing < 0 || throwing > 100) throw new Error('Throwing rating must be between 0 and 100');
@@ -258,31 +273,33 @@ export function findEarliestFieldingEvent(
   trajectory: readonly FieldingTrajectoryState[],
   fielders: readonly RatedFielder[],
 ): FieldingEvent | null {
-  let earliest: FieldingEvent | null = null;
+  const positions = fielders.map(fielder => ({ ...fielder.profile.position }));
   for (const fielder of fielders) {
     if (!Number.isFinite(fielder.catching) || fielder.catching < 0 || fielder.catching > 100) {
       throw new Error('Catching rating must be between 0 and 100');
     }
-    const catchHeight = 1.65 + fielder.catching * 0.015;
-    const catchSamples = trajectory
-      .filter(sample => !sample.reachedBoundary && !sample.hasBounced && sample.position.y > 1.2 && sample.position.y <= catchHeight)
-      .map(({ timeSeconds, position }) => ({ timeSeconds, position }));
-    const groundSamples = trajectory
-      .filter(sample => !sample.reachedBoundary && sample.hasBounced && sample.position.y <= 1.2)
-      .map(({ timeSeconds, position }) => ({ timeSeconds, position }));
-
-    for (const [kind, samples] of [['catch', catchSamples], ['ground_stop', groundSamples]] as const) {
-      const interception = findEarliestInterception(samples, fielder.profile);
-      if (!interception || (earliest && interception.timeSeconds >= earliest.timeSeconds)) continue;
-      const movementSeconds = Math.max(0, interception.timeSeconds - fielder.profile.reactionSeconds);
-      const fielderPosition = moveFielderTowardBall(
-        fielder.profile.position,
-        interception.position,
-        fielder.profile.speedMetersPerSecond,
-        movementSeconds,
-      );
-      earliest = { ...interception, fielderName: fielder.name, kind, fielderPosition };
+    // Retain profile validation even when the trajectory is empty.
+    findEarliestInterception([], fielder.profile);
+  }
+  let previousTime = 0;
+  for (const [sampleIndex, sample] of trajectory.entries()) {
+    if (!Number.isFinite(sample.timeSeconds) || sample.timeSeconds < previousTime ||
+        ![sample.position.x, sample.position.y, sample.position.z].every(Number.isFinite)) {
+      throw new Error(`Invalid trajectory sample at index ${sampleIndex}`);
+    }
+    const stepSeconds = sample.timeSeconds - previousTime;
+    previousTime = sample.timeSeconds;
+    if (sample.reachedBoundary) break;
+    for (const [index, fielder] of fielders.entries()) {
+      const result = advanceFielder(positions[index], fielder.profile, fielder.catching, sample, stepSeconds);
+      positions[index] = result.position;
+      if (result.kind) {
+        return { sampleIndex, timeSeconds: sample.timeSeconds, position: { ...sample.position },
+          distanceMeters: Math.hypot(sample.position.x - fielder.profile.position.x, sample.position.z - fielder.profile.position.z),
+          movementMeters: Math.hypot(result.position.x - fielder.profile.position.x, result.position.z - fielder.profile.position.z),
+          fielderName: fielder.name, kind: result.kind, fielderPosition: result.position };
+      }
     }
   }
-  return earliest;
+  return null;
 }
