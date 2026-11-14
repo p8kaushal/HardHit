@@ -632,8 +632,13 @@ export function getDeliveryFlightPosition(
   return position;
 }
 
-export function evaluateFinalOutcome(distance: number, hasBounced: boolean, reachedBoundary = distance >= 65): number {
-  if (reachedBoundary && !hasBounced) {
+export function evaluateFinalOutcome(
+  distance: number,
+  hasBounced: boolean,
+  reachedBoundary = distance >= 65,
+  boundaryOnFull = false,
+): number {
+  if (reachedBoundary && (boundaryOnFull || !hasBounced)) {
     return 6;
   } else if (reachedBoundary && hasBounced) {
     return 4;

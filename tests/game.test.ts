@@ -1040,6 +1040,7 @@ test('bot distribution simulation is reproducible, bounded and reports the right
   assert.ok(first.some(tier => tier.groundStops > 0), 'seeded scenario should exercise ground fielding');
   assert.ok(first.some(tier => tier.catches > 0), 'seeded scenario should exercise catches');
   assert.ok(first.some(tier => tier.runOuts > 0), 'seeded scenario should exercise run outs');
+  assert.ok(first.some(tier => tier.sixes > 0), 'seeded bot scoring should preserve on-the-full sixes after landing');
   assert.ok(first.some((tier, index) => tier.runs !== withoutFielding[index].runs || tier.wickets !== withoutFielding[index].wickets), 'fielding should change simulated outcomes');
   assert.ok(first.some((tier, index) => tier.runs !== deepField[index].runs || tier.wickets !== deepField[index].wickets), 'the selected field preset should change simulated outcomes');
   for (const tier of first) {
@@ -1866,13 +1867,15 @@ test('rope crossing and bounce are resolved in their actual order within a physi
   assert.equal(clearsRope.reachedBoundary, true);
   assert.equal(clearsRope.boundaryOnFull, true);
   assert.equal(clearsRope.hasBounced, true, 'the ball lands beyond the rope in this same step');
-  assert.equal(evaluateFinalOutcome(65, !clearsRope.boundaryOnFull, clearsRope.reachedBoundary), 6);
+  assert.equal(evaluateFinalOutcome(65, clearsRope.hasBounced, clearsRope.reachedBoundary, clearsRope.boundaryOnFull), 6,
+    'landing after a full crossing does not erase the six');
 
   const landsFirst = nearRope(BALL_RADIUS_METERS + 0.005);
   stepBall(landsFirst, 0.01);
   assert.equal(landsFirst.reachedBoundary, true);
   assert.equal(landsFirst.hasBounced, true);
-  assert.equal(evaluateFinalOutcome(65, landsFirst.hasBounced, landsFirst.reachedBoundary), 4);
+  assert.equal(evaluateFinalOutcome(65, landsFirst.hasBounced, landsFirst.reachedBoundary, landsFirst.boundaryOnFull), 4,
+    'a bounce before the rope remains a four');
 });
 
 test('six carry ends at interpolated first ground contact without truncating the rope step', () => {

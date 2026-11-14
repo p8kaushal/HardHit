@@ -99,7 +99,9 @@ export function runBotSimulation(
           }
           const distance = calculateShotDistance({ position: flight.position }, { x: contact.x, z: contact.z });
           const fieldingEvent = findEarliestFieldingEvent(trajectory, fielders);
-          let shotRuns: number | null = evaluateFinalOutcome(distance, flight.hasBounced, flight.reachedBoundary);
+          // The simulator advances full-boundary shots through their landing
+          // to measure carry, so preserve the earlier rope-crossing event.
+          let shotRuns: number | null = evaluateFinalOutcome(distance, flight.hasBounced, flight.reachedBoundary, flight.boundaryOnFull);
           if (fieldingEvent?.kind === 'catch') {
             catches++;
             if (isCatchDismissalAllowed(false, freeHit)) {
