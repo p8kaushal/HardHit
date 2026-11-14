@@ -445,6 +445,12 @@ export function checkExtraBall(delivery: DeliveryChoice, _batterHand: 'RHB' | 'L
   return { isExtra: false, type: null };
 }
 
+/** Bat contact revokes a provisional wide; a no-ball retains its penalty. */
+export function resolveDeliveryExtra(delivery: DeliveryChoice, hand: 'RHB' | 'LHB', batContact: boolean): { isExtra: boolean; type: 'wide' | 'noball' | null } {
+  const extra = checkExtraBall(delivery, hand);
+  return extra.type === 'wide' && batContact ? { isExtra: false, type: null } : extra;
+}
+
 export function getLineTypeFromAimX(aimX: number, batterHand: 'RHB' | 'LHB' = 'RHB'): import('./types').LineType {
   if (batterHand === 'RHB') {
     if (aimX > 0.2) return 'off';

@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — simulate scoring on illegal deliveries
+
+- **Scope:** align seeded bot simulation with live wide cancellation, no-ball bat runs, free-hit chains and fielding dismissals. Keep attempt and legal-ball denominators explicit.
+- [x] **Acceptance:** controlled simulator fixtures cover contacted and missed wides, no-ball bat runs and protected catches on a no-ball and subsequent free hit. Existing live/replay fixtures cover protected-delivery run-outs; a simulator-specific protected run-out fixture remains open. `npm test` passes 146 tests and the production build passes with the existing Babylon chunk warning.
+
 ### Completed bounded increment — missed-delivery decision table
 
 - **Scope:** document and test the existing modeled dismissal precedence for mirrored hands, offered/no shot, pad interception, pitch and impact lines, wicket projection and no-ball. Distinguish approximated contact from physical bat/body ordering; do not claim unsupported ordering is implemented.

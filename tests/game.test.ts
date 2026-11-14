@@ -1076,16 +1076,52 @@ test('bot distribution simulation is reproducible, bounded and reports the right
     assert.equal(tier.attempts, tier.legalBalls + tier.wides + tier.noBalls);
     assert.ok(tier.runs >= tier.wides + tier.noBalls);
     assert.ok(tier.dots >= 0 && tier.fours >= 0 && tier.sixes >= 0);
-    assert.ok(tier.groundStops >= 0 && tier.groundStops <= tier.legalBalls);
-    assert.ok(tier.catches >= 0 && tier.catches <= tier.legalBalls);
+    assert.ok(tier.groundStops >= 0 && tier.groundStops <= tier.legalBalls + tier.noBalls);
+    assert.ok(tier.catches >= 0 && tier.catches <= tier.legalBalls + tier.noBalls);
     assert.ok(tier.runOuts >= 0 && tier.runOuts <= tier.groundStops);
-    assert.ok(tier.dots + tier.fours + tier.sixes <= tier.legalBalls);
+    assert.ok(tier.dots + tier.fours + tier.sixes <= tier.legalBalls + tier.noBalls);
     assert.ok(tier.legalRate >= 0 && tier.legalRate <= 1);
-    assert.ok(tier.wicketRate >= 0 && tier.wicketRate <= 1);
+    assert.equal(tier.wicketRate, tier.legalBalls ? tier.wickets / tier.legalBalls : 0);
+    assert.ok(tier.wickets <= tier.legalBalls + tier.noBalls);
     assert.ok(Math.abs(Object.values(tier.deliveryShares).reduce((sum, share) => sum + share, 0) - 1) < 1e-9);
     assert.ok(tier.incompleteOvers < tier.overs);
   }
   assert.ok(first.some(tier => tier.runOuts > 0), 'seeded scenario should exercise run outs');
+});
+
+test('bot simulation scores no-ball contact and revokes a contacted wide', () => {
+  const shot = { direction: 2, type: 'lofted' as const, timing: 0.5, contactZone: 0.5 };
+  const [result] = runBotSimulation(1, 'Rookie', 7, {
+    includeFielding: false,
+    deliveryFixture: attempt => attempt === 1 ? { ...delivery(0.5), frontFootHeel: 0.01 }
+      : attempt === 2 || attempt === 3 ? delivery(0.5, 1) : delivery(0.5),
+    shotFixture: attempt => attempt === 3 ? { ...shot, timing: 0 } : shot,
+  });
+  assert.equal(result.noBalls, 1);
+  assert.equal(result.noBallBatRuns > 0, true);
+  assert.equal(result.contactedWides, 1);
+  assert.equal(result.wides, 1);
+  assert.equal(result.legalBalls, 6);
+  assert.equal(result.attempts, 8);
+  assert.ok(result.runs >= result.noBallBatRuns + 2);
+});
+
+test('bot simulation protects catches on no-balls and free hits', () => {
+  let catchVerified = false;
+  for (const type of ['grounded', 'power', 'lofted'] as const) {
+    for (let direction = 0; direction < 8; direction++) {
+      const shot = { direction, type, timing: 0.5, contactZone: 0.5 };
+      const options = { shotFixture: () => shot };
+      const [legal] = runBotSimulation(1, 'Rookie', 7, { ...options, deliveryFixture: () => delivery(0.5) });
+      const [protectedBall] = runBotSimulation(1, 'Rookie', 7, { ...options, deliveryFixture: attempt => attempt === 1 ? { ...delivery(0.5), frontFootHeel: 0.01 } : delivery(0.5) });
+      if (legal.catches === 6 && protectedBall.catches === 7) {
+        assert.equal(legal.wickets, 6);
+        assert.equal(protectedBall.wickets, 5, 'no-ball and subsequent free-hit catches are protected');
+        catchVerified = true;
+      }
+    }
+  }
+  assert.equal(catchVerified, true, 'fixture matrix must include a reachable catch');
 });
 
 test('fielding reachability respects reaction time, speed and earliest trajectory sample', () => {

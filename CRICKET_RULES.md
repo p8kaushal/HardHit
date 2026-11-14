@@ -23,7 +23,7 @@ Not yet modeled: back-foot and other no-ball faults, raised and partially ground
 
 ## Wides
 
-The prototype compares the simulated line at contact with a fixed reach threshold relative to the original and selected batter positions. A delivery reachable from the original stance is not made wide merely by moving away. Bat contact cancels a wide. A wide adds one run and does not count as a legal ball.
+The prototype compares the simulated line at contact with a fixed reach threshold relative to the original and selected batter positions. A delivery reachable from the original stance is not made wide merely by moving away. Bat contact cancels a wide in both live play and the seeded bot simulator. A wide adds one run and does not count as a legal ball. The simulator also resolves contact and fielding on no-balls, rather than discarding their bat runs.
 
 This is a simplified line test, not a complete implementation of MCC Law 22 or ICC T20I clause 22. The MCC 2026 law considers where the striker is standing or has stood after the ball comes into play and separately defines a delivery passing over head height after landing. The game does not model the batter's full path during delivery, actual bat reach, ball height for a high wide, or format-specific markings. Movement is currently locked at release.
 

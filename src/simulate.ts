@@ -1,7 +1,7 @@
 import { createBotPlayer } from './game';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { evaluateWicket, checkExtraBall, resolveMissedDelivery, deliveryContactPoint, deliveryVelocityAtCrease, battingAssistanceMultiplier, shotFlightQuality, calculateShotTrajectory, calculateShotDistance, evaluateFinalOutcome } from './formula';
-import type { DeliveryType, FieldPreset } from './types';
+import { evaluateWicket, checkExtraBall, resolveDeliveryExtra, deliveryContactPoint, deliveryVelocityAtCrease, battingAssistanceMultiplier, shotFlightQuality, calculateShotTrajectory, calculateShotDistance, evaluateFinalOutcome } from './formula';
+import type { DeliveryChoice, DeliveryType, FieldPreset, ShotChoice } from './types';
 import { SeededRandom } from './random';
 import { stepBall, type BallState } from './ball-physics';
 import { createDefaultFieldLayout, decideAutomatedRuns, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, findEarliestFieldingEvent, isCatchDismissalAllowed, type RatedFielder } from './fielding';
@@ -22,7 +22,12 @@ export interface BotSimulationResult {
   catches: number;
   runOuts: number;
   incompleteOvers: number;
+  /** Bat runs scored on no-balls, included in runs and boundary counts. */
+  noBallBatRuns: number;
+  /** Provisional wides cancelled by bat contact, included in legalBalls. */
+  contactedWides: number;
   legalRate: number;
+  /** Wickets per legal ball; run-outs on no-balls can make this exceed one. */
   wicketRate: number;
   deliveryShares: Record<DeliveryType, number>;
 }
@@ -31,6 +36,9 @@ export interface BotSimulationOptions {
   /** Test/control comparison; production simulation includes fielders by default. */
   includeFielding?: boolean;
   fieldPreset?: FieldPreset;
+  /** Deterministic delivery and shot fixtures for simulation verification. */
+  deliveryFixture?: (attempt: number) => DeliveryChoice;
+  shotFixture?: (attempt: number) => ShotChoice;
 }
 
 /** Synthetic seeded bot scoring simulation using the production shot-flight physics. */
@@ -46,7 +54,7 @@ export function runBotSimulation(
     const random = new SeededRandom((seed + tierIndex * 0x9e3779b9) >>> 0).next;
     const bowler = createBotPlayer(tier);
     const batter = createBotPlayer('Rookie');
-    let attempts = 0, legalBalls = 0, wides = 0, noBalls = 0, wickets = 0, runs = 0, dots = 0, fours = 0, sixes = 0, groundStops = 0, catches = 0, runOuts = 0, incompleteOvers = 0;
+    let attempts = 0, legalBalls = 0, wides = 0, noBalls = 0, wickets = 0, runs = 0, dots = 0, fours = 0, sixes = 0, groundStops = 0, catches = 0, runOuts = 0, incompleteOvers = 0, noBallBatRuns = 0, contactedWides = 0;
     let freeHit = false;
     const deliveryCounts: Record<DeliveryType, number> = { fast: 0, medium: 0, slow: 0, offspin: 0, legspin: 0 };
 
@@ -64,22 +72,23 @@ export function runBotSimulation(
       while (legalInOver < 6 && overAttempts < 24) {
         overAttempts++;
         attempts++;
-        const delivery = botChooseDelivery(bowler, tier, hand, random);
+        const delivery = options.deliveryFixture?.(attempts) ?? botChooseDelivery(bowler, tier, hand, random);
         deliveryCounts[delivery.type]++;
-        const extra = checkExtraBall(delivery, hand);
+        const shot = options.shotFixture?.(attempts) ?? botChooseShot(batter, bowler, delivery, 'Rookie', random);
+        const result = evaluateWicket(batter, bowler, delivery, shot);
+        const missed = result.missed ?? false;
+        const provisionalExtra = checkExtraBall(delivery, hand);
+        const extra = resolveDeliveryExtra(delivery, hand, !missed);
+        if (provisionalExtra.type === 'wide' && !extra.isExtra) contactedWides++;
+        const protectedDelivery = freeHit || extra.type === 'noball';
         if (extra.isExtra) {
           if (extra.type === 'wide') wides++;
           else noBalls++;
           runs++;
           freeHit = freeHit || extra.type === 'noball';
-          continue;
+          if (extra.type === 'wide') continue;
         }
-        const shot = botChooseShot(batter, bowler, delivery, 'Rookie', random);
-        const result = evaluateWicket(batter, bowler, delivery, shot);
-        let missed = result.missed ?? false;
-        let isWicket = result.isWicket;
-        if (missed) isWicket = resolveMissedDelivery(delivery, hand, true) !== null;
-        if (freeHit) isWicket = false;
+        const isWicket = result.isWicket && !protectedDelivery;
         if (isWicket) wickets++;
         else if (!missed) {
           const quality = shotFlightQuality(shot, delivery, battingAssistanceMultiplier(batter, bowler, 'Rookie'));
@@ -104,7 +113,7 @@ export function runBotSimulation(
           let shotRuns: number | null = evaluateFinalOutcome(distance, flight.hasBounced, flight.reachedBoundary, flight.boundaryOnFull);
           if (fieldingEvent?.kind === 'catch') {
             catches++;
-            if (isCatchDismissalAllowed(false, freeHit)) {
+            if (isCatchDismissalAllowed(extra.type === 'noball', protectedDelivery)) {
               wickets++;
               shotRuns = null;
             } else {
@@ -129,20 +138,23 @@ export function runBotSimulation(
           }
           if (shotRuns !== null) {
             runs += shotRuns;
-            if (shotRuns === 0) dots++;
+            if (extra.type === 'noball') noBallBatRuns += shotRuns;
+            if (shotRuns === 0 && !extra.isExtra) dots++;
             else if (shotRuns === 4) fours++;
             else if (shotRuns === 6) sixes++;
           }
-        } else dots++;
-        freeHit = false;
-        legalBalls++;
-        legalInOver++;
+        } else if (!extra.isExtra) dots++;
+        if (!extra.isExtra) {
+          freeHit = false;
+          legalBalls++;
+          legalInOver++;
+        }
       }
       if (legalInOver < 6) incompleteOvers++;
     }
     const typeTotal = Object.values(deliveryCounts).reduce((sum, count) => sum + count, 0);
     return {
-      tier, overs: overCount, attempts, legalBalls, wides, noBalls, wickets, runs, dots, fours, sixes, groundStops, catches, runOuts, incompleteOvers,
+      tier, overs: overCount, attempts, legalBalls, wides, noBalls, wickets, runs, dots, fours, sixes, groundStops, catches, runOuts, incompleteOvers, noBallBatRuns, contactedWides,
       legalRate: attempts ? legalBalls / attempts : 0,
       wicketRate: legalBalls ? wickets / legalBalls : 0,
       deliveryShares: Object.fromEntries(Object.entries(deliveryCounts).map(([type, count]) => [type, typeTotal ? count / typeTotal : 0])) as Record<DeliveryType, number>,
