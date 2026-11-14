@@ -1124,6 +1124,27 @@ test('bot simulation protects catches on no-balls and free hits', () => {
   assert.equal(catchVerified, true, 'fixture matrix must include a reachable catch');
 });
 
+test('bot simulation counts run-outs on a no-ball and the following free hit', () => {
+  const ball: DeliveryChoice = { ...delivery(0.5, -0.7), aimTarget: { x: -0.7, z: -8.2 }, turn: 0.5 };
+  const shot = { direction: 3, type: 'defensive' as const, timing: 0.4, contactZone: 0.5 };
+  const [legal] = runBotSimulation(1, 'Rookie', 7, { deliveryFixture: () => ball, shotFixture: () => shot });
+  const [protectedDeliveries] = runBotSimulation(1, 'Rookie', 7, {
+    deliveryFixture: attempt => attempt === 1 ? { ...ball, frontFootHeel: 0.01 } : ball,
+    shotFixture: () => shot,
+  });
+  assert.equal(legal.groundStops, 6);
+  assert.equal(legal.runOuts, 6);
+  assert.equal(legal.wickets, 6);
+  assert.equal(protectedDeliveries.groundStops, 7);
+  assert.equal(protectedDeliveries.runOuts, 7);
+  assert.equal(protectedDeliveries.wickets, 7);
+  assert.equal(protectedDeliveries.noBalls, 1);
+  assert.equal(protectedDeliveries.legalBalls, 6);
+  assert.equal(protectedDeliveries.attempts, 7);
+  assert.equal(protectedDeliveries.noBallBatRuns, 0);
+  assert.equal(protectedDeliveries.runs, 1, 'the no-ball penalty remains when a runner is out');
+});
+
 test('fielding reachability respects reaction time, speed and earliest trajectory sample', () => {
   const trajectory = [
     { timeSeconds: 0.5, position: { x: 2, y: 0.2, z: 0 } },

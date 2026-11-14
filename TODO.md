@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — verify protected-delivery simulated run-outs
+
+- **Scope:** reproduce a real simulated interception and throw on a no-ball and its following free hit, and compare scoring and wickets with the same legal-delivery inputs.
+- [x] **Acceptance:** a deterministic defensive shot produces a ground interception and run-out on the no-ball, the following free hit and five later legal deliveries. The fixture checks all seven wickets, six legal balls, the no-ball penalty and no bat runs; the existing protected-catch fixture still passes. `npm test` passed 147 tests and production build passed with the existing Babylon chunk warning. These are numerical model fixtures, not running or fielding calibration.
+
 ### Completed bounded increment — isolate browser traces from replay
 
 - Replay verification invokes the same instrumented controller as live play. The harness now excludes those replay calls from live shot and match traces, preventing duplicate entries and false score-summary failures when `--trace-shots` and `--verify-replay` are combined.
@@ -8,7 +13,7 @@
 ### Completed bounded increment — simulate scoring on illegal deliveries
 
 - **Scope:** align seeded bot simulation with live wide cancellation, no-ball bat runs, free-hit chains and fielding dismissals. Keep attempt and legal-ball denominators explicit.
-- [x] **Acceptance:** controlled simulator fixtures cover contacted and missed wides, no-ball bat runs and protected catches on a no-ball and subsequent free hit. Existing live/replay fixtures cover protected-delivery run-outs; a simulator-specific protected run-out fixture remains open. `npm test` passes 146 tests and the production build passes with the existing Babylon chunk warning.
+- [x] **Acceptance:** controlled simulator fixtures cover contacted and missed wides, no-ball bat runs and protected catches on a no-ball and subsequent free hit. Existing live/replay fixtures cover protected-delivery run-outs; the subsequent increment above adds simulator-specific run-out coverage. At this increment `npm test` passed 146 tests and the production build passed with the existing Babylon chunk warning.
 
 ### Completed bounded increment — missed-delivery decision table
 
