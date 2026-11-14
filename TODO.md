@@ -1,5 +1,11 @@
 # Gameplay to-do
 
+### Completed bounded increment — timed fielding return
+
+- **Finding:** ground-ball scoring waits numerically for a gather and throw, but the scene immediately ends when a fielder stops the ball, so the result appears before the modeled return.
+- **Scope:** show a gather and throw to the threatened wicket using the adjudicator's exact delay and throw duration; keep scoring pending until arrival and honor gameplay pause. Catch/boundary flows remain unchanged.
+- [x] **Acceptance:** a deterministic scene fixture verifies the selected wicket, gather/throw timing, pause and one resolution. `npm test` passed 152 tests; production build passed with the existing Babylon warning. A two-innings browser match verified two returns reached their modeled wickets while score/events stayed pending, a keeper run-out and a 12-event replay matching scorecards. Runner movement and fielder throwing animation remain open.
+
 ### Completed bounded increment — visible non-striker
 
 - **Scope:** add a non-striker model at the bowler's end and source the ground-map marker from its scene position. Keep it off the bowling sightline and identify it by role, without inventing a squad identity.

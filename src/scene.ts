@@ -4,7 +4,7 @@ import { CameraMode, DeliveryChoice, DeliveryType, FieldPreset } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
-import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
+import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_RUNNER_PICKUP_DELAY_SECONDS, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
@@ -46,6 +46,7 @@ export class GameScene {
   private fieldPreset: FieldPreset = 'balanced';
   private shotFieldedBy: FieldingPosition['name'] | null = null;
   private shotCaughtBy: FieldingPosition['name'] | null = null;
+  private fieldingReturn: { startedAt: number; pickup: BABYLON.Vector3; hand: BABYLON.Vector3; wicket: BABYLON.Vector3; arrivalSeconds: number } | null = null;
 
 
   // Animation state
@@ -99,7 +100,8 @@ export class GameScene {
         this.updateDeliveryAnimation?.();
         this.updateMissedAnimation?.();
         if (globalAutoAssistConfig.isBallInPlay) {
-          this.updateBallPhysics();
+          if (this.fieldingReturn) this.updateFieldingReturn();
+          else this.updateBallPhysics();
         }
         if (globalAutoAssistConfig.isRunUpActive) {
           this.updateBowlerRunUp();
@@ -143,6 +145,7 @@ export class GameScene {
     };
 
     globalAutoAssistConfig.resetSceneForInnings = () => {
+      this.fieldingReturn = null;
       // Reposition single camera to Player Anchor
       this.resetCameraToPlayerView(!this.isBotBatting);
       // Reset ball mesh to bowler release point
@@ -986,6 +989,7 @@ export class GameScene {
   }
 
   public endDeliveryCycle(): void {
+    this.fieldingReturn = null;
     globalAutoAssistConfig.isBallInPlay = false;
     this.isAnimatingBall = false;
     
@@ -1009,6 +1013,37 @@ export class GameScene {
     const onResolved = this.onBallResolvedCallback;
     this.onBallResolvedCallback = null;
     onResolved?.();
+  }
+
+  /** Keep the ball live until the same return used for run adjudication arrives. */
+  private beginFieldingReturn(): boolean {
+    const decision = this.getShotRunDecision();
+    const fielder = this.shotFieldedBy && this.fielderRoots.get(this.shotFieldedBy);
+    if (!decision || !fielder || !this.ballMesh || !this.currentBallPos) return false;
+    this.clearBallTrail();
+    this.fieldingReturn = {
+      startedAt: gameNow(),
+      pickup: new BABYLON.Vector3(this.currentBallPos.x, this.currentBallPos.y + BALL_VISUAL_OFFSET, this.currentBallPos.z),
+      hand: new BABYLON.Vector3(fielder.position.x, 1, fielder.position.z),
+      wicket: new BABYLON.Vector3(0, 0.35, decision.threatenedEnd === 'striker' ? BATTER_STUMPS_Z : -BATTER_STUMPS_Z),
+      arrivalSeconds: decision.throwArrivalSeconds,
+    };
+    return true;
+  }
+
+  private updateFieldingReturn(): void {
+    const returning = this.fieldingReturn;
+    if (!returning || !this.ballMesh) return;
+    const elapsed = Math.max(0, (gameNow() - returning.startedAt) / 1000);
+    const gather = FIELDING_RUNNER_PICKUP_DELAY_SECONDS;
+    if (elapsed < gather) {
+      this.ballMesh.position.copyFrom(BABYLON.Vector3.Lerp(returning.pickup, returning.hand, elapsed / gather));
+    } else {
+      const throwDuration = Math.max(0, returning.arrivalSeconds - gather);
+      const fraction = throwDuration === 0 ? 1 : Math.min(1, (elapsed - gather) / throwDuration);
+      this.ballMesh.position.copyFrom(BABYLON.Vector3.Lerp(returning.hand, returning.wicket, fraction));
+    }
+    if (elapsed >= returning.arrivalSeconds) this.endDeliveryCycle();
   }
 
   public resetBowlerMesh(): void {
@@ -1113,7 +1148,7 @@ export class GameScene {
       this.ballMesh.position.copyFrom(this.currentBallPos);
       this.ballMesh.position.y += BALL_VISUAL_OFFSET;
       if (this.shotPhysics.stopped || (this.shotPhysics.reachedBoundary && (!this.shotPhysics.boundaryOnFull || this.shotPhysics.hasBounced))) {
-        this.endDeliveryCycle();
+        if (!this.shotFieldedBy || !this.beginFieldingReturn()) this.endDeliveryCycle();
         return;
       }
 
@@ -1144,6 +1179,7 @@ export class GameScene {
 
 
   public animateHitPath(distance: number, direction: number, V_out?: { x: number, y: number, z: number }): void {
+    this.fieldingReturn = null;
     this.isAnimatingBall = false;
     this.updateMissedAnimation = null;
     this.clearBallTrail();

@@ -1293,6 +1293,46 @@ test('automated runners stop safely after their configured run limit', () => {
   assert.equal(zeroRuns.nonStrikerPositionZ, -BATTER_CREASE_Z);
 });
 
+test('fielded return reaches the adjudicated wicket before resolving and pauses with gameplay', () => {
+  const originalPerformance = globalThis.performance;
+  let now = 1000;
+  Object.assign(globalThis, { performance: { now: () => now } });
+  const scene = Object.create(GameScene.prototype) as any;
+  scene.shotFieldedBy = 'point';
+  scene.fielderRoots = new Map([['point', { position: { x: 4, z: 2 } }]]);
+  scene.currentBallPos = new Vector3(3.5, BALL_RADIUS_METERS, 2);
+  scene.ballMesh = { position: new Vector3() };
+  scene.clearBallTrail = () => {};
+  scene.getShotRunDecision = () => ({ threatenedEnd: 'nonStriker', throwArrivalSeconds: 2 });
+  let resolved = 0;
+  scene.endDeliveryCycle = () => { resolved++; scene.fieldingReturn = null; };
+  try {
+    assert.equal(scene.beginFieldingReturn(), true);
+    now += 700;
+    scene.updateFieldingReturn();
+    assert.ok(Vector3.Distance(scene.ballMesh.position, new Vector3(4, 1, 2)) < 1e-9);
+    setGamePaused(true);
+    now += 3000;
+    scene.updateFieldingReturn();
+    assert.equal(resolved, 0);
+    assert.ok(Vector3.Distance(scene.ballMesh.position, new Vector3(4, 1, 2)) < 1e-9);
+    setGamePaused(false);
+    now += 650;
+    scene.updateFieldingReturn();
+    assert.ok(Vector3.Distance(scene.ballMesh.position, new Vector3(2, 0.675, 6)) < 1e-9);
+    assert.equal(resolved, 0);
+    now += 650;
+    scene.updateFieldingReturn();
+    assert.ok(Vector3.Distance(scene.ballMesh.position, new Vector3(0, 0.35, 10)) < 1e-9);
+    assert.equal(resolved, 1);
+    scene.updateFieldingReturn();
+    assert.equal(resolved, 1);
+  } finally {
+    setGamePaused(false);
+    Object.assign(globalThis, { performance: originalPerformance });
+  }
+});
+
 test('repeated runs wait at the crease between completed crossings', () => {
   const crossing = RUNNER_CREASE_TO_CREASE_METERS / FIELDING_RUNNER_SPEED_METERS_PER_SECOND;
   const pause = FIELDING_RUNNER_TURN_DELAY_SECONDS;

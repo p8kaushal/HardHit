@@ -62,7 +62,7 @@ try {
     const { UIManager } = await import('/src/ui.ts');
     const { globalAutoAssistConfig } = await import('/src/game.ts');
     const { MatchController } = await import('/src/game.ts');
-    const { setGamePaused, isGamePaused } = await import('/src/game-clock.ts');
+    const { gameNow, setGamePaused, isGamePaused } = await import('/src/game-clock.ts');
     const { deliveryContactPoint, BALL_RADIUS_METERS } = await import('/src/formula.ts');
     const { fieldRadarPoint } = await import('/src/field-radar.ts');
     if (fieldPresetFixture) {
@@ -83,6 +83,7 @@ try {
     }
     const animateDelivery = GameScene.prototype.animateDelivery;
     const endDeliveryCycle = GameScene.prototype.endDeliveryCycle;
+    const beginFieldingReturn = GameScene.prototype.beginFieldingReturn;
     const getShotFielder = GameScene.prototype.getShotFielder;
     const getShotCatcher = GameScene.prototype.getShotCatcher;
     const showResultToast = UIManager.prototype.showResultToast;
@@ -136,6 +137,7 @@ try {
     window.__playerShotTrace = [];
     window.__matchReplay = [];
     window.__fielderSceneChecks = [];
+    window.__fieldingReturns = [];
     let playerBatting = false;
     let playerController;
     GameScene.prototype.getShotFielder = function (...args) {
@@ -157,6 +159,7 @@ try {
     const recordBall = MatchController.prototype.recordBall;
     MatchController.prototype.recordBall = function (delivery, shot, fieldPreset) {
       if (window.__replayingMatch) return recordBall.call(this, delivery, shot, fieldPreset);
+      window.__liveMatchController = this;
       const contact = window.__matchContacts.at(-1);
       const result = recordBall.call(this, delivery, shot, fieldPreset);
       window.__matchReplay.push({
@@ -247,6 +250,15 @@ try {
       return result;
     };
     GameScene.prototype.endDeliveryCycle = function (...args) {
+      if (this.fieldingReturn) {
+        const returning = this.fieldingReturn;
+        window.__fieldingReturns.push({ elapsed: (gameNow() - returning.startedAt) / 1000,
+          expected: returning.arrivalSeconds, wicket: { x: returning.wicket.x, y: returning.wicket.y, z: returning.wicket.z },
+          ball: { x: this.ballMesh.position.x, y: this.ballMesh.position.y, z: this.ballMesh.position.z },
+          ballInPlay: globalAutoAssistConfig.isBallInPlay, pendingAtStart: returning.pendingAtStart,
+          pendingAtEnd: window.__liveMatchController?.state.events.at(-1)?.resolved === false,
+          scoreAtStart: returning.scoreAtStart, scoreAtEnd: window.__liveMatchController?.getCurrentInnings().score });
+      }
       const trace = window.__playerShotTrace.at(-1);
       if (traceShots && playerBatting && trace && !trace.flightSamples && this.shotPhysics) {
         const flightSamples = this.getShotTrajectory();
@@ -260,6 +272,14 @@ try {
         });
       }
       return endDeliveryCycle.apply(this, args);
+    };
+    GameScene.prototype.beginFieldingReturn = function (...args) {
+      const started = beginFieldingReturn.apply(this, args);
+      if (started) {
+        this.fieldingReturn.pendingAtStart = window.__liveMatchController?.state.events.at(-1)?.resolved === false;
+        this.fieldingReturn.scoreAtStart = window.__liveMatchController?.getCurrentInnings().score;
+      }
+      return started;
     };
     GameScene.prototype.animateDelivery = function (target, length, type, arrived, ...rest) {
       return animateDelivery.call(this, target, length, type, () => {
@@ -604,6 +624,12 @@ try {
     if (!runOut || !toasts.some(toast => toast.title === 'WICKET!' && toast.description === runOut.wicketReason)) {
       throw new Error(`A fielded ground shot did not resolve and display a run out: ${JSON.stringify(trace.map(shot => ({ fieldedBy: shot.fieldedBy, runs: shot.runs, runOutBy: shot.runOutBy, wicket: shot.wicket, wicketReason: shot.wicketReason })))}`);
     }
+    const returns = await page.evaluate(() => window.__fieldingReturns);
+    if (!returns.length || returns.some(item => !item.ballInPlay || !item.pendingAtStart || !item.pendingAtEnd || item.scoreAtStart !== item.scoreAtEnd || item.elapsed + 0.001 < item.expected ||
+        Math.hypot(item.ball.x - item.wicket.x, item.ball.y - item.wicket.y, item.ball.z - item.wicket.z) > 1e-6)) {
+      throw new Error(`Fielding return did not reach its wicket before resolution: ${JSON.stringify(returns)}`);
+    }
+    console.log(`Verified ${returns.length} timed fielding return(s) reached the modeled wicket before scoring.`);
     console.log(`Ground shot was run out by ${runOut.runOutBy}; ${runOut.runs} run(s) counted before the wicket.`);
   }
   if (catchFixture) {
