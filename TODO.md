@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — missed-delivery decision table
+
+- **Scope:** document and test the existing modeled dismissal precedence for mirrored hands, offered/no shot, pad interception, pitch and impact lines, wicket projection and no-ball. Distinguish approximated contact from physical bat/body ordering; do not claim unsupported ordering is implemented.
+- [x] **Acceptance:** table fixtures assert pad interception and dismissal outcomes for both hands, offered/no shot and no-ball protection; limitations and comparison to Law 36 are explicit. Physical first-contact order and calibration remain open.
+
 ### Completed bounded increment — add the missing tenth fielder
 
 - **Finding:** the ground map showed 12 scene representations because the fielding side had a bowler and only nine fielders (including the wicketkeeper). ICC T20I Playing Conditions clause 1.1 defines an eleven-player side, so the modeled bowling side was short one fielder.

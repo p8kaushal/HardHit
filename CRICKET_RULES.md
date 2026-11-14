@@ -31,6 +31,19 @@ This is a simplified line test, not a complete implementation of MCC Law 22 or I
 
 A missed delivery can be bowled or LBW using a simplified projected path and pad/stump geometry. The incoming path is extended from the modeled popping crease to the rendered stump plane for the wicket test. A no-ball cannot result in either. The model takes batter handedness and stance into account; it rejects LBW when the ball pitches outside leg, or impacts outside off when a shot is offered. If there was no shot, impact outside off can qualify. A ball that misses the modeled wicket is not a wicket.
 
+For a delivery already classified as missed, the modeled decision order is:
+
+| Condition | Modeled result |
+| --- | --- |
+| Front-foot no-ball or projected wicket miss | Neither bowled nor LBW |
+| Projected wicket hit, pad avoided | Bowled |
+| Pad intercepted, ball pitched outside leg before impact | Not LBW |
+| Pad intercepted in line, with eligible pitch and projected wicket hit | LBW |
+| Pad intercepted outside off, with eligible pitch and projected wicket hit | LBW only if no shot was offered |
+| Pad intercepted outside leg | Not LBW |
+
+The table is tested for mirrored right- and left-handed examples. A free hit also suppresses these dismissals in match adjudication. Law 36 requires first interception and a genuine attempt to play the ball to be considered; the prototype instead classifies a shot as offered from player input and resolves bat contact using timing and reach before applying this missed-delivery table. It cannot distinguish pad-first from bat-first contact or judge a genuine attempt. The modeled ball-radius overlap thresholds and projected path are approximations, not a complete Law 36 assessment.
+
 The projection beyond the crease extrapolates the current approximate path and is not calibrated. Missed deliveries that avoid the simplified pad model continue visually to the stump plane; a modeled pad impact currently stops the visual without a physical deflection. The model does not currently simulate bat-versus-pad first-contact ordering, full body geometry, umpire's-call margins, or all the evidence required to establish the MCC Law 36 sequence. It must not be presented as a fully accurate LBW decision system. Catches are modeled for reachable airborne shots; run-outs are modeled for fielded ground shots. Stumpings, hit wicket, leg byes and byes are not simulated.
 
 ## Existing test coverage

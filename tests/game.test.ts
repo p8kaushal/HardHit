@@ -679,6 +679,32 @@ test('LBW considers pitch, impact, offered shot, stumps, handedness and no-balls
   assert.equal(resolveMissedDelivery(delivery(0.5, 0.7), 'RHB', false), null);
 });
 
+test('missed-delivery decision table holds for mirrored batters', () => {
+  const turning: DeliveryChoice = { ...delivery(0.5, 0.35), type: 'offspin', turn: 1 };
+  const cases: Array<{ name: string; ball: DeliveryChoice; pad: boolean; offered: boolean; result: 'lbw' | 'bowled' | null }> = [
+    { name: 'in-line pad and wicket', ball: turning, pad: true, offered: true, result: 'lbw' },
+    { name: 'outside off with shot', ball: { ...turning, aimTarget: { x: 0.54, z: -3.5 } }, pad: true, offered: true, result: null },
+    { name: 'outside off without shot', ball: { ...turning, aimTarget: { x: 0.54, z: -3.5 } }, pad: true, offered: false, result: 'lbw' },
+    { name: 'pitched outside leg', ball: { ...delivery(0.5, -0.25), type: 'legspin', turn: 1 }, pad: true, offered: false, result: null },
+    { name: 'pad avoided and wicket hit', ball: { ...turning, batterPosition: { x: 0.6, z: 0 } }, pad: false, offered: false, result: 'bowled' },
+    { name: 'wicket missed', ball: delivery(0.5, 0.7), pad: false, offered: false, result: null },
+    { name: 'no-ball suppresses LBW', ball: { ...turning, frontFootHeel: 0.01 }, pad: true, offered: true, result: null },
+    { name: 'no-ball suppresses bowled', ball: { ...turning, frontFootHeel: 0.01, batterPosition: { x: 0.6, z: 0 } }, pad: false, offered: false, result: null },
+  ];
+  for (const item of cases) {
+    const mirrored: DeliveryChoice = {
+      ...item.ball,
+      aimTarget: { ...item.ball.aimTarget, x: -item.ball.aimTarget.x },
+      type: item.ball.type === 'offspin' ? 'legspin' : item.ball.type === 'legspin' ? 'offspin' : item.ball.type,
+      batterPosition: item.ball.batterPosition && { ...item.ball.batterPosition, x: -item.ball.batterPosition.x },
+    };
+    for (const [ball, hand] of [[item.ball, 'RHB'], [mirrored, 'LHB']] as const) {
+      assert.equal(deliveryHitsPad(ball), item.pad, `${item.name}: ${hand} pad`);
+      assert.equal(resolveMissedDelivery(ball, hand, item.offered), item.result, `${item.name}: ${hand} decision`);
+    }
+  }
+});
+
 test('mirrored handedness and bowling arm preserve offered-shot LBW decisions', () => {
   const right = {
     ...delivery(0.5, 0.35), type: 'offspin' as const, turn: 1,
