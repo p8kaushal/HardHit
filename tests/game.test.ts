@@ -12,14 +12,14 @@ import { SeededRandom } from '../src/random';
 import { MAX_MATCH_HISTORY, readMatchHistory, saveMatchRecord } from '../src/match-history';
 import { replayMatchRecord } from '../src/match-replay';
 import { addLeaderboardEntry, readLeaderboard } from '../src/leaderboard';
-import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateDistance, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
+import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, BATTER_CONTACT_Z, BATTER_CREASE_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, calculateBounceTarget, calculateDistance, calculateShotDistance, calculateShotTrajectory, checkExtraBall, deliveryAnimationStep, deliveryArrivalHeight, deliveryBaseCreaseX, deliveryCreaseX, deliveryDurationMs, deliveryPitchPoint, deliveryReleaseX, deliverySwingAtBounce, deliveryVelocityAtCrease, evaluateFinalOutcome, evaluateWicket, footworkFactor, frameIndependentDamping, getDeliveryFlightPosition, getLineTypeFromAimX, getParabolicFlightPosition, resolveMissedDelivery, sampleFrontFootLanding } from '../src/formula';
 import { isSpinDelivery, updateBowlingAdjustmentVisibility } from '../src/bowling-controls';
 import { clearGameTimeout, gameNow, isGamePaused, setGamePaused, setGameTimeout, shouldPauseGameplay } from '../src/game-clock';
 import { SoundManager } from '../src/sound';
 import { UIManager, opponentBadgeText } from '../src/ui';
 import { GameScene } from '../src/scene';
 import { battingTimingFeedback } from '../src/batting-timing';
-import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryBounceProgress, deliveryContactPoint, deliveryHitsPad, deliveryProgressAtZ, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
+import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryBatterImpactPoint, deliveryBounceProgress, deliveryContactPoint, deliveryHitsPad, deliveryProgressAtZ, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
 import { fieldRadarPoint } from '../src/field-radar';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
@@ -679,6 +679,21 @@ test('LBW considers pitch, impact, offered shot, stumps, handedness and no-balls
   assert.equal(resolveMissedDelivery(delivery(0.5, 0.7), 'RHB', false), null);
 });
 
+test('pad interception and LBW use the same stance-adjusted batter-plane sample', () => {
+  const base = delivery(0.5, 0.7);
+  for (const hand of ['RHB', 'LHB'] as const) {
+    for (const batterPosition of [{ x: 0, z: 0 }, { x: 0.2, z: -0.35 }]) {
+      const ball = { ...base, batterPosition };
+      const impact = deliveryBatterImpactPoint(ball);
+      const expectedZ = BATTER_CONTACT_Z + batterPosition.z;
+      assert.ok(Math.abs(impact.z - expectedZ) < 1e-9, `${hand}: impact follows the adjusted batter plane`);
+      assert.equal(deliveryHitsPad(ball), Math.abs(impact.x - batterPosition.x) <= 0.30 + BALL_RADIUS_METERS && impact.y >= 0.18 && impact.y <= 1.05);
+      const verdict = resolveMissedDelivery(ball, hand, false);
+      assert.ok(verdict === 'lbw' || verdict === 'bowled' || verdict === null);
+    }
+  }
+});
+
 test('missed-delivery decision table holds for mirrored batters', () => {
   const turning: DeliveryChoice = { ...delivery(0.5, 0.35), type: 'offspin', turn: 1 };
   const cases: Array<{ name: string; ball: DeliveryChoice; pad: boolean; offered: boolean; result: 'lbw' | 'bowled' | null }> = [
@@ -1149,6 +1164,35 @@ test('bot simulation counts run-outs on a no-ball and the following free hit', (
   assert.equal(protectedDeliveries.attempts, 7);
   assert.equal(protectedDeliveries.noBallBatRuns, 0);
   assert.equal(protectedDeliveries.runs, 1, 'the no-ball penalty remains when a runner is out');
+});
+
+test('bot simulation recovers stopped balls and bounds unavailable fielders', () => {
+  const ball = delivery(0.5);
+  const shot = { direction: 3, type: 'defensive' as const, timing: 0.4, contactZone: 0.5 };
+  const fixture = { deliveryFixture: () => ball, shotFixture: () => shot };
+  const [recovered] = runBotSimulation(1, 'Rookie', 7, { ...fixture, fieldersFixture: [{
+    name: 'point', profile: { position: { x: 30, z: -8.4 }, reactionSeconds: 0.2, speedMetersPerSecond: 2, reachRadiusMeters: 0.4 }, catching: 50,
+  }] });
+  assert.equal(recovered.legalBalls, 6);
+  assert.equal(recovered.groundStops, 6);
+  assert.equal(recovered.recoveredAfterRest, 6);
+  assert.equal(recovered.recoveryTimeouts, 0);
+  assert.equal(recovered.runs, 18, 'runners complete the maximum before distant recovery');
+  const [unavailable] = runBotSimulation(1, 'Rookie', 7, { ...fixture, fieldersFixture: [{
+    name: 'point', profile: { position: { x: 1000, z: -8.4 }, reactionSeconds: 0.2, speedMetersPerSecond: 0.01, reachRadiusMeters: 0.4 }, catching: 50,
+  }] });
+  assert.equal(unavailable.groundStops, 0);
+  assert.equal(unavailable.recoveryTimeouts, 6);
+  assert.equal(unavailable.legalBalls, 6);
+  const [withoutFielders] = runBotSimulation(1, 'Rookie', 7, { ...fixture, includeFielding: false });
+  assert.equal(withoutFielders.groundStops, 0);
+  assert.equal(withoutFielders.recoveryTimeouts, 0);
+  assert.equal(withoutFielders.legalBalls, 6);
+  const [stationary] = runBotSimulation(1, 'Rookie', 7, { ...fixture, fieldersFixture: [{
+    name: 'point', profile: { position: { x: 0, z: -8.4 }, reactionSeconds: 5, speedMetersPerSecond: 0, reachRadiusMeters: 100 }, catching: 50,
+  }] });
+  assert.equal(stationary.recoveredAfterRest, 6, 'an in-reach fielder may react after the ball stops');
+  assert.equal(stationary.recoveryTimeouts, 0);
 });
 
 test('fielding reachability respects reaction time, speed and earliest trajectory sample', () => {
@@ -2125,6 +2169,31 @@ test('shot physics keeps pace at low frame rates while bounding long stalls', ()
   assert.ok(Math.abs(sixtyFps.position.z - tenFps.position.z) < 1e-9);
   const stalled = simulate(1, 10);
   assert.ok(stalled.position.x > 0.2 && stalled.position.x < 0.3);
+});
+
+test('fixed-step recovery continues after rest and stops at interception', () => {
+  const resting = (): BallState => ({ position: { x: 0, y: BALL_RADIUS_METERS, z: 0 }, velocity: { x: 0.2, y: 0, z: 0 }, hasBounced: true, reachedBoundary: false, stopped: true });
+  let samples = 0;
+  const ball = resting();
+  const remaining = advanceBallFrame(ball, 0, 1 / 30, () => { samples++; return samples === 3; }, true);
+  assert.equal(samples, 3, 'recovery advances fixed steps after the ball stops and stops at the pickup');
+  assert.ok(Math.abs(remaining - 1 / 120) < 1e-9);
+  assert.equal(ball.position.x, 0, 'a resting ball does not drift during recovery');
+  let ordinarySamples = 0;
+  advanceBallFrame(resting(), 0, 1 / 30, () => { ordinarySamples++; });
+  assert.equal(ordinarySamples, 1, 'ordinary flight still ends when the ball rests');
+  for (const fps of [30, 60, 120]) {
+    let count = 0;
+    let frames = 0;
+    let accumulator = 0;
+    const fixed = resting();
+    while (count < 84 && frames++ < fps * 2) {
+      accumulator = advanceBallFrame(fixed, accumulator, 1 / fps, () => ++count === 84, true);
+    }
+    assert.equal(count, 84, `recovery steps at ${fps} fps`);
+    assert.ok(Math.abs(frames / fps - 0.7) < 1e-9, `pickup timing at ${fps} fps`);
+    assert.equal(fixed.position.x, 0);
+  }
 });
 
 test('fixed-step observer captures every simulated position without changing physics', () => {

@@ -4,7 +4,7 @@ import { evaluateWicket, checkExtraBall, resolveDeliveryExtra, deliveryContactPo
 import type { DeliveryChoice, DeliveryType, FieldPreset, ShotChoice } from './types';
 import { SeededRandom } from './random';
 import { stepBall, type BallState } from './ball-physics';
-import { createDefaultFieldLayout, decideAutomatedRuns, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, findEarliestFieldingEvent, isCatchDismissalAllowed, type RatedFielder } from './fielding';
+import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_MAX_RECOVERY_SECONDS, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, isCatchDismissalAllowed, type RatedFielder } from './fielding';
 
 export interface BotSimulationResult {
   tier: 'Rookie' | 'Medium' | 'Hard';
@@ -19,6 +19,10 @@ export interface BotSimulationResult {
   fours: number;
   sixes: number;
   groundStops: number;
+  /** Ground stops after the ball had already come to rest. */
+  recoveredAfterRest: number;
+  /** Stopped shots that exceeded the bounded recovery wait. */
+  recoveryTimeouts: number;
   catches: number;
   runOuts: number;
   incompleteOvers: number;
@@ -56,7 +60,7 @@ export function runBotSimulation(
     const random = new SeededRandom((seed + tierIndex * 0x9e3779b9) >>> 0).next;
     const bowler = createBotPlayer(tier);
     const batter = createBotPlayer('Rookie');
-    let attempts = 0, legalBalls = 0, wides = 0, noBalls = 0, wickets = 0, runs = 0, dots = 0, fours = 0, sixes = 0, groundStops = 0, catches = 0, runOuts = 0, incompleteOvers = 0, noBallBatRuns = 0, contactedWides = 0;
+    let attempts = 0, legalBalls = 0, wides = 0, noBalls = 0, wickets = 0, runs = 0, dots = 0, fours = 0, sixes = 0, groundStops = 0, catches = 0, runOuts = 0, incompleteOvers = 0, noBallBatRuns = 0, contactedWides = 0, recoveredAfterRest = 0, recoveryTimeouts = 0;
     let freeHit = false;
     const deliveryCounts: Record<DeliveryType, number> = { fast: 0, medium: 0, slow: 0, offspin: 0, legspin: 0 };
 
@@ -101,15 +105,32 @@ export function runBotSimulation(
             position: { x: contact.x, y: contact.y, z: contact.z }, velocity,
             hasBounced: false, reachedBoundary: false, stopped: false,
           };
-          const trajectory: Array<{ timeSeconds: number; position: { x: number; y: number; z: number }; hasBounced: boolean; reachedBoundary: boolean }> = [];
+          const fielderPositions = fielders.map(fielder => ({ ...fielder.profile.position }));
+          let canRecover = false;
+          let fieldingEvent: { kind: 'catch' | 'ground_stop'; timeSeconds: number; position: { x: number; y: number; z: number }; fielderPosition: { x: number; z: number } } | null = null;
           let flightSeconds = 0;
-          for (let step = 0; step < 24000 && !flight.stopped && !(flight.reachedBoundary && (!flight.boundaryOnFull || flight.hasBounced)); step++) {
-            stepBall(flight, 1 / 120);
+          let restStartedAt: number | null = null;
+          for (let step = 0; step < 24000; step++) {
+            if (!flight.stopped) stepBall(flight, 1 / 120);
             flightSeconds += 1 / 120;
-            trajectory.push({ timeSeconds: flightSeconds, position: { ...flight.position }, hasBounced: flight.hasBounced, reachedBoundary: flight.reachedBoundary });
+            if (flight.stopped && restStartedAt === null) restStartedAt = flightSeconds;
+            if (!flight.reachedBoundary) {
+              const sample = { timeSeconds: flightSeconds, position: flight.position, hasBounced: flight.hasBounced, reachedBoundary: false };
+              for (const [index, fielder] of fielders.entries()) {
+                const next = advanceFielder(fielderPositions[index], fielder.profile, fielder.catching, sample, 1 / 120);
+                fielderPositions[index] = next.position;
+                if (next.kind) {
+                  fieldingEvent = { kind: next.kind, timeSeconds: flightSeconds, position: { ...flight.position }, fielderPosition: next.position };
+                  break;
+                }
+              }
+            }
+            canRecover = fielders.some((fielder, index) => fielder.profile.speedMetersPerSecond > 0 ||
+              Math.hypot(fielderPositions[index].x - flight.position.x, fielderPositions[index].z - flight.position.z) <= fielder.profile.reachRadiusMeters);
+            if (fieldingEvent || (flight.stopped && (!canRecover || (restStartedAt !== null && flightSeconds - restStartedAt >= FIELDING_MAX_RECOVERY_SECONDS))) ||
+                (flight.reachedBoundary && (!flight.boundaryOnFull || flight.hasBounced))) break;
           }
           const distance = calculateShotDistance({ position: flight.position }, { x: contact.x, z: contact.z });
-          const fieldingEvent = findEarliestFieldingEvent(trajectory, fielders);
           // The simulator advances full-boundary shots through their landing
           // to measure carry, so preserve the earlier rope-crossing event.
           let shotRuns: number | null = evaluateFinalOutcome(distance, flight.hasBounced, flight.reachedBoundary, flight.boundaryOnFull);
@@ -127,6 +148,7 @@ export function runBotSimulation(
             }
           } else if (fieldingEvent?.kind === 'ground_stop') {
             groundStops++;
+            if (restStartedAt !== null && fieldingEvent.timeSeconds > restStartedAt + 1e-10) recoveredAfterRest++;
             const runDecision = decideAutomatedRuns(
               fieldingEvent.timeSeconds,
               fieldingEvent.fielderPosition,
@@ -138,6 +160,7 @@ export function runBotSimulation(
               runOuts++;
             }
           }
+          if (!fieldingEvent && canRecover && restStartedAt !== null && flightSeconds - restStartedAt >= FIELDING_MAX_RECOVERY_SECONDS) recoveryTimeouts++;
           if (shotRuns !== null) {
             runs += shotRuns;
             if (extra.type === 'noball') noBallBatRuns += shotRuns;
@@ -156,7 +179,7 @@ export function runBotSimulation(
     }
     const typeTotal = Object.values(deliveryCounts).reduce((sum, count) => sum + count, 0);
     return {
-      tier, overs: overCount, attempts, legalBalls, wides, noBalls, wickets, runs, dots, fours, sixes, groundStops, catches, runOuts, incompleteOvers, noBallBatRuns, contactedWides,
+      tier, overs: overCount, attempts, legalBalls, wides, noBalls, wickets, runs, dots, fours, sixes, groundStops, recoveredAfterRest, recoveryTimeouts, catches, runOuts, incompleteOvers, noBallBatRuns, contactedWides,
       legalRate: attempts ? legalBalls / attempts : 0,
       wicketRate: legalBalls ? wickets / legalBalls : 0,
       deliveryShares: Object.fromEntries(Object.entries(deliveryCounts).map(([type, count]) => [type, typeTotal ? count / typeTotal : 0])) as Record<DeliveryType, number>,

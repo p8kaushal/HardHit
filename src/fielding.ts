@@ -21,6 +21,8 @@ export interface FieldingPosition {
 }
 
 export const FIELDING_MAX_RUNS = 3;
+// Prevent an unavailable fielder or damaged scene from locking a match forever.
+export const FIELDING_MAX_RECOVERY_SECONDS = 90;
 // Mean-equivalent speed from a 17.68 m cricket sprint with a bat in 2.83 s;
 // the endpoints below use the scene's 17.6 m popping-crease separation.
 export const FIELDING_RUNNER_SPEED_METERS_PER_SECOND = 6.25;

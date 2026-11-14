@@ -15,17 +15,21 @@ export function advanceBallFrame(
   accumulator: number,
   elapsedSeconds: number,
   onStep?: (state: Readonly<BallState>, stepSeconds: number) => boolean | void,
+  continueAfterRest = false,
 ): number {
   const step = 1 / 120;
   const elapsed = Number.isFinite(elapsedSeconds) ? Math.max(0, Math.min(elapsedSeconds, 0.25)) : 0;
   let remaining = Math.max(0, accumulator) + elapsed;
   let steps = 0;
   while (remaining + 1e-10 >= step && steps < 30) {
-    stepBall(state, step);
+    // After physical rest, only the observer (for example a pursuing fielder)
+    // advances. Residual sub-threshold velocity must not move the ball again.
+    if (!state.stopped) stepBall(state, step);
     remaining = Math.max(0, remaining - step);
     steps++;
-    if (onStep?.(state, step) === true) state.stopped = true;
-    if (state.stopped || (state.reachedBoundary && (!state.boundaryOnFull || state.hasBounced))) break;
+    const intercepted = onStep?.(state, step) === true;
+    if (intercepted) state.stopped = true;
+    if (intercepted || (state.stopped && !continueAfterRest) || (state.reachedBoundary && (!state.boundaryOnFull || state.hasBounced))) break;
   }
   return remaining;
 }

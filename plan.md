@@ -1,5 +1,13 @@
 # HardHit project plan index
 
+## User priorities — November 14, 2026
+
+1. **Primary:** cricket logic and physics realism. Prioritize decision ordering, delivery/impact/trajectory consistency, and evidence-backed calibration. Keep each increment scoped and document assumptions; do not spend the main effort on fielding polish.
+2. **Secondary:** fix batting-camera pitch visibility where the wicketkeeper obstructs the view. Preserve a readable keeper representation and verify both hands and compact landscape layouts.
+3. **Secondary:** add a player-controlled auto-run option, enabled by default. When disabled, provide clear run/continue choices and resolve them against the ball/throw timeline; bot running remains automated.
+
+Current branch: `feature/cricket-logic-physics`. First bounded logic/physics slice: audit and improve missed-delivery/pad-impact decision ordering, because it feeds LBW, wide, no-ball and free-hit outcomes. Existing uncommitted recovery work is preserved on this branch.
+
 ## Current account handoff — November 14, 2026
 
 The non-camera gameplay-realism goal is active on `feature/gameplay-realism-clean`, based on local `main` at `bb0d8d1`; camera batting is excluded. The current scene has ten fielders, the bowler, the striker and a non-striker role model, all represented on the ground map. Live and simulated fielders share pursuit and catch logic; fielded ground shots use numerical runners and return-throw adjudication, with provisional turn timing. The latest verification passes 153 tests and the production build, with the existing Babylon bundle warning. Both innings orders passed browser matches with matching map markers and saved replay; running biomechanics, fielding strategy, physical calibration and device testing remain open. See `TODO.md`, `DELIVERY_PLAN.md`, `CRICKET_RULES.md`, `PHYSICS_CALIBRATION.md` and the ignored local `handoff.md` for details. Do not merge, deploy or push.

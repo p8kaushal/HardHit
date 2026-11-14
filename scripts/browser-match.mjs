@@ -29,9 +29,10 @@ try {
   const botBatsSpin = process.argv.includes('--bot-bats-spin');
   const fixtureWide = process.argv.includes('--fixture-wide');
   const runOutFixture = process.argv.includes('--require-runout');
+  const recoveryFixture = process.argv.includes('--require-recovery');
   const pauseReturn = process.argv.includes('--pause-return');
   if (pauseReturn && !runOutFixture) throw new Error('--pause-return requires --require-runout');
-  const fieldingFixture = process.argv.includes('--require-fielding') || runOutFixture;
+  const fieldingFixture = process.argv.includes('--require-fielding') || runOutFixture || recoveryFixture;
   const lowCatchFixture = process.argv.includes('--require-low-catch');
   const catchFixture = process.argv.includes('--require-catch') || lowCatchFixture;
   const verifyReplay = process.argv.includes('--verify-replay');
@@ -59,7 +60,7 @@ try {
       }, { timeout: 5000 }, portrait);
     });
   }
-  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, pauseReturn, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, lowCatchFixture, fieldPresetFixture }) => {
+  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, pauseReturn, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, recoveryFixture, catchFixture, lowCatchFixture, fieldPresetFixture }) => {
     const { GameScene } = await import('/src/scene.ts');
     const { UIManager } = await import('/src/ui.ts');
     const { globalAutoAssistConfig } = await import('/src/game.ts');
@@ -231,13 +232,19 @@ try {
     };
     const animateHitPath = GameScene.prototype.animateHitPath;
     GameScene.prototype.animateHitPath = function (distance, direction, velocity, ...rest) {
-      if (catchFixture && playerBatting) {
+      if (recoveryFixture && playerBatting && !window.__recoveryFixtureSet) {
+        velocity = { x: 1, y: 0, z: 0 };
+      } else if (catchFixture && playerBatting) {
         velocity = lowCatchFixture ? { x: 6, y: 1, z: 0 } : { x: 10, y: 6, z: 0 };
       } else if (fieldingFixture && playerBatting && velocity) {
         velocity = { ...velocity, x: velocity.x * 0.35, z: velocity.z * 0.35 };
       }
       const result = animateHitPath.call(this, distance, direction, velocity, ...rest);
-      if (fieldingFixture && playerBatting && !window.__fieldingFixtureSet) {
+      if (recoveryFixture && playerBatting && !window.__recoveryFixtureSet) {
+        for (const fielder of this.fielderRoots.values()) fielder.position.set(30, 0, -8.4);
+        window.__recoveryFixtureSet = true;
+      }
+      if (fieldingFixture && !recoveryFixture && playerBatting && !window.__fieldingFixtureSet) {
         const pointFielder = this.fielderRoots.get('point');
         pointFielder?.position.set(2.5, 0, -8.4);
         window.__fieldingFixtureSet = true;
@@ -286,6 +293,7 @@ try {
         const returning = this.fieldingReturn;
         window.__fieldingReturns.push({ elapsed: (gameNow() - returning.startedAt) / 1000,
           expected: returning.arrivalSeconds, wicket: { x: returning.wicket.x, y: returning.wicket.y, z: returning.wicket.z },
+          restStartedAt: this.shotRestStartedAt, flightSeconds: this.shotElapsedSeconds, fielder: this.shotFieldedBy,
           ball: { x: this.ballMesh.position.x, y: this.ballMesh.position.y, z: this.ballMesh.position.z },
           ballInPlay: globalAutoAssistConfig.isBallInPlay, pendingAtStart: returning.pendingAtStart,
           pendingAtEnd: window.__liveMatchController?.state.events.at(-1)?.resolved === false,
@@ -330,7 +338,7 @@ try {
         arrived();
       }, ...rest);
     };
-  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, pauseReturn, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, lowCatchFixture, fieldPresetFixture });
+  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, pauseReturn, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, recoveryFixture, catchFixture, lowCatchFixture, fieldPresetFixture });
   if (process.argv.includes('--force-tie')) {
     // Test-only fixture: make regular-innings deliveries legal dots so the
     // real UI must play both sudden-death innings. Production code is unchanged.
@@ -684,6 +692,15 @@ try {
       console.log('Fielding return, runners and pending score remained fixed during a direct clock pause.');
     }
     console.log(`Ground shot was run out by ${runOut.runOutBy}; ${runOut.runs} run(s) counted before the wicket.`);
+  }
+  if (recoveryFixture) {
+    const returns = await page.evaluate(() => window.__fieldingReturns);
+    const recovered = returns.find(item => item.restStartedAt !== null && item.flightSeconds > item.restStartedAt + 0.1);
+    if (!recovered || !recovered.fielder || !recovered.pendingAtStart || !recovered.pendingAtEnd ||
+        recovered.scoreAtStart !== recovered.scoreAtEnd || recovered.elapsed + 0.001 < recovered.expected) {
+      throw new Error(`Stopped ball was not recovered before its timed return and score: ${JSON.stringify(returns)}`);
+    }
+    console.log(`Stopped ball was recovered by ${recovered.fielder} ${(recovered.flightSeconds - recovered.restStartedAt).toFixed(2)} s after rest.`);
   }
   if (catchFixture) {
     if (!process.argv.includes('--trace-shots')) throw new Error('catch fixtures require --trace-shots');

@@ -1,5 +1,27 @@
 # Gameplay to-do
 
+## User priority order — November 14, 2026
+
+1. **Primary: cricket logic and physics realism.** Work on decision correctness, shared sampled trajectories, contact and wicket logic, and evidence-backed calibration before fielding polish.
+2. **Secondary: batting view.** Resolve keeper occlusion of the pitch from the batting camera, preserving the keeper's useful on-field/map representation.
+3. **Secondary: auto-run control.** Add a player choice, enabled by default; when disabled, expose run/continue decisions tied to the ball and return timeline. Bot decisions remain automatic.
+
+### Completed bounded increment — unify batter-plane delivery sampling
+
+- **Finding:** `deliveryHitsPad` and `resolveMissedDelivery` independently calculate batter-plane progress and sample the delivery path. This duplicates the key physical input to pad interception and LBW adjudication, making later impact-order/deflection work vulnerable to drift.
+- **Scope:** derive the batter-plane position once from the authored path and use that shared sample for pad and missed-delivery decisions. Preserve current outcomes while making the modeled impact point explicit and test both handednesses, stance offsets, no-ball precedence and 30/60/120 Hz sampling consistency. This does not add unsupported bat-first/pad-first claims or calibrate LBW.
+- [x] **Acceptance:** pad contact and missed-delivery adjudication now consume one shared authored-path sample at the stance-adjusted batter plane; the pad overlap is evaluated from that same sample rather than resampling. Fixtures cover both handednesses and stance offsets, while existing mirrored offered/no-shot, no-ball, pitch-line and projected-wicket tests preserve the decision table. `npm test` passed 156 tests and `npm run build` passed with the existing Babylon bundle warning. This is internal consistency only; the path, body geometry, contact order and LBW projection remain uncalibrated. No browser rerun was needed because visible behavior is unchanged.
+
+### Next priority — model impact and pad deflection against evidence
+
+- Sample incoming position/velocity at first body contact, resolve bowled/LBW eligibility from that same event, and continue a pad-deflected trajectory instead of stopping the visual. First establish traceable parameter sources or a reproducible test dataset; avoid claiming Law 36 accuracy without first-contact and genuine-attempt inputs.
+
+### Completed bounded increment — recover stopped balls
+
+- **Finding:** the game finalizes an unfielded ground shot as soon as the ball stops, even while fielders are still approaching, and estimates runs from distance rather than the runner/return timeline.
+- **Scope:** keep stationary in-boundary balls live while an available fielder pursues them, in both scene and seeded simulation. Preserve boundary/catch precedence and a bounded fallback for absent or unable fielders.
+- [x] **Acceptance:** deterministic tests cover 30/60/120 fps recovery cadence, post-rest retrieval, no-fielder distance-estimate fallback and 90-second timeout. `npm test` passed 155 tests; production build passed with the existing Babylon chunk warning. Seed `0x51a7` over 80 overs per tier produced 163/154/116 ground stops, including 158/149/103 recovered after rest, with 2/4/1 catches and no timeouts for Rookie/Medium/Hard; these synthetic figures are not calibration targets. A controlled two-innings browser match verified a keeper collect 0.24 s after rest, pending scoring through the return, and a saved 14-event replay matching scorecards. `git diff --check` and browser harness syntax check passed. Recovery speed/timeout are provisional, and fallback runs remain distance estimates.
+
 ### Completed bounded increment — visible automated runners
 
 - **Scope:** render both batters' movement during shot flight and the fielding return using the same crossing, turn and run-out timing as adjudication; keep the ground map tied to scene positions and restore the crease setup for the next ball.

@@ -4,7 +4,7 @@ import { CameraMode, DeliveryChoice, DeliveryType, FieldPreset } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
-import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_RUNNER_PICKUP_DELAY_SECONDS, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, sampleAutomatedRunners, sampleAutomatedReturn, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
+import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_MAX_RECOVERY_SECONDS, FIELDING_RUNNER_PICKUP_DELAY_SECONDS, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, sampleAutomatedRunners, sampleAutomatedReturn, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
@@ -82,6 +82,7 @@ export class GameScene {
   private ballPathPoints: BABYLON.Vector3[] = [];
   private shotTrajectory: FieldingTrajectorySample[] = [];
   private shotElapsedSeconds = 0;
+  private shotRestStartedAt: number | null = null;
   private shotCameraDirection: CameraVector = { x: 0, y: 0, z: 1 };
   
   constructor(canvasElementId: string) {
@@ -1144,9 +1145,16 @@ export class GameScene {
   private updateBallPhysics(): void {
     try {
       if (!this.currentBallPos || !this.shotPhysics || !this.ballMesh) return;
+      const canRecoverBall = () => [...this.fielderProfiles].some(([name, profile]) => {
+        const root = this.fielderRoots.get(name);
+        return !!root && (profile.speedMetersPerSecond > 0 ||
+          Math.hypot(root.position.x - this.currentBallPos!.x, root.position.z - this.currentBallPos!.z) <= profile.reachRadiusMeters);
+      });
+      const canRecover = canRecoverBall();
 
       this.physicsAccumulator = advanceBallFrame(this.shotPhysics, this.physicsAccumulator, this.engine.getDeltaTime() / 1000, (state, stepSeconds) => {
         this.shotElapsedSeconds += stepSeconds;
+        if (state.stopped && this.shotRestStartedAt === null) this.shotRestStartedAt = this.shotElapsedSeconds;
         this.setRunnerVisuals(sampleAutomatedRunners(this.shotElapsedSeconds), this.shotElapsedSeconds);
         this.shotTrajectory.push({
           timeSeconds: this.shotElapsedSeconds,
@@ -1169,14 +1177,16 @@ export class GameScene {
             return true;
           }
         }
-        return false;
-      });
+        return this.shotRestStartedAt !== null && this.shotElapsedSeconds - this.shotRestStartedAt >= FIELDING_MAX_RECOVERY_SECONDS;
+      }, canRecover);
       globalAutoAssistConfig.hasBounced = this.shotPhysics.hasBounced;
       this.shotReachedBoundary = this.shotPhysics.reachedBoundary;
       this.shotBoundaryOnFull = this.shotPhysics.boundaryOnFull ?? false;
       this.ballMesh.position.copyFrom(this.currentBallPos);
       this.ballMesh.position.y += BALL_VISUAL_OFFSET;
-      if (this.shotPhysics.stopped || (this.shotPhysics.reachedBoundary && (!this.shotPhysics.boundaryOnFull || this.shotPhysics.hasBounced))) {
+      const recoveryExpired = this.shotRestStartedAt !== null && this.shotElapsedSeconds - this.shotRestStartedAt >= FIELDING_MAX_RECOVERY_SECONDS;
+      if (this.shotFieldedBy || this.shotCaughtBy || (this.shotPhysics.stopped && (!canRecoverBall() || recoveryExpired)) ||
+          (this.shotPhysics.reachedBoundary && (!this.shotPhysics.boundaryOnFull || this.shotPhysics.hasBounced))) {
         if (!this.shotFieldedBy || !this.beginFieldingReturn()) this.endDeliveryCycle();
         return;
       }
@@ -1240,6 +1250,7 @@ export class GameScene {
     this.currentBallPos = startPoint.clone();
     this.shotOrigin = startPoint.clone();
     this.shotElapsedSeconds = 0;
+    this.shotRestStartedAt = null;
     this.shotTrajectory = [{
       timeSeconds: 0,
       position: { x: startPoint.x, y: startPoint.y, z: startPoint.z },
