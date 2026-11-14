@@ -1,12 +1,12 @@
 # HardHit 🏏
 
-> **HardHit** is an immersive, physics-driven 3D single-over (6-ball) cricket duel game built on modern web standards with **Babylon.js**, **TypeScript**, and **Vite**.
+> **HardHit** is a work-in-progress 3D cricket contest built with **Babylon.js**, **TypeScript**, and **Vite**. It is an offline six-hitting duel against a bot, not a complete or calibrated cricket simulator.
 
 Play a biggest-six duel against a bot. Each batter faces six legal deliveries; the longest six wins, with wickets and further tie-breaks when needed. If neither batter hits a six and wickets are level, runs decide the winner. Real-player 1v1 is planned but is not yet implemented. See [CRICKET_RULES.md](CRICKET_RULES.md) for the modeled rules and limitations, [TODO.md](TODO.md) for open tasks and [DELIVERY_PLAN.md](DELIVERY_PLAN.md) for the delivery and verification plan.
 
 [PHYSICS_CALIBRATION.md](PHYSICS_CALIBRATION.md) records the measurements, assumptions and open validation work behind the current approximations.
 
-The phased plan is approved for implementation. The current physics and umpiring are approximations, and physical-device validation remains open. Planned AI teammates will field automatically, with performance influenced by field settings and ratings related to the human all-rounder's performance.
+The current physics and umpiring are approximations, and physical-device validation remains open. AI fielders and runners are part of the current prototype. Real-player 1v1, online services, and progression-linked teammate ratings are not implemented. See [plan.md](plan.md) for the implementation handoff and source map.
 
 Run `npm run test:browser` for headless Chromium lobby-to-gameplay, touch-control and first-delivery checks at 568×240, 667×300 and 1024×768, for both batting and bowling. It starts and stops its own local server and browser; it does not yet test a complete match or physical devices.
 
@@ -39,6 +39,7 @@ Run `npm run test:match` for a longer, seeded browser match: the player bowls fi
 - **Front-foot No-balls**: A simplified front-foot landing is sampled from bowler accuracy and pace separately from release timing. A no-ball reports the estimated overstep; the foot animation and calibration are still planned.
 - **AI Difficulty Tiers**: Challenge Rookie, Medium and Hard bots.
 - **Match State & Rules Engine**: Six legal balls per innings, biggest-six scoring, tie-breaks and a one-ball sudden death, plus a personal leaderboard stored in the browser.
+- **Fielding and running**: AI-controlled fielders, automated running, ground-ball recovery and saved match-event replay, all with documented approximations.
 
 ---
 
@@ -104,6 +105,10 @@ Ensure you have the following installed locally:
 - `npm run build` &mdash; Runs TypeScript compiler checks (`tsc`) and builds the production bundle into `/dist`.
 - `npm test` &mdash; Runs the automated match-rule checks.
 - `npm run preview` &mdash; Locally previews the generated production build.
+- `npm run test:browser` &mdash; Headless Chromium lobby and first-delivery checks at three landscape viewports.
+- `npm run test:production` &mdash; Builds the production bundle, then runs browser checks against the preview.
+- `npm run test:match` and related `test:match:*` scripts &mdash; Seeded browser match scenarios described above.
+- `npm run test:repeat-match` &mdash; Repeats seeded browser matches to check lifecycle and persistence behavior.
 
 ---
 

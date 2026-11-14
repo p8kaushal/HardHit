@@ -110,6 +110,12 @@ export interface BatBallContactEvent {
   incomingVelocity: Vector3D;
   bladePosition: Vector3D;
   bladeFraction: number;
+  /** Approximate coordinates in the modeled bat-face frame, in metres. */
+  faceCoordinates?: { alongBlade: number; acrossBlade: number };
+  /** Blade-point velocity immediately before contact, in m/s. */
+  batVelocity?: Vector3D;
+  /** Distal blade-tip velocity immediately before contact, in m/s. */
+  batTipVelocity?: Vector3D;
 }
 
 export interface Innings {
@@ -174,7 +180,7 @@ export interface MatchEvent {
   delivery: DeliveryChoice;
   shot: ShotChoice | null;
   /** Absent on historical records; present to select the deterministic contact adjudicator. */
-  contactModel?: 'swept-blade-v1';
+  contactModel?: 'swept-blade-v1' | 'swept-blade-v2';
   batContact?: BatBallContactEvent;
   missed: boolean;
   isWicket: boolean;

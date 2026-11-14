@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NullEngine, Scene, Vector3 } from 'babylonjs';
+import { MeshBuilder, NullEngine, Scene, TransformNode, Vector3 } from 'babylonjs';
 import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchController } from '../src/game';
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
@@ -24,7 +24,8 @@ import { fieldRadarPoint } from '../src/field-radar';
 import { deflectFromReferencePad, PAD_P2_REBOUND_DATA } from '../src/pad-impact';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
-import { findBatBallContact } from '../src/bat-physics';
+import { BAT_BLADE_LENGTH_METERS, batBladeWorldPoint, batPivotLocalPosition, battingPivotPosition, findBatBallContact } from '../src/bat-physics';
+import { BAT_SWEETSPOT_FROM_TOE_METERS, predictEmpiricalBatImpactLaunchSpeed } from '../src/bat-impact-response';
 import type { BallOutcome, DeliveryChoice, Player, ShotType } from '../src/types';
 
 const storage = new Map<string, string>();
@@ -35,6 +36,34 @@ Object.assign(globalThis, { localStorage: {
 
 const delivery = (timing: number, x = 0): DeliveryChoice => ({
   aimTarget: { x, z: -3.5 }, line: 'middle', length: 'good', type: 'fast', releaseTiming: timing
+});
+
+test('empirical bat launch-speed candidate uses absolute sweetspot offsets and stays isolated', () => {
+  const sweetspotAlongBlade = BAT_BLADE_LENGTH_METERS - BAT_SWEETSPOT_FROM_TOE_METERS;
+  const central = predictEmpiricalBatImpactLaunchSpeed({
+    alongBladeMeters: sweetspotAlongBlade,
+    acrossBladeMeters: 0,
+    batTipVelocity: { x: 0, y: 0, z: 26.8 },
+  });
+  const mirrored = predictEmpiricalBatImpactLaunchSpeed({
+    alongBladeMeters: sweetspotAlongBlade + 0.05,
+    acrossBladeMeters: -0.02,
+    batTipVelocity: { x: 0, y: 0, z: 26.8 },
+  });
+  const equallyOffCentre = predictEmpiricalBatImpactLaunchSpeed({
+    alongBladeMeters: sweetspotAlongBlade + 0.05,
+    acrossBladeMeters: 0.02,
+    batTipVelocity: { x: 0, y: 0, z: 26.8 },
+  });
+
+  assert.ok(Math.abs(central - 33.2766) < 1e-10);
+  assert.ok(mirrored < central);
+  assert.equal(mirrored, equallyOffCentre);
+  assert.throws(() => predictEmpiricalBatImpactLaunchSpeed({
+    alongBladeMeters: sweetspotAlongBlade,
+    acrossBladeMeters: 0,
+    batTipVelocity: { x: Number.NaN, y: 0, z: 0 },
+  }), RangeError);
 });
 
 test('a new match initializes even when a previous scene has a ball in play', () => {
@@ -1185,7 +1214,7 @@ test('bot simulation protects catches on no-balls and free hits', () => {
 
 test('bot simulation counts run-outs on a no-ball and the following free hit', () => {
   const ball: DeliveryChoice = { ...delivery(0.5), turn: 0.5, overTheWicket: true };
-  const shot = { direction: 0, type: 'grounded' as const, timing: 0.4, contactZone: 0.5 };
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
   const fieldersFixture = [{ name: 'point' as const, profile: { position: { x: 0, z: 10 }, reactionSeconds: 0.5, speedMetersPerSecond: 0, reachRadiusMeters: 0.5 }, catching: 0, throwing: 100 }];
   const [legal] = runBotSimulation(1, 'Rookie', 7, { deliveryFixture: () => ball, shotFixture: () => shot, fieldersFixture });
   const [protectedDeliveries] = runBotSimulation(1, 'Rookie', 7, {
@@ -1208,7 +1237,7 @@ test('bot simulation counts run-outs on a no-ball and the following free hit', (
 
 test('bot simulation recovers stopped balls and bounds unavailable fielders', () => {
   const ball = delivery(0.5);
-  const shot = { direction: 3, type: 'defensive' as const, timing: 0.4, contactZone: 0.5 };
+  const shot = { direction: 3, type: 'defensive' as const, timing: 0.5, contactZone: 0.5 };
   const fixture = { deliveryFixture: () => ball, shotFixture: () => shot };
   const [recovered] = runBotSimulation(1, 'Rookie', 7, { ...fixture, fieldersFixture: [{
     name: 'point', profile: { position: { x: 30, z: -8.4 }, reactionSeconds: 0.2, speedMetersPerSecond: 2, reachRadiusMeters: 0.4 }, catching: 50,
@@ -1582,6 +1611,8 @@ test('match event log copies delivery inputs and records final flight outcome', 
   const event = game.state.events[0];
   assert.equal(event.resolved, false);
   assert.ok(event.batContact, 'a recorded batting contact includes its swept point and incoming velocity');
+  assert.equal(event.contactModel, 'swept-blade-v2');
+  assert.ok(event.batContact!.faceCoordinates && event.batContact!.batVelocity);
   assert.ok(event.batContact!.timeSeconds >= 0);
   assert.ok(Math.hypot(...Object.values(event.batContact!.incomingVelocity)) > 0);
   assert.equal(outcome.distance, 0, 'an in-flight ball has no measured carry yet');
@@ -1625,7 +1656,7 @@ test('saved regular match events replay through controller adjudication', () => 
   game.setTossResult(game.state.player.id, 'bat');
   game.startMatch();
   for (let ball = 0; ball < 6; ball++) {
-    const result = game.recordBall(delivery(0.5), { direction: 2, type: ball === 0 ? 'lofted' : 'grounded', timing: 0.5, contactZone: 0.5 }, ball === 0 ? 'deep' : undefined);
+    const result = game.recordBall(delivery(0.5), { direction: 2, type: ball === 0 ? 'lofted' : 'grounded', timing: 0.5, contactZone: 0.5 }, ball === 0 ? 'deep' : undefined, ball === 0 ? 'swept-blade-v1' : undefined);
     assert.equal(result.isWicket, false);
     if (ball === 0) game.finalizeBallOutcome(8, false, false, 'point');
     else if (ball === 1) game.finalizeBallOutcome(21, true, false, null, 0, 'point');
@@ -2150,7 +2181,64 @@ test('swept bat collision uses the incoming path and mirrors swing handedness', 
   assert.ok(Math.abs(right.ballPosition.x - left.ballPosition.x) < 1e-9);
   assert.ok(Math.hypot(...Object.values(right.incomingVelocity)) > 0);
   assert.ok(right.bladeFraction >= 0 && right.bladeFraction <= 1);
+  assert.ok(right.faceCoordinates, 'v2 contact records its modeled face coordinates');
+  assert.ok(Number.isFinite(right.faceCoordinates!.alongBlade) && Number.isFinite(right.faceCoordinates!.acrossBlade));
+  assert.ok(right.faceCoordinates!.alongBlade >= 0 && right.faceCoordinates!.alongBlade <= BAT_BLADE_LENGTH_METERS);
+  assert.ok(Math.abs(right.faceCoordinates!.acrossBlade) <= 0.054, 'the inferred face impact stays on the modeled blade width');
+  assert.ok(right.batVelocity && Math.hypot(...Object.values(right.batVelocity)) > 0, 'v2 records nonzero pre-impact blade velocity');
+  assert.ok(right.batTipVelocity && Math.hypot(...Object.values(right.batTipVelocity)) >= 22.6 && Math.hypot(...Object.values(right.batTipVelocity)) <= 28.4,
+    'modeled distal bat speed at impact falls within the independent skilled-batter group means');
+  assert.ok(left.batVelocity && Math.hypot(...Object.values(left.batVelocity)) > 0);
+  assert.ok(Math.abs(Math.hypot(...Object.values(right.batVelocity!)) - Math.hypot(...Object.values(left.batVelocity!))) < 1e-8,
+    'mirrored hands produce equal blade speed magnitudes');
+  const v1 = findBatBallContact(incoming, shot, 'RHB', 0, 'swept-blade-v1');
+  assert.ok(v1, 'the legacy swept-blade anchor remains available for saved-event replay');
+  assert.equal(v1!.faceCoordinates, undefined);
+  assert.equal(v1!.batVelocity, undefined);
   assert.equal(findBatBallContact(incoming, { ...shot, timing: 0 }, 'RHB'), null, 'a swing begun too early has ended before the ball reaches the bat');
+});
+
+test('v2 collision pivot matches the Babylon batter transform for both hands', () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    for (const hand of ['RHB', 'LHB'] as const) {
+      const batterPosition = { x: -0.3, z: 0.4 };
+      const root = new TransformNode(`batter-${hand}`, scene);
+      root.position.set(batterPosition.x, 0, BATTER_CREASE_Z + batterPosition.z);
+      root.rotation.y = hand === 'RHB' ? Math.PI / 2 : -Math.PI / 2;
+      const pivot = new TransformNode(`pivot-${hand}`, scene);
+      pivot.parent = root;
+      const local = batPivotLocalPosition(hand);
+      pivot.position.set(local.x, local.y, local.z);
+      const swingAngle = hand === 'RHB' ? -0.7 : 0.7;
+      pivot.rotation.z = swingAngle;
+      const bat = MeshBuilder.CreateBox(`bat-${hand}`, { width: 0.041, height: 0.64, depth: 0.108 }, scene);
+      bat.parent = pivot;
+      bat.position.y = -0.43;
+      bat.rotation.y = Math.PI / 2;
+      pivot.computeWorldMatrix(true);
+      const actual = pivot.getAbsolutePosition();
+      const modeled = battingPivotPosition(hand, batterPosition);
+      assert.ok(Math.abs(actual.x - modeled.x) < 1e-6, `${hand} pivot X: ${actual.x} vs ${modeled.x}`);
+      assert.ok(Math.abs(actual.y - modeled.y) < 1e-6, `${hand} pivot Y: ${actual.y} vs ${modeled.y}`);
+      assert.ok(Math.abs(actual.z - modeled.z) < 1e-6, `${hand} pivot Z: ${actual.z} vs ${modeled.z}`);
+      bat.computeWorldMatrix(true);
+      const renderedShoulder = Vector3.TransformCoordinates(new Vector3(0, 0.32, 0), bat.getWorldMatrix());
+      const renderedToe = Vector3.TransformCoordinates(new Vector3(0, -0.32, 0), bat.getWorldMatrix());
+      const modeledShoulder = batBladeWorldPoint(modeled, 0, swingAngle, hand);
+      const modeledToe = batBladeWorldPoint(modeled, BAT_BLADE_LENGTH_METERS, swingAngle, hand);
+      assert.ok(Vector3.Distance(renderedShoulder, new Vector3(modeledShoulder.x, modeledShoulder.y, modeledShoulder.z)) < 1e-5,
+        `${hand} shoulder pose differs: rendered ${renderedShoulder} modeled ${JSON.stringify(modeledShoulder)}`);
+      assert.ok(Vector3.Distance(renderedToe, new Vector3(modeledToe.x, modeledToe.y, modeledToe.z)) < 1e-5,
+        `${hand} toe pose differs: rendered ${renderedToe} modeled ${JSON.stringify(modeledToe)}`);
+      bat.dispose();
+      root.dispose();
+    }
+  } finally {
+    scene.dispose();
+    engine.dispose();
+  }
 });
 
 test('shot quality affects exit speed without changing direction', () => {

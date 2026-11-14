@@ -313,7 +313,7 @@ export class MatchController {
     globalAutoAssistConfig.bowlerArm = innings.bowler.bowlingArm || 'Right';
   }
 
-  public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null, fieldPreset?: FieldPreset, contactModel: 'swept-blade-v1' | 'legacy-timing' = 'swept-blade-v1'): BallOutcome {
+  public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null, fieldPreset?: FieldPreset, contactModel: 'swept-blade-v1' | 'swept-blade-v2' | 'legacy-timing' = 'swept-blade-v2'): BallOutcome {
     const innings = this.getCurrentInnings();
     if (this.state.status !== 'playing' || !innings || innings.finished) {
       throw new Error('Cannot record a delivery after the innings has finished');
@@ -345,7 +345,7 @@ export class MatchController {
 
     const wicketResult = shot ? evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier) : null;
     const batContact: BatBallContactEvent | null = shot
-      ? findBatBallContact(delivery, shot, innings.batter.batterHand || 'RHB', assistMultiplier)
+      ? findBatBallContact(delivery, shot, innings.batter.batterHand || 'RHB', assistMultiplier, contactModel === 'swept-blade-v1' ? 'swept-blade-v1' : 'swept-blade-v2')
       : null;
     if (wicketResult) missed = contactModel === 'legacy-timing' ? (wicketResult.missed ?? false) : !batContact;
     const relativeLine = deliveryContactPoint(delivery).x - (delivery.batterPosition?.x ?? 0);
@@ -427,8 +427,8 @@ export class MatchController {
       bowlerId: innings.bowler.id,
       delivery: { ...delivery, aimTarget: { ...delivery.aimTarget }, ...(delivery.batterPosition ? { batterPosition: { ...delivery.batterPosition } } : {}) },
       shot: shot ? { ...shot } : null,
-      ...(contactModel === 'swept-blade-v1' ? { contactModel } : {}),
-      ...(contactModel === 'swept-blade-v1' && batContact ? { batContact: { ...batContact, ballPosition: { ...batContact.ballPosition }, incomingVelocity: { ...batContact.incomingVelocity }, bladePosition: { ...batContact.bladePosition } } } : {}),
+      ...(contactModel !== 'legacy-timing' ? { contactModel } : {}),
+      ...(contactModel !== 'legacy-timing' && batContact ? { batContact: { ...batContact, ballPosition: { ...batContact.ballPosition }, incomingVelocity: { ...batContact.incomingVelocity }, bladePosition: { ...batContact.bladePosition }, ...(batContact.faceCoordinates ? { faceCoordinates: { ...batContact.faceCoordinates } } : {}), ...(batContact.batVelocity ? { batVelocity: { ...batContact.batVelocity } } : {}), ...(batContact.batTipVelocity ? { batTipVelocity: { ...batContact.batTipVelocity } } : {}) } } : {}),
       missed,
       isWicket,
       wicketReason,

@@ -7,7 +7,7 @@ import { advanceBallFrame, type BallState } from './ball-physics';
 import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_MAX_RECOVERY_SECONDS, FIELDING_RUNNER_PICKUP_DELAY_SECONDS, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, sampleAutomatedRunners, sampleAutomatedReturn, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 import { deflectFromReferencePad } from './pad-impact';
-import { batPivotLocalPosition } from './bat-physics';
+import { BAT_SWING_KEYS, batPivotLocalPosition } from './bat-physics';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
 const BALL_VISUAL_RADIUS = 0.075;
@@ -996,8 +996,9 @@ export class GameScene {
       this.scene.stopAnimation(batter);
       const swing = new BABYLON.Animation('batSwing', 'rotation.z', 60, BABYLON.Animation.ANIMATIONTYPE_FLOAT);
       const handMirror = this.batterHand === 'RHB' ? -1 : 1;
-      swing.setKeys([{ frame: 0, value: -0.2 * handMirror }, { frame: 4, value: -1.4 * handMirror }, { frame: 10, value: 1.1 * handMirror }, { frame: 18, value: -0.2 * handMirror }]);
-      this.scene.beginDirectAnimation(pivot, [swing], 0, 18, false, 1, () => {
+      const animationKeys = BAT_SWING_KEYS.map(([seconds, angle]) => ({ frame: seconds * 60, value: angle * handMirror }));
+      swing.setKeys(animationKeys);
+      this.scene.beginDirectAnimation(pivot, [swing], 0, BAT_SWING_KEYS[BAT_SWING_KEYS.length - 1][0] * 60, false, 1, () => {
         successCallback();
       });
     } else {

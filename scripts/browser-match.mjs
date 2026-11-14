@@ -399,6 +399,7 @@ try {
   const loftDuringBatting = process.argv.includes('--loft');
   const squareDuringBatting = process.argv.includes('--square');
   let lastAttempt = 0, lastState = '', swings = 0, selectedLoft = false, selectedSquare = false;
+  let lastObservedState;
   while (Date.now() < deadline) {
     const state = await page.evaluate(() => ({
       summary: document.querySelector('#match-summary-modal').classList.contains('active'),
@@ -411,6 +412,7 @@ try {
       balls: document.querySelector('#hud-balls-count').textContent,
       score: document.querySelector('#hud-score-count').textContent,
     }));
+    lastObservedState = state;
     const label = `${state.innings}: ${state.balls} score ${state.score}`;
     const counts = state.balls.match(/^(\d+)\/(\d+)$/);
     if (counts && Number(counts[1]) > Number(counts[2])) throw new Error(`Legal ball limit exceeded: ${label}`);
@@ -438,6 +440,7 @@ try {
     }
     await new Promise(resolve => setTimeout(resolve, 60));
   }
+  if (!lastObservedState?.summary) throw new Error(`Match did not finish before its deadline. Last observed state: ${JSON.stringify(lastObservedState)}`);
   await page.waitForSelector('#match-summary-modal.active', { timeout: 1000 });
   if (verifyFieldRadar) {
     const radar = await page.evaluate(() => {
