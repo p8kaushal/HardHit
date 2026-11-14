@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — stop automated runners at the run limit
+
+- **Finding:** the run count is capped at three, but runner positions continue cycling after three completed crossings, so a sufficiently late fielding event can produce a run-out after running should have stopped. A configured zero-run limit has the same inconsistency.
+- [x] **Acceptance:** runner movement stops at the configured cap; fixtures verify zero runs, three completed runs, a late fielding event and a throw before the third crossing is complete. Existing crossing, run-out and symmetry tests still pass. `npm test` passed 148 tests and the production build passed with the existing Babylon bundle warning. Running speed, turns and throws remain provisional.
+
 ### Completed bounded increment — verify protected-delivery simulated run-outs
 
 - **Scope:** reproduce a real simulated interception and throw on a no-ball and its following free hit, and compare scoring and wickets with the same legal-delivery inputs.

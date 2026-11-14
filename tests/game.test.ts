@@ -1265,6 +1265,27 @@ test('automated runners complete crossings or are run out at the threatened wick
   assert.throws(() => decideAutomatedRuns(-1, quickThrowAtStriker, 20), /Invalid automated run decision/);
 });
 
+test('automated runners stop safely after their configured run limit', () => {
+  const crossing = RUNNER_CREASE_TO_CREASE_METERS / FIELDING_RUNNER_SPEED_METERS_PER_SECOND;
+  const wicket = { x: 0, z: -10 };
+  const beforeThird = decideAutomatedRuns(3 * crossing - 1, wicket, 20);
+  assert.equal(beforeThird.runs, 2);
+  assert.equal(beforeThird.runOut, true);
+  const thirdCompleted = decideAutomatedRuns(3 * crossing, wicket, 20);
+  const longAfterThird = decideAutomatedRuns(3 * crossing + crossing / 2, wicket, 20);
+  for (const decision of [thirdCompleted, longAfterThird]) {
+    assert.equal(decision.runs, 3);
+    assert.equal(decision.runOut, false);
+    assert.equal(Math.abs(decision.strikerPositionZ), Math.abs(BATTER_CREASE_Z));
+    assert.equal(Math.abs(decision.nonStrikerPositionZ), Math.abs(BATTER_CREASE_Z));
+  }
+  const zeroRuns = decideAutomatedRuns(crossing / 2, wicket, 20, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, 0.7, 0);
+  assert.equal(zeroRuns.runs, 0);
+  assert.equal(zeroRuns.runOut, false);
+  assert.equal(zeroRuns.strikerPositionZ, BATTER_CREASE_Z);
+  assert.equal(zeroRuns.nonStrikerPositionZ, -BATTER_CREASE_Z);
+});
+
 test('automated runner path starts and regains safety at the modeled popping creases', () => {
   const atStartingCreases = decideAutomatedRuns(0, { x: 0, z: -10 }, 20);
   assert.equal(RUNNER_CREASE_TO_CREASE_METERS, 17.6, 'runner distance matches the rendered ±8.8 m crease lines');

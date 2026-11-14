@@ -188,7 +188,12 @@ export function decideAutomatedRuns(
   const throwDistance = Math.min(distanceToStriker, distanceToNonStriker);
   const throwArrivalSeconds = pickupDelaySeconds + throwDistance / throwSpeedMetersPerSecond;
 
-  const progress = runnerDistanceFromStartingCrease(runnerSpeedMetersPerSecond * flightSeconds);
+  // Once the configured maximum is complete, both runners stay safe at their
+  // creases instead of starting another crossing that can no longer score.
+  const progress = runnerDistanceFromStartingCrease(Math.min(
+    maximumRuns * RUNNER_CREASE_TO_CREASE_METERS,
+    runnerSpeedMetersPerSecond * flightSeconds,
+  ));
   const strikerPositionZ = BATTER_CREASE_Z + progress;
   const nonStrikerPositionZ = -BATTER_CREASE_Z - progress;
   const targetCreaseZ = threatenedEnd === 'striker' ? BATTER_CREASE_Z : -BATTER_CREASE_Z;
