@@ -836,12 +836,13 @@ export class UIManager {
       
       if (lastBall && lastBall.shot && !lastBall.missed && !lastBall.isWicket && lastBall.extraType !== 'wide') {
         const rawDistance = this.gameScene.getShotDistance();
-        const hasBounced = this.gameScene.shotBoundaryOnFull ? false : (globalAutoAssistConfig.hasBounced || false);
+        const hasBounced = globalAutoAssistConfig.hasBounced || false;
         const caughtBy = this.gameScene.getShotCatcher();
         const runDecision = this.gameScene.getShotRunDecision();
         const fieldedRuns = runDecision?.runs ?? null;
         const runOutBy = runDecision?.runOut ? runDecision.fielderName : null;
-        const runs = this.controller.finalizeBallOutcome(rawDistance, hasBounced, this.gameScene.shotReachedBoundary, caughtBy, fieldedRuns ?? undefined, runOutBy);
+        const physicsEvents = this.gameScene.getShotPhysicsEvents?.() ?? [];
+        const runs = this.controller.finalizeBallOutcome(rawDistance, hasBounced, this.gameScene.shotReachedBoundary, caughtBy, fieldedRuns ?? undefined, runOutBy, physicsEvents);
         const shotDistanceMeters = lastBall.distance;
         const fieldedBy = this.gameScene.getShotFielder();
 

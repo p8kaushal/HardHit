@@ -225,13 +225,13 @@ try {
         extra: result.extraType,
         freeHit: result.isFreeHit,
         fieldPreset,
-        estimatedDistance: result.distance,
+        pendingDistance: result.distance,
         resolved: false,
       });
       playerBatting = this.getCurrentInnings().batter.id === this.state.player.id;
       if (traceShots && playerBatting) {
         playerController = this;
-        window.__playerShotTrace.push({ delivery: structuredClone(delivery), shot: structuredClone(shot), missed: result.missed, wicket: result.isWicket, reason: result.wicketReason, extra: result.extraType, freeHit: result.isFreeHit, estimatedDistance: result.distance });
+        window.__playerShotTrace.push({ delivery: structuredClone(delivery), shot: structuredClone(shot), missed: result.missed, wicket: result.isWicket, reason: result.wicketReason, extra: result.extraType, freeHit: result.isFreeHit, pendingDistance: result.distance });
       }
       if (contact && !contact.recorded) {
         contact.recorded = true;
@@ -240,10 +240,10 @@ try {
       return result;
     };
     const finalize = MatchController.prototype.finalizeBallOutcome;
-    MatchController.prototype.finalizeBallOutcome = function (distance, bounced, reachedBoundary, caughtBy, fieldedRuns, runOutBy) {
-      if (window.__replayingMatch) return finalize.call(this, distance, bounced, reachedBoundary, caughtBy, fieldedRuns, runOutBy);
+    MatchController.prototype.finalizeBallOutcome = function (distance, bounced, reachedBoundary, caughtBy, fieldedRuns, runOutBy, physicsEvents) {
+      if (window.__replayingMatch) return finalize.call(this, distance, bounced, reachedBoundary, caughtBy, fieldedRuns, runOutBy, physicsEvents);
       const playerBatting = this.getCurrentInnings().batter.id === this.state.player.id;
-      const runs = finalize.call(this, distance, bounced, reachedBoundary, caughtBy, fieldedRuns, runOutBy);
+      const runs = finalize.call(this, distance, bounced, reachedBoundary, caughtBy, fieldedRuns, runOutBy, physicsEvents);
       const lastBall = this.getCurrentInnings().balls.at(-1);
       const replayEntry = window.__matchReplay.at(-1);
       if (replayEntry && !replayEntry.resolved) Object.assign(replayEntry, { resolved: true, flightDistance: distance, bounced, reachedBoundary, runs });
@@ -612,7 +612,7 @@ try {
         const firstLandingDistance = landing && shot.launchPosition
           ? Math.hypot(landing.position.x - shot.launchPosition.x, landing.position.z - shot.launchPosition.z)
           : null;
-        return { ...shot, firstLandingDistance, estimateError: firstLandingDistance === null ? null : shot.estimatedDistance - firstLandingDistance,
+        return { ...shot, firstLandingDistance,
           flightSampleCount: flightSamples?.length ?? 0, flightFirst: flightSamples?.[0], flightLast: flightSamples?.at(-1) };
       });
       console.log(`Player shot trace: ${JSON.stringify(summarized)}`);

@@ -1,4 +1,4 @@
-import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, FieldPreset, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
+import { Player, MatchState, Innings, BallOutcome, BallPhysicsEvent, DeliveryChoice, FieldPreset, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
 import { battingAssistanceMultiplier, evaluateWicket, resolveMissedDelivery, resolveDeliveryExtra, deliveryContactPoint, deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 import { SeededRandom } from './random';
@@ -444,7 +444,7 @@ export class MatchController {
     return outcome;
   }
 
-  public finalizeBallOutcome(rawDistance: number, hasBounced: boolean, reachedBoundary?: boolean, caughtBy?: string | null, fieldedRuns?: number, runOutBy?: string | null): number {
+  public finalizeBallOutcome(rawDistance: number, hasBounced: boolean, reachedBoundary?: boolean, caughtBy?: string | null, fieldedRuns?: number, runOutBy?: string | null, physicsEvents?: BallPhysicsEvent[]): number {
     try {
       if (fieldedRuns !== undefined && (!Number.isInteger(fieldedRuns) || fieldedRuns < 0 || fieldedRuns > 3)) {
         throw new Error('Fielded run estimate must be an integer from zero to three');
@@ -461,6 +461,16 @@ export class MatchController {
       if (!lastBall || !lastBall.shot || lastBall.missed || lastBall.isWicket || lastBall.extraType === 'wide') return 0;
       if (lastBall.runs !== undefined) return lastBall.runs;
 
+      let boundaryOnFull = false;
+      if (physicsEvents?.length) {
+        const firstGroundContact = physicsEvents.find(event => event.kind === 'ground_contact');
+        const firstBoundary = physicsEvents.find(event => event.kind === 'boundary_crossing');
+        hasBounced = !!firstGroundContact;
+        reachedBoundary = !!firstBoundary;
+        boundaryOnFull = !!firstBoundary && (!firstGroundContact || firstBoundary.timeSeconds < firstGroundContact.timeSeconds);
+        physicsEvents = physicsEvents.map(event => ({ ...event, position: { ...event.position }, velocity: { ...event.velocity } }));
+      }
+
       if (caughtBy && isCatchDismissalAllowed(lastBall.extraType === 'noball', lastBall.isFreeHit) && !hasBounced && !reachedBoundary) {
         lastBall.distance = distance;
         lastBall.runs = 0;
@@ -468,7 +478,7 @@ export class MatchController {
         lastBall.wicketReason = `Caught by ${caughtBy}`;
         innings.wicketsLost += 1;
         const catchEvent = [...this.state.events].reverse().find(item => item.inningsIndex === this.state.currentInningsIndex && item.ballNumber === lastBall.ballNumber);
-        if (catchEvent) Object.assign(catchEvent, { distance, runs: 0, isWicket: true, wicketReason: lastBall.wicketReason, resolved: true, flight: { hasBounced: false, reachedBoundary: false }, caughtBy });
+        if (catchEvent) Object.assign(catchEvent, { distance, runs: 0, isWicket: true, wicketReason: lastBall.wicketReason, resolved: true, flight: { hasBounced: false, reachedBoundary: false, boundaryOnFull: false }, caughtBy, ...(physicsEvents ? { physicsEvents } : {}) });
         this.handleInningsCompletion();
         return 0;
       }
@@ -484,14 +494,14 @@ export class MatchController {
         innings.score += runs;
         innings.wicketsLost += 1;
         const runOutEvent = [...this.state.events].reverse().find(item => item.inningsIndex === this.state.currentInningsIndex && item.ballNumber === lastBall.ballNumber);
-        if (runOutEvent) Object.assign(runOutEvent, { distance, runs, isWicket: true, wicketReason: lastBall.wicketReason, resolved: true, flight: { hasBounced, reachedBoundary: false }, fieldedRuns: runs, runOutBy });
+        if (runOutEvent) Object.assign(runOutEvent, { distance, runs, isWicket: true, wicketReason: lastBall.wicketReason, resolved: true, flight: { hasBounced, reachedBoundary: false, boundaryOnFull: false }, fieldedRuns: runs, runOutBy, ...(physicsEvents ? { physicsEvents } : {}) });
         this.handleInningsCompletion();
         return runs;
       }
       
       // Evaluate outcome using formula
       // A fielder cannot erase a rope crossing that happened first in the flight.
-      const runs = reachedBoundary ? evaluateFinalOutcome(distance, hasBounced, reachedBoundary) :
+      const runs = reachedBoundary ? evaluateFinalOutcome(distance, hasBounced, reachedBoundary, boundaryOnFull) :
         fieldedRuns === undefined ? evaluateFinalOutcome(distance, hasBounced, reachedBoundary) : fieldedRuns;
       
       innings.score += runs;
@@ -506,7 +516,8 @@ export class MatchController {
         event.distance = distance;
         event.runs = runs;
         event.resolved = true;
-        event.flight = { hasBounced, ...(reachedBoundary === undefined ? {} : { reachedBoundary }) };
+        event.flight = { hasBounced, ...(reachedBoundary === undefined ? {} : { reachedBoundary }), ...(physicsEvents ? { boundaryOnFull } : {}) };
+        if (physicsEvents) event.physicsEvents = physicsEvents;
         if (fieldedRuns !== undefined) event.fieldedRuns = fieldedRuns;
         if (runOutBy) event.runOutBy = runOutBy;
       }

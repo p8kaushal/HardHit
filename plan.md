@@ -6,9 +6,9 @@
 2. **Secondary:** fix batting-camera pitch visibility where the wicketkeeper obstructs the view. Preserve a readable keeper representation and verify both hands and compact landscape layouts.
 3. **Secondary:** add a player-controlled auto-run option, enabled by default. When disabled, provide clear run/continue choices and resolve them against the ball/throw timeline; bot running remains automated.
 
-Current branch: `feature/cricket-logic-physics`. The missed-delivery/pad-impact slice is implemented with explicit laboratory assumptions and limitations; see `TODO.md` and `PHYSICS_CALIBRATION.md`. The first carry invariant is now implemented: pending shots record zero distance and finalized shots take distance from physical flight. Next, unify the trajectory/contact/bounce/rope data as a shared SI event stream before changing contact or launch physics.
+Current branch: `feature/cricket-logic-physics`. The missed-delivery/pad-impact slice is implemented with explicit laboratory assumptions and limitations; see `TODO.md` and `PHYSICS_CALIBRATION.md`. Pending shots record zero distance until physical flight finalizes. The outgoing solver now records timestamped SI ground-contact, rope-crossing and rest events; final scoring and saved replay preserve event order. Next extend this shared contract to incoming delivery and bat/body contact, then implement swept bat/ball collision before changing launch coefficients.
 
-Current whole-game mechanics audit and dependency-ordered plan: [REALISM_AUDIT_AND_PLAN.md](REALISM_AUDIT_AND_PLAN.md). A controlled straight-lofted browser trace found first landing at 63.7–72.7 m versus heuristic estimates at 37.1–57.8 m; the heuristic no longer populates pending events. Never make a strict six fixture pass by weakening its assertion or blindly increasing shot speed.
+Current whole-game mechanics audit and dependency-ordered plan: [REALISM_AUDIT_AND_PLAN.md](REALISM_AUDIT_AND_PLAN.md). A controlled straight-lofted browser trace found first landing at 63.7–72.7 m versus heuristic estimates at 37.1–57.8 m; the heuristic no longer populates pending events. The latest browser replay matched 12 saved events and both scorecards. Never make a strict six fixture pass by weakening its assertion or blindly increasing shot speed.
 
 ## Current account handoff — November 14, 2026
 

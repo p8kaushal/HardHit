@@ -1,4 +1,5 @@
 import { BALL_AIR_DAMPING, BALL_RADIUS_METERS, frameIndependentDamping } from './formula';
+import type { BallPhysicsEvent } from './types';
 
 export interface BallState {
   position: { x: number; y: number; z: number };
@@ -7,6 +8,20 @@ export interface BallState {
   reachedBoundary: boolean;
   boundaryOnFull?: boolean;
   stopped: boolean;
+  elapsedSeconds?: number;
+  physicsEvents?: BallPhysicsEvent[];
+}
+
+function recordPhysicsEvent(state: BallState, kind: BallPhysicsEvent['kind'], timeSeconds: number, position: BallState['position'], boundaryOnFull?: boolean): void {
+  const events = state.physicsEvents ??= [];
+  events.push({
+    sequence: events.length,
+    timeSeconds,
+    kind,
+    position: { ...position },
+    velocity: { ...state.velocity },
+    ...(boundaryOnFull === undefined ? {} : { boundaryOnFull }),
+  });
 }
 
 /** Advance fixed simulation steps while bounding catch-up after a long stall. */
@@ -37,7 +52,13 @@ export function advanceBallFrame(
 /** Advance one small, fixed interval in metres and seconds. */
 export function stepBall(state: BallState, dt: number): void {
   const { position: p, velocity: v } = state;
+  const stepStartSeconds = state.elapsedSeconds ?? 0;
   const previous = { x: p.x, y: p.y, z: p.z };
+  const atFraction = (fraction: number) => ({
+    x: previous.x + (p.x - previous.x) * fraction,
+    y: previous.y + (p.y - previous.y) * fraction,
+    z: previous.z + (p.z - previous.z) * fraction,
+  });
   const drag = frameIndependentDamping(BALL_AIR_DAMPING, dt);
   v.x *= drag;
   v.y = v.y * drag - 9.81 * dt;
@@ -61,11 +82,13 @@ export function stepBall(state: BallState, dt: number): void {
   if (crossing >= 0 && crossing <= 1 && crossing < impact) {
     state.reachedBoundary = true;
     state.boundaryOnFull = !state.hasBounced;
+    recordPhysicsEvent(state, 'boundary_crossing', stepStartSeconds + crossing * dt, atFraction(crossing), state.boundaryOnFull);
     if (state.hasBounced) {
       p.x = previous.x + dx * crossing;
       p.y = previous.y + (p.y - previous.y) * crossing;
       p.z = previous.z + dz * crossing;
       state.stopped = false;
+      state.elapsedSeconds = stepStartSeconds + dt;
       return;
     }
   }
@@ -77,10 +100,14 @@ export function stepBall(state: BallState, dt: number): void {
     p.y = BALL_RADIUS_METERS;
     p.z = previous.z + dz * impact;
     state.hasBounced = true;
+    recordPhysicsEvent(state, 'ground_contact', stepStartSeconds + impact * dt, { ...p });
+    state.elapsedSeconds = stepStartSeconds + dt;
     return;
   }
 
   if (p.y <= BALL_RADIUS_METERS) {
+    const firstGroundContact = !state.hasBounced;
+    const groundPosition = impact >= 0 && impact <= 1 ? atFraction(impact) : { x: p.x, y: BALL_RADIUS_METERS, z: p.z };
     p.y = BALL_RADIUS_METERS;
     state.hasBounced = true;
     if (v.y < 0) v.y = Math.abs(v.y) * 0.55;
@@ -89,10 +116,16 @@ export function stepBall(state: BallState, dt: number): void {
     const friction = frameIndependentDamping(0.92, dt);
     v.x *= friction;
     v.z *= friction;
+    if (firstGroundContact) recordPhysicsEvent(state, 'ground_contact', stepStartSeconds + (impact >= 0 && impact <= 1 ? impact : 1) * dt, groundPosition);
   }
   if (!state.reachedBoundary && crossing >= 0 && crossing <= 1) {
     state.reachedBoundary = true;
     state.boundaryOnFull = false;
+    const boundaryPosition = atFraction(crossing);
+    if (impact <= crossing) boundaryPosition.y = BALL_RADIUS_METERS;
+    recordPhysicsEvent(state, 'boundary_crossing', stepStartSeconds + crossing * dt, boundaryPosition, false);
   }
   state.stopped = p.y <= BALL_RADIUS_METERS && Math.abs(v.y) < 0.45 && Math.hypot(v.x, v.z) < 0.3;
+  if (state.stopped) recordPhysicsEvent(state, 'rest', stepStartSeconds + dt, { ...p });
+  state.elapsedSeconds = stepStartSeconds + dt;
 }

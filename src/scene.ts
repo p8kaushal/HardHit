@@ -1282,6 +1282,12 @@ export class GameScene {
     return this.shotTrajectory.map(sample => ({ ...sample, position: { ...sample.position } }));
   }
 
+  public getShotPhysicsEvents() {
+    return (this.shotPhysics?.physicsEvents ?? []).map(event => ({
+      ...event, position: { ...event.position }, velocity: { ...event.velocity },
+    }));
+  }
+
   public animateMissWicket(isWicket: boolean, continuingDelivery?: DeliveryChoice, padImpactDelivery?: DeliveryChoice): void {
     this.isAnimatingBall = false;
     this.updateMissedAnimation = null;

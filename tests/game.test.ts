@@ -1588,12 +1588,19 @@ test('match event log copies delivery inputs and records final flight outcome', 
   shot.direction = 7;
   assert.equal(event.delivery.aimTarget.x, 0);
   assert.equal(event.shot?.direction, 2);
-  assert.equal(game.finalizeBallOutcome(73, false, true), 6);
+  const physicsEvents = [
+    { sequence: 0, timeSeconds: 1.25, kind: 'boundary_crossing' as const, position: { x: 65, y: 2, z: 0 }, velocity: { x: 20, y: 3, z: 0 }, boundaryOnFull: true },
+    { sequence: 1, timeSeconds: 1.5, kind: 'ground_contact' as const, position: { x: 70, y: 0.036, z: 0 }, velocity: { x: 20, y: -2, z: 0 } },
+  ];
+  assert.equal(game.finalizeBallOutcome(73, false, false, null, undefined, undefined, physicsEvents), 6,
+    'ordered physical events override contradictory summary flags');
   assert.equal(outcome.distance, 73, 'finalized distance comes from the physical flight');
   assert.equal(event.distance, 73);
   assert.equal(event.resolved, true);
   assert.equal(event.runs, outcome.runs ?? 6);
-  assert.deepEqual(event.flight, { hasBounced: false, reachedBoundary: true });
+  assert.deepEqual(event.flight, { hasBounced: true, reachedBoundary: true, boundaryOnFull: true });
+  assert.deepEqual(event.physicsEvents, physicsEvents);
+  assert.notEqual(event.physicsEvents, physicsEvents);
 });
 
 test('saved regular match events replay through controller adjudication', () => {
@@ -2290,6 +2297,10 @@ test('rope crossing and bounce are resolved in their actual order within a physi
   assert.equal(clearsRope.reachedBoundary, true);
   assert.equal(clearsRope.boundaryOnFull, true);
   assert.equal(clearsRope.hasBounced, true, 'the ball lands beyond the rope in this same step');
+  assert.deepEqual(clearsRope.physicsEvents?.map(({ kind }) => kind), ['boundary_crossing', 'ground_contact']);
+  assert.ok(clearsRope.physicsEvents![0].timeSeconds < clearsRope.physicsEvents![1].timeSeconds);
+  assert.ok(Math.abs(Math.hypot(clearsRope.physicsEvents![0].position.x, clearsRope.physicsEvents![0].position.z) - 65) < 1e-9);
+  assert.equal(clearsRope.physicsEvents![0].boundaryOnFull, true);
   assert.equal(evaluateFinalOutcome(65, clearsRope.hasBounced, clearsRope.reachedBoundary, clearsRope.boundaryOnFull), 6,
     'landing after a full crossing does not erase the six');
 
@@ -2297,6 +2308,10 @@ test('rope crossing and bounce are resolved in their actual order within a physi
   stepBall(landsFirst, 0.01);
   assert.equal(landsFirst.reachedBoundary, true);
   assert.equal(landsFirst.hasBounced, true);
+  assert.deepEqual(landsFirst.physicsEvents?.map(({ kind }) => kind), ['ground_contact', 'boundary_crossing']);
+  assert.ok(landsFirst.physicsEvents![0].timeSeconds < landsFirst.physicsEvents![1].timeSeconds);
+  assert.equal(landsFirst.physicsEvents![1].boundaryOnFull, false);
+  assert.equal(landsFirst.physicsEvents![1].position.y, BALL_RADIUS_METERS, 'post-bounce rope event remains on the modeled turf plane');
   assert.equal(evaluateFinalOutcome(65, landsFirst.hasBounced, landsFirst.reachedBoundary, landsFirst.boundaryOnFull), 4,
     'a bounce before the rope remains a four');
 });

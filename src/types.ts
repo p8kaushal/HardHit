@@ -92,6 +92,17 @@ export interface BallOutcome {
   ballTrajectory?: Vector3D[]; // Precomputed 3D path for rendering
 }
 
+/** A timestamped, SI-unit event emitted by fixed-step ball flight. */
+export interface BallPhysicsEvent {
+  sequence: number;
+  timeSeconds: number;
+  kind: 'ground_contact' | 'boundary_crossing' | 'rest';
+  position: Vector3D;
+  velocity: Vector3D;
+  /** Set on boundary events; records whether the rope was crossed before first bounce. */
+  boundaryOnFull?: boolean;
+}
+
 export interface Innings {
   batter: Player;
   bowler: Player;
@@ -162,7 +173,9 @@ export interface MatchEvent {
   distance: number;
   runs?: number;
   resolved: boolean;
-  flight?: { hasBounced: boolean; reachedBoundary?: boolean };
+  flight?: { hasBounced: boolean; reachedBoundary?: boolean; boundaryOnFull?: boolean };
+  /** Ordered physical events from the outgoing fixed-step flight, in metres and seconds. */
+  physicsEvents?: BallPhysicsEvent[];
   caughtBy?: string;
   fieldedRuns?: number;
   runOutBy?: string;

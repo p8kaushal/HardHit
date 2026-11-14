@@ -57,12 +57,12 @@ export function replayMatchRecord(record: MatchHistoryRecord): MatchController {
     assertSame({ missed: outcome.missed ?? false, isWicket: outcome.isWicket, wicketReason: outcome.wicketReason, isFreeHit: outcome.isFreeHit, isExtra: outcome.isExtra, extraType: outcome.extraType },
       { missed: event.missed, isWicket: event.caughtBy || event.runOutBy ? false : event.isWicket, wicketReason: expectedDecisionReason, isFreeHit: event.isFreeHit, isExtra: event.isExtra, extraType: event.extraType }, `decision ${event.sequence}`);
     if (event.flight) {
-      const runs = game.finalizeBallOutcome(event.distance, event.flight.hasBounced, event.flight.reachedBoundary, event.caughtBy, event.fieldedRuns, event.runOutBy);
+      const runs = game.finalizeBallOutcome(event.distance, event.flight.hasBounced, event.flight.reachedBoundary, event.caughtBy, event.fieldedRuns, event.runOutBy, event.physicsEvents);
       assertSame(runs, event.runs, `flight score ${event.sequence}`);
     }
     const replayed = game.state.events[game.state.events.length - 1];
-    assertSame({ distance: replayed.distance, runs: replayed.runs, resolved: replayed.resolved, isWicket: replayed.isWicket, wicketReason: replayed.wicketReason, runOutBy: replayed.runOutBy, fieldPreset: replayed.fieldPreset },
-      { distance: event.distance, runs: event.runs, resolved: event.resolved, isWicket: event.isWicket, wicketReason: event.wicketReason, runOutBy: event.runOutBy, fieldPreset: event.fieldPreset }, `event ${event.sequence}`);
+    assertSame({ distance: replayed.distance, runs: replayed.runs, resolved: replayed.resolved, isWicket: replayed.isWicket, wicketReason: replayed.wicketReason, runOutBy: replayed.runOutBy, fieldPreset: replayed.fieldPreset, physicsEvents: replayed.physicsEvents },
+      { distance: event.distance, runs: event.runs, resolved: event.resolved, isWicket: event.isWicket, wicketReason: event.wicketReason, runOutBy: event.runOutBy, fieldPreset: event.fieldPreset, physicsEvents: event.physicsEvents }, `event ${event.sequence}`);
   }
 
   if (game.state.currentInningsIndex === 1 && game.getCurrentInnings().finished) {

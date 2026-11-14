@@ -6,7 +6,13 @@
 2. **Secondary: batting view.** Resolve keeper occlusion of the pitch from the batting camera, preserving the keeper's useful on-field/map representation.
 3. **Secondary: auto-run control.** Add a player choice, enabled by default; when disabled, expose run/continue decisions tied to the ball and return timeline. Bot decisions remain automatic.
 
-### In progress — replace pre-flight distance with resolved physical carry
+### In progress — share ordered outgoing ball events with scoring and replay
+
+- **Finding:** the fixed-step solver knew the within-step order of first bounce and rope crossing but retained only summary booleans. Saved events and replay therefore could not inspect or preserve the physical order that determines a four versus six.
+- **Scope:** emit timestamped SI events for first ground contact, rope crossing and rest from the existing 120 Hz solver; persist them with the resolved delivery; make final scoring and saved replay derive bounce/rope ordering from the event sequence. Do not alter flight coefficients or claim full trajectory replay yet.
+- **Acceptance:** tests verify exact rope position, strictly ordered crossing/contact times in both orders, and event-derived scoring despite contradictory summary flags. Browser match verifies saved-event replay against both scorecards. `npm test` passed 158 tests; `npm run build` passed with the existing Babylon bundle warning; browser syntax and `git diff --check` passed. A two-innings browser run replayed 12 events and matched 24–17 scorecards. The record currently stores discrete contact/boundary/rest events, not every integration sample, incoming delivery, bat collision, catch contact or full deterministic resimulation.
+
+### Completed bounded increment — replace pre-flight distance with resolved physical carry
 
 - **Finding:** a reproduced straight lofted shot sequence contacted successfully but each shot bounced before the straight rope. First landing measured 63.7–72.7 m; the pre-flight estimate was 37.1–57.8 m. That estimate was stored on the pending event even though it neither drove the physical flight nor resolved the score.
 - **Scope:** pending shots now retain zero distance until first-flight resolution writes the measured physical carry. Keep launch coefficients and strict assertions unchanged while later diagnosing attainability against source data.
