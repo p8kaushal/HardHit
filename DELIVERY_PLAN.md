@@ -1,5 +1,7 @@
 # HardHit delivery plan
 
+For the fresh whole-game pros/cons audit, mechanics priority order and active straight-shot/flight-distance investigation, see [`REALISM_AUDIT_AND_PLAN.md`](REALISM_AUDIT_AND_PLAN.md). That current assessment supersedes stale dated status statements below where they conflict; keep this document as the phased execution plan.
+
 This is the proposed plan for taking the existing offline prototype to a reliable mobile-first six-hitting duel and, after that foundation is ready, a deployable real-player 1v1 game. `TODO.md` tracks the implementation checklist; this document defines priorities, phase gates and decision boundaries.
 
 **Approval:** The user approved proceeding phase by phase and specified the AI teammate model. Complete and verify phases in order, commit focused increments, and continue autonomously unless a decision or access listed below is needed. Approval of the plan is not approval for an unspecified paid service, public deployment or destructive action.
@@ -15,7 +17,7 @@ This is the proposed plan for taking the existing offline prototype to a reliabl
 
 ## Current baseline
 
-**Clean-branch snapshot — 14 November 2026:** `feature/gameplay-realism-clean`, based on local `main` at `bb0d8d1`; current working changes are summarized in the ignored local `handoff.md`. The app is a TypeScript/Vite web game using Babylon.js with a six-legal-ball offline contest, interactive batting/bowling, authored delivery paths, approximate shot resolution, simplified dismissals/extras, seeded bot decisions, persistent match events and browser-local profile/history.
+**Current snapshot — 14 November 2026:** `feature/cricket-logic-physics`, based at `a3f3462`; current working changes are summarized in the ignored local `handoff.md`. The app is a TypeScript/Vite web game using Babylon.js with a six-legal-ball offline contest, interactive batting/bowling, authored delivery paths, approximate shot resolution, simplified dismissals/extras, seeded bot decisions, persistent match events and browser-local profile/history. The latest carry increment records zero distance while a shot is pending and writes physical flight distance during finalization; see `REALISM_AUDIT_AND_PLAN.md`.
 
 In a disposable copy, `npm ci` installed 42 packages, `npm test` passed 117 tests at that snapshot, `npm run build` passed with the existing ~1.09 MB gzip Babylon chunk warning, and `npm run test:production` passed batting/bowling smoke at 568×240, 667×300 and 1024×768 without browser errors. The latest workspace suite passes 133 tests after the fielding movement increment. The full dependency audit reported seven advisories (one moderate, six high); `npm audit --omit=dev` reported zero production advisories. Runtime asset sources and licenses are inventoried in `THIRD_PARTY_NOTICES.md`; BudgetPixel's terms qualify their audio license as applying to rights they hold, so the deeper rights chain is not established.
 

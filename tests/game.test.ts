@@ -1581,12 +1581,16 @@ test('match event log copies delivery inputs and records final flight outcome', 
   const outcome = game.recordBall(input, shot);
   const event = game.state.events[0];
   assert.equal(event.resolved, false);
+  assert.equal(outcome.distance, 0, 'an in-flight ball has no measured carry yet');
+  assert.equal(event.distance, 0, 'the event must not store a pre-flight distance estimate');
   assert.notEqual(event.delivery, input);
   input.aimTarget.x = 99;
   shot.direction = 7;
   assert.equal(event.delivery.aimTarget.x, 0);
   assert.equal(event.shot?.direction, 2);
   assert.equal(game.finalizeBallOutcome(73, false, true), 6);
+  assert.equal(outcome.distance, 73, 'finalized distance comes from the physical flight');
+  assert.equal(event.distance, 73);
   assert.equal(event.resolved, true);
   assert.equal(event.runs, outcome.runs ?? 6);
   assert.deepEqual(event.flight, { hasBounced: false, reachedBoundary: true });

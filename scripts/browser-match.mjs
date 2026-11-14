@@ -607,7 +607,15 @@ try {
     }
     if (process.argv.includes('--trace-shots')) {
       const trace = await page.evaluate(() => window.__playerShotTrace);
-      console.log(`Player shot trace: ${JSON.stringify(trace.map(({ flightSamples, ...shot }) => ({ ...shot, flightSampleCount: flightSamples?.length ?? 0, flightFirst: flightSamples?.[0], flightLast: flightSamples?.at(-1) })))}`);
+      const summarized = trace.map(({ flightSamples, ...shot }) => {
+        const landing = flightSamples?.find(sample => sample.position.y <= 0.036 + 1e-6);
+        const firstLandingDistance = landing && shot.launchPosition
+          ? Math.hypot(landing.position.x - shot.launchPosition.x, landing.position.z - shot.launchPosition.z)
+          : null;
+        return { ...shot, firstLandingDistance, estimateError: firstLandingDistance === null ? null : shot.estimatedDistance - firstLandingDistance,
+          flightSampleCount: flightSamples?.length ?? 0, flightFirst: flightSamples?.[0], flightLast: flightSamples?.at(-1) };
+      });
+      console.log(`Player shot trace: ${JSON.stringify(summarized)}`);
       const incompleteTrajectory = trace.find(shot => shot.launchVelocity && (
         !Array.isArray(shot.flightSamples) || shot.flightSamples.length < 2 ||
         shot.flightSamples.some((sample, index) => !Number.isFinite(sample.timeSeconds) || (index > 0 && Math.abs(sample.timeSeconds - shot.flightSamples[index - 1].timeSeconds - 1 / 120) > 1e-9)) ||

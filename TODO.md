@@ -6,6 +6,12 @@
 2. **Secondary: batting view.** Resolve keeper occlusion of the pitch from the batting camera, preserving the keeper's useful on-field/map representation.
 3. **Secondary: auto-run control.** Add a player choice, enabled by default; when disabled, expose run/continue decisions tied to the ball and return timeline. Bot decisions remain automatic.
 
+### In progress — replace pre-flight distance with resolved physical carry
+
+- **Finding:** a reproduced straight lofted shot sequence contacted successfully but each shot bounced before the straight rope. First landing measured 63.7–72.7 m; the pre-flight estimate was 37.1–57.8 m. That estimate was stored on the pending event even though it neither drove the physical flight nor resolved the score.
+- **Scope:** pending shots now retain zero distance until first-flight resolution writes the measured physical carry. Keep launch coefficients and strict assertions unchanged while later diagnosing attainability against source data.
+- [x] **Acceptance:** deterministic event coverage verifies pending outcome/event distance is zero and both are updated from the physical finalized distance. Browser trace reports first landing and estimate error; the strict straight-lofted control still produces bounced fours, consistent with first landing before the 65 m rope. `npm test` passed 158 tests; `npm run build` passed with the existing Babylon bundle warning; `git diff --check` passed. This removes a misleading shadow value; it does not calibrate carry or explain whether the straight six is attainable.
+
 ### Completed bounded increment — unify batter-plane delivery sampling
 
 - **Finding:** `deliveryHitsPad` and `resolveMissedDelivery` independently calculate batter-plane progress and sample the delivery path. This duplicates the key physical input to pad interception and LBW adjudication, making later impact-order/deflection work vulnerable to drift.

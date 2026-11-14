@@ -1,5 +1,5 @@
 import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, FieldPreset, ShotChoice, PlayerStats, CameraMode, TieBreakDetails } from './types';
-import { battingAssistanceMultiplier, evaluateWicket, resolveMissedDelivery, calculateDistance, resolveDeliveryExtra, deliveryContactPoint, deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
+import { battingAssistanceMultiplier, evaluateWicket, resolveMissedDelivery, resolveDeliveryExtra, deliveryContactPoint, deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 import { SeededRandom } from './random';
 import { isCatchDismissalAllowed } from './fielding';
@@ -372,13 +372,9 @@ export class MatchController {
       wicketReason = extra.type === 'noball' ? 'Front-foot no-ball! (Free hit next)' : wicketResult.reason;
       
       if (!isWicket && !missed) {
-        const distResult = calculateDistance(innings.batter, innings.bowler, delivery, shot, wicketResult.safeWindowMs, wicketResult.isEdgeFallback, assistMultiplier);
-        distance = distResult.distance;
-        if (distResult.isMiscueWicket) {
-          isWicket = true;
-          wicketReason = distResult.miscueReason;
-          distance = 0;
-        }
+        // The shot is still airborne. Keep distance unset/zero until the physical flight resolves.
+        // Pre-flight batting heuristics must not be recorded as measured carry or score input.
+        distance = 0;
       }
 
       // Check Free Hit survival rules
