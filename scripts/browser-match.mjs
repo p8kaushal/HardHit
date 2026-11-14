@@ -147,6 +147,7 @@ try {
     window.__flightPause = null;
     const recordBall = MatchController.prototype.recordBall;
     MatchController.prototype.recordBall = function (delivery, shot, fieldPreset) {
+      if (window.__replayingMatch) return recordBall.call(this, delivery, shot, fieldPreset);
       const contact = window.__matchContacts.at(-1);
       const result = recordBall.call(this, delivery, shot, fieldPreset);
       window.__matchReplay.push({
@@ -175,6 +176,7 @@ try {
     };
     const finalize = MatchController.prototype.finalizeBallOutcome;
     MatchController.prototype.finalizeBallOutcome = function (distance, bounced, reachedBoundary, caughtBy, fieldedRuns, runOutBy) {
+      if (window.__replayingMatch) return finalize.call(this, distance, bounced, reachedBoundary, caughtBy, fieldedRuns, runOutBy);
       const playerBatting = this.getCurrentInnings().batter.id === this.state.player.id;
       const runs = finalize.call(this, distance, bounced, reachedBoundary, caughtBy, fieldedRuns, runOutBy);
       const lastBall = this.getCurrentInnings().balls.at(-1);
@@ -380,7 +382,9 @@ try {
       const record = stored?.records?.[0];
       if (!record) throw new Error('Completed match was not persisted before replay');
       const { replayMatchRecord } = await import('/src/match-replay.ts');
-      const replayed = replayMatchRecord(record);
+      let replayed;
+      window.__replayingMatch = true;
+      try { replayed = replayMatchRecord(record); } finally { window.__replayingMatch = false; }
       const inningsFor = batterId => {
         const innings = replayed.state.innings.find(item => item.batter.id === batterId);
         return innings ? { score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled } : null;

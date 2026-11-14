@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — isolate browser traces from replay
+
+- Replay verification invokes the same instrumented controller as live play. The harness now excludes those replay calls from live shot and match traces, preventing duplicate entries and false score-summary failures when `--trace-shots` and `--verify-replay` are combined.
+- [x] The injected no-ball, lofted square-shot browser match passed both innings, scorecards, lobby return and a 13-event replay; browser script syntax and `git diff --check` passed.
+
 ### Completed bounded increment — simulate scoring on illegal deliveries
 
 - **Scope:** align seeded bot simulation with live wide cancellation, no-ball bat runs, free-hit chains and fielding dismissals. Keep attempt and legal-ball denominators explicit.
