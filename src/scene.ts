@@ -4,7 +4,7 @@ import { CameraMode, DeliveryChoice, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
-import { createDefaultFieldLayout, estimateRunsBeforeReturnThrow, fielderReachProfileFromRatings, hasFielderReacted, moveFielderTowardBall, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
+import { createDefaultFieldLayout, estimateRunsBeforeReturnThrow, FIELDING_MAX_RUNS, FIELDING_SECONDS_PER_RUN, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, hasFielderReacted, moveFielderTowardBall, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
@@ -499,8 +499,8 @@ export class GameScene {
     const root = this.fielderRoots.get(this.shotFieldedBy);
     if (!root) return null;
     const stumpsDistance = Math.min(Math.hypot(root.position.x, root.position.z - 10), Math.hypot(root.position.x, root.position.z + 10));
-    const throwSpeed = 12 + this.fieldingRatings.throwing * 0.12;
-    return estimateRunsBeforeReturnThrow(this.shotElapsedSeconds, stumpsDistance, throwSpeed, 2.8, 3);
+    const throwSpeed = fielderThrowSpeedFromRating(this.fieldingRatings.throwing);
+    return estimateRunsBeforeReturnThrow(this.shotElapsedSeconds, stumpsDistance, throwSpeed, FIELDING_SECONDS_PER_RUN, FIELDING_MAX_RUNS);
   }
 
   private buildFielders(): void {

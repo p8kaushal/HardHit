@@ -17,6 +17,14 @@ export interface FieldingPosition {
   position: { x: number; z: number };
 }
 
+export const FIELDING_SECONDS_PER_RUN = 2.8;
+export const FIELDING_MAX_RUNS = 3;
+
+/** A caught ball dismisses only when the delivery's modeled protections allow it. */
+export function isCatchDismissalAllowed(isNoBall: boolean, isFreeHit: boolean): boolean {
+  return !isNoBall && !isFreeHit;
+}
+
 const DEFAULT_FIELD_LAYOUT: ReadonlyArray<FieldingPosition> = [
   { name: 'keeper', position: { x: 0, z: -11.5 } },
   { name: 'close', position: { x: -4, z: -14 } },
@@ -63,6 +71,23 @@ export interface FieldingInterception {
   movementMeters: number;
 }
 
+export interface FieldingTrajectoryState extends FieldingTrajectorySample {
+  hasBounced: boolean;
+  reachedBoundary: boolean;
+}
+
+export interface RatedFielder {
+  name: FielderPositionName;
+  profile: FielderReachProfile;
+  catching: number;
+}
+
+export interface FieldingEvent extends FieldingInterception {
+  fielderName: FielderPositionName;
+  kind: 'catch' | 'ground_stop';
+  fielderPosition: { x: number; z: number };
+}
+
 /** Move a fielder toward a ground target by at most speed × elapsed time. */
 export function moveFielderTowardBall(
   current: { x: number; z: number },
@@ -86,6 +111,12 @@ export function hasFielderReacted(profile: FielderReachProfile, elapsedSeconds: 
     throw new Error('Invalid fielder reaction time');
   }
   return elapsedSeconds + 1e-10 >= profile.reactionSeconds;
+}
+
+/** Map the provisional 0–100 throwing skill to return-throw speed in m/s. */
+export function fielderThrowSpeedFromRating(throwing: number): number {
+  if (!Number.isFinite(throwing) || throwing < 0 || throwing > 100) throw new Error('Throwing rating must be between 0 and 100');
+  return 12 + throwing * 0.12;
 }
 
 /** Estimate completed end-to-end runs before a fielder's return throw arrives. */
@@ -141,4 +172,38 @@ export function findEarliestInterception(
     }
   }
   return null;
+}
+
+/** Find the first reachable legal catch or low bounced-ball stop before the rope. */
+export function findEarliestFieldingEvent(
+  trajectory: readonly FieldingTrajectoryState[],
+  fielders: readonly RatedFielder[],
+): FieldingEvent | null {
+  let earliest: FieldingEvent | null = null;
+  for (const fielder of fielders) {
+    if (!Number.isFinite(fielder.catching) || fielder.catching < 0 || fielder.catching > 100) {
+      throw new Error('Catching rating must be between 0 and 100');
+    }
+    const catchHeight = 1.65 + fielder.catching * 0.015;
+    const catchSamples = trajectory
+      .filter(sample => !sample.reachedBoundary && !sample.hasBounced && sample.position.y > 1.2 && sample.position.y <= catchHeight)
+      .map(({ timeSeconds, position }) => ({ timeSeconds, position }));
+    const groundSamples = trajectory
+      .filter(sample => !sample.reachedBoundary && sample.hasBounced && sample.position.y <= 1.2)
+      .map(({ timeSeconds, position }) => ({ timeSeconds, position }));
+
+    for (const [kind, samples] of [['catch', catchSamples], ['ground_stop', groundSamples]] as const) {
+      const interception = findEarliestInterception(samples, fielder.profile);
+      if (!interception || (earliest && interception.timeSeconds >= earliest.timeSeconds)) continue;
+      const movementSeconds = Math.max(0, interception.timeSeconds - fielder.profile.reactionSeconds);
+      const fielderPosition = moveFielderTowardBall(
+        fielder.profile.position,
+        interception.position,
+        fielder.profile.speedMetersPerSecond,
+        movementSeconds,
+      );
+      earliest = { ...interception, fielderName: fielder.name, kind, fielderPosition };
+    }
+  }
+  return earliest;
 }

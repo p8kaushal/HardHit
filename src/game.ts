@@ -2,6 +2,7 @@ import { Player, MatchState, Innings, BallOutcome, DeliveryChoice, ShotChoice, P
 import { battingAssistanceMultiplier, evaluateWicket, resolveMissedDelivery, calculateDistance, checkExtraBall, deliveryContactPoint, deliveryReleaseX, calculateEffectiveWindow, calculateContactQuality, getContactQualityTier, evaluateFinalOutcome } from './formula';
 import { clearGameTimeout, gameNow, setGameTimeout } from './game-clock';
 import { SeededRandom } from './random';
+import { isCatchDismissalAllowed } from './fielding';
 
 const LOCAL_STORAGE_KEY = 'six_hitting_contest_player';
 
@@ -465,7 +466,7 @@ export class MatchController {
       if (!lastBall || !lastBall.shot || lastBall.missed || lastBall.isWicket || lastBall.extraType === 'wide') return 0;
       if (lastBall.runs !== undefined) return lastBall.runs;
 
-      if (caughtBy && !lastBall.isFreeHit && lastBall.extraType !== 'noball' && !hasBounced && !reachedBoundary) {
+      if (caughtBy && isCatchDismissalAllowed(lastBall.extraType === 'noball', lastBall.isFreeHit) && !hasBounced && !reachedBoundary) {
         lastBall.distance = distance;
         lastBall.runs = 0;
         lastBall.isWicket = true;

@@ -5,7 +5,7 @@ import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchContro
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
-import { createDefaultFieldLayout, estimateRunsBeforeReturnThrow, fielderReachProfileFromRatings, findEarliestInterception, hasFielderReacted, moveFielderTowardBall } from '../src/fielding';
+import { createDefaultFieldLayout, estimateRunsBeforeReturnThrow, fielderReachProfileFromRatings, findEarliestFieldingEvent, findEarliestInterception, fielderThrowSpeedFromRating, hasFielderReacted, isCatchDismissalAllowed, moveFielderTowardBall } from '../src/fielding';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
@@ -1019,7 +1019,11 @@ test('seeded bot bowling uses bounded pace, spin and swing variety', () => {
 test('bot distribution simulation is reproducible, bounded and reports the right denominators', () => {
   const first = runBotSimulation(80, undefined, 0x51a7);
   const second = runBotSimulation(80, undefined, 0x51a7);
+  const withoutFielding = runBotSimulation(80, undefined, 0x51a7, { includeFielding: false });
   assert.deepEqual(first, second);
+  assert.ok(first.some(tier => tier.groundStops > 0), 'seeded scenario should exercise ground fielding');
+  assert.ok(first.some(tier => tier.catches > 0), 'seeded scenario should exercise catches');
+  assert.ok(first.some((tier, index) => tier.runs !== withoutFielding[index].runs || tier.wickets !== withoutFielding[index].wickets), 'fielding should change simulated outcomes');
   for (const tier of first) {
     assert.equal(tier.overs, 80);
     assert.ok(tier.legalBalls <= 480);
@@ -1027,6 +1031,8 @@ test('bot distribution simulation is reproducible, bounded and reports the right
     assert.equal(tier.attempts, tier.legalBalls + tier.wides + tier.noBalls);
     assert.ok(tier.runs >= tier.wides + tier.noBalls);
     assert.ok(tier.dots >= 0 && tier.fours >= 0 && tier.sixes >= 0);
+    assert.ok(tier.groundStops >= 0 && tier.groundStops <= tier.legalBalls);
+    assert.ok(tier.catches >= 0 && tier.catches <= tier.legalBalls);
     assert.ok(tier.dots + tier.fours + tier.sixes <= tier.legalBalls);
     assert.ok(tier.legalRate >= 0 && tier.legalRate <= 1);
     assert.ok(tier.wicketRate >= 0 && tier.wicketRate <= 1);
@@ -1114,6 +1120,45 @@ test('run decision counts completed runs before the return throw, mirrors both h
   assert.equal(invalidEstimate.finalizeBallOutcome(8, true, false, null, -1), 0);
   assert.equal(invalidEstimate.getCurrentInnings().score, 0);
   assert.throws(() => estimateRunsBeforeReturnThrow(1, 10, 0, 3), /Invalid run decision/);
+  assert.equal(fielderThrowSpeedFromRating(0), 12);
+  assert.equal(fielderThrowSpeedFromRating(100), 24);
+  assert.throws(() => fielderThrowSpeedFromRating(101), /Throwing rating/);
+});
+
+test('fielding trajectory picks the first reachable catch or ground stop before rope crossing', () => {
+  const fielder = {
+    name: 'point' as const,
+    profile: { position: { x: 0, z: 0 }, reactionSeconds: 0, speedMetersPerSecond: 5, reachRadiusMeters: 0.4 },
+    catching: 50,
+  };
+  const catchEvent = findEarliestFieldingEvent([
+    { timeSeconds: 0.5, position: { x: 1, y: 1.5, z: 0 }, hasBounced: false, reachedBoundary: false },
+    { timeSeconds: 0.7, position: { x: 2, y: 0.04, z: 0 }, hasBounced: true, reachedBoundary: false },
+  ], [fielder]);
+  assert.equal(catchEvent?.kind, 'catch');
+  assert.equal(catchEvent?.timeSeconds, 0.5);
+
+  const groundEvent = findEarliestFieldingEvent([
+    { timeSeconds: 0.5, position: { x: 2, y: 0.04, z: 0 }, hasBounced: true, reachedBoundary: false },
+  ], [fielder]);
+  assert.equal(groundEvent?.kind, 'ground_stop');
+
+  assert.equal(findEarliestFieldingEvent([
+    { timeSeconds: 0.1, position: { x: 0, y: 0.04, z: 0 }, hasBounced: true, reachedBoundary: true },
+  ], [fielder]), null, 'a boundary event cannot be intercepted after the rope');
+  const rightPoint = createDefaultFieldLayout('RHB').find(item => item.name === 'point')!;
+  const leftPoint = createDefaultFieldLayout('LHB').find(item => item.name === 'point')!;
+  const mirroredEvent = (position: { x: number; z: number }, sign: number) => findEarliestFieldingEvent([
+    { timeSeconds: 1, position: { x: position.x + sign, y: 0.04, z: position.z }, hasBounced: true, reachedBoundary: false },
+  ], [{ name: 'point', profile: { position, reactionSeconds: 0, speedMetersPerSecond: 2, reachRadiusMeters: 0.2 }, catching: 50 }]);
+  const rightEvent = mirroredEvent(rightPoint.position, 1);
+  const leftEvent = mirroredEvent(leftPoint.position, -1);
+  assert.equal(rightEvent?.kind, 'ground_stop');
+  assert.equal(leftEvent?.kind, rightEvent?.kind);
+  assert.equal(leftEvent?.timeSeconds, rightEvent?.timeSeconds);
+  assert.equal(isCatchDismissalAllowed(false, false), true);
+  assert.equal(isCatchDismissalAllowed(false, true), false);
+  assert.equal(isCatchDismissalAllowed(true, false), false);
 });
 
 test('bot fielding ratings scale with difficulty and remain bounded', () => {
@@ -2128,6 +2173,19 @@ test('aerial catch on a no-ball stops the shot without dismissing the batter', (
   assert.equal(innings.score, 2, 'one penalty run plus one estimated run');
   assert.equal(innings.balls[0].isWicket, false);
   assert.equal(innings.balls[0].runs, 1);
+});
+
+test('aerial catch on a free hit does not dismiss the batter', () => {
+  const game = match();
+  game.recordBall({ ...delivery(0.5), frontFootHeel: 0.01 }, { direction: 0, type: 'lofted', timing: 0.5, contactZone: 0.5 });
+  game.finalizeBallOutcome(8, false, false, 'cover');
+  const innings = game.getCurrentInnings();
+  const freeHit = game.recordBall(delivery(0.5), { direction: 0, type: 'lofted', timing: 0.5, contactZone: 0.5 });
+  assert.equal(freeHit.isFreeHit, true);
+  game.finalizeBallOutcome(8, false, false, 'point');
+  assert.equal(innings.wicketsLost, 0);
+  assert.equal(innings.score, 3, 'the no-ball penalty and the two stopped shots still score runs');
+  assert.equal(innings.balls[1].isWicket, false);
 });
 
 test('the result banner uses the same finalized distance as the score', () => {
