@@ -13,7 +13,7 @@ export interface FielderReachProfile {
   reachRadiusMeters: number;
 }
 
-export type FielderPositionName = 'keeper' | 'close' | 'point' | 'cover' | 'midOff' | 'midOn' | 'squareLeg' | 'fineLeg' | 'longBoundary';
+export type FielderPositionName = 'keeper' | 'close' | 'point' | 'thirdMan' | 'cover' | 'midOff' | 'midOn' | 'squareLeg' | 'fineLeg' | 'longBoundary';
 
 export interface FieldingPosition {
   name: FielderPositionName;
@@ -36,6 +36,7 @@ const DEFAULT_FIELD_LAYOUT: ReadonlyArray<FieldingPosition> = [
   { name: 'keeper', position: { x: 0, z: -11.5 } },
   { name: 'close', position: { x: -4, z: -14 } },
   { name: 'point', position: { x: 25, z: -6 } },
+  { name: 'thirdMan', position: { x: -38, z: -16 } },
   { name: 'cover', position: { x: 30, z: 14 } },
   { name: 'midOff', position: { x: -17, z: 25 } },
   { name: 'midOn', position: { x: 17, z: 25 } },
@@ -47,12 +48,12 @@ const DEFAULT_FIELD_LAYOUT: ReadonlyArray<FieldingPosition> = [
 const FIELD_PRESET_POSITIONS: Record<FieldPreset, Partial<Record<FielderPositionName, { x: number; z: number }>>> = {
   balanced: {},
   attacking: {
-    close: { x: -3, z: -12 }, point: { x: 19, z: -7 }, cover: { x: 23, z: 12 },
+    close: { x: -3, z: -12 }, point: { x: 19, z: -7 }, thirdMan: { x: -24, z: -12 }, cover: { x: 23, z: 12 },
     midOff: { x: -14, z: 22 }, midOn: { x: 14, z: 22 }, squareLeg: { x: -18, z: -14 },
     fineLeg: { x: 17, z: -28 }, longBoundary: { x: -10, z: 38 },
   },
   deep: {
-    close: { x: -5, z: -17 }, point: { x: 33, z: -10 }, cover: { x: 37, z: 18 },
+    close: { x: -5, z: -17 }, point: { x: 33, z: -10 }, thirdMan: { x: -46, z: -23 }, cover: { x: 37, z: 18 },
     midOff: { x: -23, z: 31 }, midOn: { x: 23, z: 31 }, squareLeg: { x: -30, z: -23 },
     fineLeg: { x: 25, z: -42 }, longBoundary: { x: -12, z: 55 },
   },

@@ -1091,7 +1091,9 @@ test('default field layout mirrors by batter hand and stays inside the modeled f
   for (const preset of ['attacking', 'balanced', 'deep'] as const) {
     const right = createDefaultFieldLayout('RHB', preset);
     const left = createDefaultFieldLayout('LHB', preset);
-    assert.equal(right.length, 9);
+    assert.equal(right.length, 10);
+    assert.equal(new Set(right.map(fielder => fielder.name)).size, 10);
+    assert.equal(new Set(right.map(fielder => `${fielder.position.x}:${fielder.position.z}`)).size, 10);
     assert.deepEqual(left.map(fielder => fielder.name), right.map(fielder => fielder.name));
     right.forEach((fielder, index) => {
       assert.ok(Math.hypot(fielder.position.x, fielder.position.z) < 65, `${preset} ${fielder.name} is beyond the rope`);
@@ -1104,6 +1106,11 @@ test('default field layout mirrors by batter hand and stays inside the modeled f
   const deep = createDefaultFieldLayout('RHB', 'deep').find(fielder => fielder.name === 'point')!;
   assert.ok(Math.hypot(attacking.position.x, attacking.position.z) < Math.hypot(balanced.position.x, balanced.position.z));
   assert.ok(Math.hypot(deep.position.x, deep.position.z) > Math.hypot(balanced.position.x, balanced.position.z));
+  const attackingThirdMan = createDefaultFieldLayout('RHB', 'attacking').find(fielder => fielder.name === 'thirdMan')!;
+  const balancedThirdMan = createDefaultFieldLayout('RHB', 'balanced').find(fielder => fielder.name === 'thirdMan')!;
+  const deepThirdMan = createDefaultFieldLayout('RHB', 'deep').find(fielder => fielder.name === 'thirdMan')!;
+  assert.ok(Math.hypot(attackingThirdMan.position.x, attackingThirdMan.position.z) < Math.hypot(balancedThirdMan.position.x, balancedThirdMan.position.z));
+  assert.ok(Math.hypot(deepThirdMan.position.x, deepThirdMan.position.z) > Math.hypot(balancedThirdMan.position.x, balancedThirdMan.position.z));
   assert.throws(() => createDefaultFieldLayout('RHB', 'unknown' as never), /Unknown field preset/);
 });
 

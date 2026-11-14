@@ -98,6 +98,7 @@ export class UIManager {
       keeper: { label: 'Wicketkeeper', shortLabel: 'WK' },
       close: { label: 'Close fielder', shortLabel: 'CL' },
       point: { label: 'Point', shortLabel: 'PT' },
+      thirdMan: { label: 'Third man', shortLabel: 'TM' },
       cover: { label: 'Cover', shortLabel: 'CV' },
       midOff: { label: 'Mid-off', shortLabel: 'MO' },
       midOn: { label: 'Mid-on', shortLabel: 'MI' },

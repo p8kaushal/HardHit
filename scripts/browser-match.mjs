@@ -357,13 +357,13 @@ try {
       const panelWidthAfter = radarPanel.getBoundingClientRect().width;
       button?.click();
       return { count: markers.length, batting: batting.length, fielding: fielding.length, roles, expanded, expandedAfterClick, bodyVisible, collapsedAgain: button?.getAttribute('aria-expanded'), panelWidthBefore, panelWidthAfter, colors, shortLabels,
-        labels: [...markers].every(marker => !!marker.getAttribute('aria-label') && !!marker.querySelector('title')?.textContent && !!marker.querySelector('.field-radar-marker-label')?.textContent) && new Set(shortLabels).size === 12 && document.querySelectorAll('#field-radar-player-list li').length === 12,
+        labels: [...markers].every(marker => !!marker.getAttribute('aria-label') && !!marker.querySelector('title')?.textContent && !!marker.querySelector('.field-radar-marker-label')?.textContent) && new Set(shortLabels).size === 13 && document.querySelectorAll('#field-radar-player-list li').length === 13,
         points: markers.map(marker => ({ role: marker.getAttribute('data-player-role'), team: marker.getAttribute('data-team'), transform: marker.getAttribute('transform') })) };
     });
     const expectedExpanded = compactFieldRadar ? 'false' : 'true';
     const expectedAfterClick = compactFieldRadar ? 'true' : 'false';
     const expectedVisibleAfterClick = compactFieldRadar;
-    if (radar.count !== 12 || radar.batting !== 2 || radar.fielding !== 10 || radar.roles.fielder !== 9 || radar.roles.bowler !== 1 || radar.roles.striker !== 1 || radar.roles['non-striker'] !== 1 || radar.expanded !== expectedExpanded || radar.expandedAfterClick !== expectedAfterClick || radar.bodyVisible !== expectedVisibleAfterClick || radar.collapsedAgain !== expectedExpanded || (compactFieldRadar && radar.panelWidthAfter <= radar.panelWidthBefore) || !radar.labels || radar.points.some(point => !point.transform) || radar.colors.batting !== 'rgb(53, 215, 244)' || radar.colors.fielding !== 'rgb(255, 196, 92)') {
+    if (radar.count !== 13 || radar.batting !== 2 || radar.fielding !== 11 || radar.roles.fielder !== 10 || radar.roles.bowler !== 1 || radar.roles.striker !== 1 || radar.roles['non-striker'] !== 1 || radar.expanded !== expectedExpanded || radar.expandedAfterClick !== expectedAfterClick || radar.bodyVisible !== expectedVisibleAfterClick || radar.collapsedAgain !== expectedExpanded || (compactFieldRadar && radar.panelWidthAfter <= radar.panelWidthBefore) || !radar.labels || radar.points.some(point => !point.transform) || radar.colors.batting !== 'rgb(53, 215, 244)' || radar.colors.fielding !== 'rgb(255, 196, 92)') {
       throw new Error(`Field radar did not show all players or accessible collapse behavior: ${JSON.stringify(radar)}`);
     }
     if (fieldPresetFixture === 'all') {
@@ -372,7 +372,7 @@ try {
         throw new Error(`Field radar did not track all selected field plans: ${JSON.stringify(pointTransforms)}`);
       }
     }
-    console.log(`Field radar showed 9 fielders, bowler and both batters with team colors; collapse/expand worked${compactFieldRadar ? ' at 667×300' : ''}.`);
+    console.log(`Ground map showed 10 fielders, bowler and both batters with team colors; collapse/expand worked${compactFieldRadar ? ' at 667×300' : ''}.`);
   }
   if (verifyReplay) {
     const replay = await page.evaluate(async () => {
@@ -437,7 +437,7 @@ try {
   }
   const contacts = await page.evaluate(() => window.__matchContacts);
   const fielders = await page.evaluate(() => window.__fielderSceneCheck);
-  if (!fielders || fielders.positions.length !== 9 || fielders.meshes.length !== 36 || fielders.meshes.some(mesh => mesh.pickable || !mesh.visible) || fielders.positions.some(fielder => Math.hypot(fielder.position.x, fielder.position.z) >= 65)) {
+  if (!fielders || fielders.positions.length !== 10 || fielders.meshes.length !== 40 || fielders.meshes.some(mesh => mesh.pickable || !mesh.visible) || fielders.positions.some(fielder => Math.hypot(fielder.position.x, fielder.position.z) >= 65)) {
     throw new Error(`Visible default fielder setup is incomplete: ${JSON.stringify(fielders)}`);
   }
   console.log(`Visible fielding setup has ${fielders.positions.length} players in range with ${fielders.meshes.length} enabled, non-pickable meshes.`);
@@ -449,9 +449,12 @@ try {
     for (const preset of requestedPresets) {
       const selection = fieldingSetups.cycle.find(item => item.preset === preset);
       const point = selection?.positions.find(fielder => fielder.name === 'point');
+      const thirdMan = selection?.positions.find(fielder => fielder.name === 'thirdMan');
       const expectedX = preset === 'attacking' ? 19 : preset === 'deep' ? 33 : 25;
       const expectedZ = preset === 'attacking' ? -7 : preset === 'deep' ? -10 : -6;
-      if (!selection?.selected || !point || point.position.x !== expectedX * xSign || point.position.z !== expectedZ) {
+      const expectedThirdManX = preset === 'attacking' ? -24 : preset === 'deep' ? -46 : -38;
+      const expectedThirdManZ = preset === 'attacking' ? -12 : preset === 'deep' ? -23 : -16;
+      if (!selection?.selected || !point || point.position.x !== expectedX * xSign || point.position.z !== expectedZ || !thirdMan || thirdMan.position.x !== expectedThirdManX * xSign || thirdMan.position.z !== expectedThirdManZ) {
         throw new Error(`Selected ${preset} field did not reach live fielder positions: ${JSON.stringify({ fieldingSetups, preset })}`);
       }
     }
