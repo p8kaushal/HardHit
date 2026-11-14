@@ -2,7 +2,7 @@
 
 ## Fresh whole-game assessment — November 14, 2026
 
-This review supersedes the dated status and findings below where they conflict. Current branch is `feature/cricket-logic-physics`, based at `a3f3462` before this work. The game is an offline six-hitting contest with a useful shared delivery sampler, fixed-step outgoing flight, rules/replay tests, seeded bots, and automated fielding/running. The central contest rules are intentional product rules, not defects. The target here is consistency with cricket mechanics and defensible physics inside that format; a good-looking animation or a passing scripted match is not evidence of calibration.
+This review supersedes the dated status and findings below where they conflict. Current branch is `feature/cricket-logic-physics`; the first implementation increment is committed and pushed, with no merge. The game is an offline six-hitting contest with a useful shared delivery sampler, fixed-step outgoing flight, rules/replay tests, seeded bots, and automated fielding/running. The central contest rules are intentional product rules, not defects. The target here is consistency with cricket mechanics and defensible physics inside that format; a good-looking animation or a passing scripted match is not evidence of calibration.
 
 ### Pros
 
