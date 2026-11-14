@@ -5,7 +5,7 @@ import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchContro
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
-import { createDefaultFieldLayout, decideAutomatedRuns, fielderReachProfileFromRatings, findEarliestFieldingEvent, findEarliestInterception, fielderThrowSpeedFromRating, hasFielderReacted, isCatchDismissalAllowed, moveFielderTowardBall } from '../src/fielding';
+import { createDefaultFieldLayout, decideAutomatedRuns, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, fielderReachProfileFromRatings, findEarliestFieldingEvent, findEarliestInterception, fielderThrowSpeedFromRating, hasFielderReacted, isCatchDismissalAllowed, moveFielderTowardBall, RUNNER_CREASE_TO_CREASE_METERS } from '../src/fielding';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
@@ -1173,6 +1173,19 @@ test('automated runners complete crossings or are run out at the threatened wick
   assert.deepEqual({ runs: left.runs, runOut: left.runOut, threatenedEnd: left.threatenedEnd },
     { runs: right.runs, runOut: right.runOut, threatenedEnd: right.threatenedEnd });
   assert.throws(() => decideAutomatedRuns(-1, quickThrowAtStriker, 20), /Invalid automated run decision/);
+});
+
+test('automated runner path starts and regains safety at the modeled popping creases', () => {
+  const atStartingCreases = decideAutomatedRuns(0, { x: 0, z: -10 }, 20);
+  assert.equal(RUNNER_CREASE_TO_CREASE_METERS, 17.6, 'runner distance matches the rendered ±8.8 m crease lines');
+  assert.equal(FIELDING_RUNNER_SPEED_METERS_PER_SECOND, 6.25, 'speed is the mean-equivalent of 17.68 m in 2.83 s');
+  assert.equal(atStartingCreases.strikerPositionZ, BATTER_CREASE_Z);
+  assert.equal(atStartingCreases.nonStrikerPositionZ, -BATTER_CREASE_Z);
+  assert.equal(atStartingCreases.runnerArrivalSeconds, 0, 'a runner grounded at the target crease is already safe');
+
+  const betweenCreases = decideAutomatedRuns(1, { x: 0, z: -10 }, 20);
+  assert.ok(betweenCreases.strikerPositionZ > BATTER_CREASE_Z && betweenCreases.strikerPositionZ < -BATTER_CREASE_Z);
+  assert.ok(betweenCreases.nonStrikerPositionZ < -BATTER_CREASE_Z && betweenCreases.nonStrikerPositionZ > BATTER_CREASE_Z);
 });
 
 test('fielding trajectory picks the first reachable catch or ground stop before rope crossing', () => {

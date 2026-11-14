@@ -1,4 +1,5 @@
 import type { FieldPreset } from './types';
+import { BATTER_CREASE_Z } from './formula';
 
 export interface FieldingTrajectorySample {
   timeSeconds: number;
@@ -20,9 +21,11 @@ export interface FieldingPosition {
 }
 
 export const FIELDING_MAX_RUNS = 3;
-export const FIELDING_RUNNER_SPEED_METERS_PER_SECOND = 7;
+// Mean-equivalent speed from a 17.68 m cricket sprint with a bat in 2.83 s;
+// the endpoints below use the scene's 17.6 m popping-crease separation.
+export const FIELDING_RUNNER_SPEED_METERS_PER_SECOND = 6.25;
 export const FIELDING_RUNNER_PICKUP_DELAY_SECONDS = 0.7;
-export const WICKET_TO_WICKET_METERS = 20.12;
+export const RUNNER_CREASE_TO_CREASE_METERS = Math.abs(BATTER_CREASE_Z) * 2;
 
 /** A caught ball dismisses only when the delivery's modeled protections allow it. */
 export function isCatchDismissalAllowed(isNoBall: boolean, isFreeHit: boolean): boolean {
@@ -152,9 +155,9 @@ export interface AutomatedRunDecision {
 }
 
 function runnerDistanceFromStartingCrease(distanceMeters: number): number {
-  const lap = WICKET_TO_WICKET_METERS * 2;
+  const lap = RUNNER_CREASE_TO_CREASE_METERS * 2;
   const progress = distanceMeters % lap;
-  return progress <= WICKET_TO_WICKET_METERS ? progress : lap - progress;
+  return progress <= RUNNER_CREASE_TO_CREASE_METERS ? progress : lap - progress;
 }
 
 /** Resolve two automated runners against a fielder's return throw after a ground stop.
@@ -185,13 +188,13 @@ export function decideAutomatedRuns(
   const throwArrivalSeconds = pickupDelaySeconds + throwDistance / throwSpeedMetersPerSecond;
 
   const progress = runnerDistanceFromStartingCrease(runnerSpeedMetersPerSecond * flightSeconds);
-  const strikerPositionZ = -10 + progress;
-  const nonStrikerPositionZ = 10 - progress;
-  const targetZ = threatenedEnd === 'striker' ? -10 : 10;
-  const nearestRunnerDistance = Math.min(Math.abs(strikerPositionZ - targetZ), Math.abs(nonStrikerPositionZ - targetZ));
+  const strikerPositionZ = BATTER_CREASE_Z + progress;
+  const nonStrikerPositionZ = -BATTER_CREASE_Z - progress;
+  const targetCreaseZ = threatenedEnd === 'striker' ? BATTER_CREASE_Z : -BATTER_CREASE_Z;
+  const nearestRunnerDistance = Math.min(Math.abs(strikerPositionZ - targetCreaseZ), Math.abs(nonStrikerPositionZ - targetCreaseZ));
   const runnerArrivalSeconds = nearestRunnerDistance / runnerSpeedMetersPerSecond;
   const runOut = flightSeconds > 0 && runnerArrivalSeconds > throwArrivalSeconds + 1e-10;
-  const runs = Math.min(maximumRuns, Math.floor((flightSeconds + throwArrivalSeconds) * runnerSpeedMetersPerSecond / WICKET_TO_WICKET_METERS));
+  const runs = Math.min(maximumRuns, Math.floor((flightSeconds + throwArrivalSeconds) * runnerSpeedMetersPerSecond / RUNNER_CREASE_TO_CREASE_METERS));
 
   return { runs, runOut, threatenedEnd, strikerPositionZ, nonStrikerPositionZ, throwArrivalSeconds, runnerArrivalSeconds };
 }

@@ -16,6 +16,14 @@ The selected duration still represents the whole release-to-crease flight. The m
 
 The present game uses shot-type presets and timing/contact approximations rather than the study's measured bat kinematics. Do not tune individual shots merely to force this distribution. The next calibration step is to construct traceable input/output fixtures for bat speed, impact position, launch angle and velocity, then compare independent measured deliveries and real-device playback. Stand collisions and projected landings are not modeled.
 
+## Automated running between wickets
+
+[Lockie and colleagues, *Analysis of Specific Speed Testing for Cricketers* (2013)](https://pubmed.ncbi.nlm.nih.gov/23439342/) report a mean 2.83 ± 0.15 s for a 17.68 m sprint with a bat (n=17 experienced male cricketers in the reported table). Dividing distance by mean time gives about 6.25 m/s as a mean-equivalent speed; this is not a measured constant-speed profile and does not describe all ages, genders, skill levels or match decisions. The test starts with the bat at a crease and slides it through the far crease.
+
+MCC Law 30.1 defines a batter as out of their ground unless part of their person or bat is grounded behind the popping crease; the wicket itself is on the bowling crease. HardHit's modeled popping creases are at z=±8.8 m and stumps at z=±10 m. The runner model now travels 17.6 m between those modeled safe lines and uses the evidence-derived mean-equivalent 6.25 m/s, while a return throw still targets the stumps. That predicts about 2.82 s for one straight crease-to-crease run, close to the cited single-sprint mean. This uses the scene's rounded coordinates rather than the study's 17.68 m and remains a first-order model.
+
+The current model assumes constant speed, does not animate grounded bat/body contact, and does not add turn/deceleration time for repeated shuttles. The same study reports slower second/third legs and separate turning intervals in its run-a-three test, so repeated-run totals and run-out decisions are not calibrated by the single-run figure. Fielder gather delay and throwing speed also remain provisional. Source law: [MCC Laws, 2017 Code, 4th Edition (2026), Law 30](https://www.lords.org/getmedia/a4ef9f77-2a25-4f5b-a286-4601f08e6334/Laws-of-Cricket-2017-Code-4th-Edition-%282026%29_5.pdf).
+
 ## Aerodynamics and remaining evidence
 
 The [Cambridge review of cricket-ball swing](https://www.cambridge.org/core/journals/flow/article/review-and-reassessment-of-the-aerodynamics-of-cricket-ball-swing/389B2E66A420FF51FAB3EC2186AFE0AE) describes sensitivity to ball condition, seam, flight and air conditions. Its example of a 4 m/s crosswind changing lateral displacement by about 0.18 m is a model result for a particular delivery, not a universal swing limit. The game's swing slider is an authored approximation; no wind, seam state or spin-dependent aerodynamics have been validated.
