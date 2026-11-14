@@ -1064,6 +1064,7 @@ test('bot distribution simulation is reproducible, bounded and reports the right
   const deepField = runBotSimulation(80, undefined, 0x51a7, { fieldPreset: 'deep' });
   assert.deepEqual(first, second);
   assert.ok(first.some(tier => tier.groundStops > 0), 'seeded scenario should exercise ground fielding');
+  assert.ok(first.some(tier => tier.catches > 0), 'seeded scenario should exercise reachable catches');
   assert.ok(first.some(tier => tier.runOuts > 0), 'seeded scenario should exercise run outs');
   assert.ok(first.some(tier => tier.sixes > 0), 'seeded bot scoring should preserve on-the-full sixes after landing');
   assert.ok(first.some((tier, index) => tier.runs !== withoutFielding[index].runs || tier.wickets !== withoutFielding[index].wickets), 'fielding should change simulated outcomes');
@@ -1383,6 +1384,20 @@ test('simulated fielders follow the same changing ball path and reaction steps a
   assert.equal(simulated?.kind, liveEvent?.kind);
   assert.equal(simulated?.timeSeconds, liveEvent?.time);
   assert.deepEqual(simulated?.fielderPosition, liveEvent?.position);
+});
+
+test('reachable low airborne balls can be caught but ground and rope take precedence', () => {
+  const profile = { position: { x: 0, z: 0 }, reactionSeconds: 0, speedMetersPerSecond: 0, reachRadiusMeters: 0.5 };
+  const sample = { timeSeconds: 1, position: { x: 0.2, y: 0.1, z: 0 }, hasBounced: false, reachedBoundary: false };
+  for (const height of [BALL_RADIUS_METERS + 0.001, 0.5, 1.2, 1.21]) {
+    assert.equal(advanceFielder(profile.position, profile, 50, { ...sample, position: { ...sample.position, y: height } }, 0.01).kind, 'catch');
+  }
+  assert.equal(advanceFielder(profile.position, profile, 50, { ...sample, hasBounced: true }, 0.01).kind, 'ground_stop');
+  assert.equal(advanceFielder(profile.position, profile, 50, { ...sample, reachedBoundary: true }, 0.01).kind, null);
+  assert.equal(advanceFielder(profile.position, profile, 50, { ...sample, position: { ...sample.position, y: BALL_RADIUS_METERS } }, 0.01).kind, null);
+  const fielder = { name: 'point' as const, profile, catching: 50 };
+  assert.equal(findEarliestFieldingEvent([sample], [fielder])?.kind, 'catch');
+  assert.equal(findEarliestFieldingEvent([{ ...sample, hasBounced: true }], [fielder])?.kind, 'ground_stop');
 });
 
 test('bot fielding ratings scale with difficulty and remain bounded', () => {

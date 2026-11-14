@@ -1,5 +1,5 @@
 import type { FieldPreset } from './types';
-import { BATTER_CREASE_Z } from './formula';
+import { BALL_RADIUS_METERS, BATTER_CREASE_Z } from './formula';
 
 export interface FieldingTrajectorySample {
   timeSeconds: number;
@@ -152,7 +152,7 @@ export function advanceFielder(
   const position = moveFielderTowardBall(current, sample.position, profile.speedMetersPerSecond, stepSeconds);
   const gap = Math.hypot(sample.position.x - position.x, sample.position.z - position.z);
   if (gap > profile.reachRadiusMeters) return { position, kind: null };
-  if (!sample.hasBounced && sample.position.y > 1.2 && sample.position.y <= 1.65 + catching * 0.015) return { position, kind: 'catch' };
+  if (!sample.hasBounced && sample.position.y > BALL_RADIUS_METERS && sample.position.y <= 1.65 + catching * 0.015) return { position, kind: 'catch' };
   if (sample.hasBounced && sample.position.y <= 1.2) return { position, kind: 'ground_stop' };
   return { position, kind: null };
 }

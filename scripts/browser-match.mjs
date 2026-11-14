@@ -30,7 +30,8 @@ try {
   const fixtureWide = process.argv.includes('--fixture-wide');
   const runOutFixture = process.argv.includes('--require-runout');
   const fieldingFixture = process.argv.includes('--require-fielding') || runOutFixture;
-  const catchFixture = process.argv.includes('--require-catch');
+  const lowCatchFixture = process.argv.includes('--require-low-catch');
+  const catchFixture = process.argv.includes('--require-catch') || lowCatchFixture;
   const verifyReplay = process.argv.includes('--verify-replay');
   const fieldPresetFixture = process.argv.find(argument => argument.startsWith('--field-setting='))?.split('=')[1];
   if (runOutFixture && !process.argv.includes('--trace-shots')) throw new Error('--require-runout requires --trace-shots');
@@ -56,7 +57,7 @@ try {
       }, { timeout: 5000 }, portrait);
     });
   }
-  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, fieldPresetFixture }) => {
+  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, lowCatchFixture, fieldPresetFixture }) => {
     const { GameScene } = await import('/src/scene.ts');
     const { UIManager } = await import('/src/ui.ts');
     const { globalAutoAssistConfig } = await import('/src/game.ts');
@@ -188,7 +189,7 @@ try {
     const animateHitPath = GameScene.prototype.animateHitPath;
     GameScene.prototype.animateHitPath = function (distance, direction, velocity, ...rest) {
       if (catchFixture && playerBatting) {
-        velocity = { x: 10, y: 6, z: 0 };
+        velocity = lowCatchFixture ? { x: 6, y: 1, z: 0 } : { x: 10, y: 6, z: 0 };
       } else if (fieldingFixture && playerBatting && velocity) {
         velocity = { ...velocity, x: velocity.x * 0.35, z: velocity.z * 0.35 };
       }
@@ -199,7 +200,7 @@ try {
         window.__fieldingFixtureSet = true;
       }
       if (catchFixture && playerBatting && !window.__catchFixtureSet) {
-        this.fielderRoots.get('point')?.position.set(3.8, 0, -8.4);
+        this.fielderRoots.get('point')?.position.set(lowCatchFixture ? 1.5 : 3.8, 0, -8.4);
         window.__catchFixtureSet = true;
       }
       const trace = window.__playerShotTrace.at(-1);
@@ -260,7 +261,7 @@ try {
         arrived();
       }, ...rest);
     };
-  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, fieldPresetFixture });
+  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, lowCatchFixture, fieldPresetFixture });
   if (process.argv.includes('--force-tie')) {
     // Test-only fixture: make regular-innings deliveries legal dots so the
     // real UI must play both sudden-death innings. Production code is unchanged.
@@ -590,13 +591,16 @@ try {
     }
     console.log(`Ground shot was run out by ${runOut.runOutBy}; ${runOut.runs} run(s) counted before the wicket.`);
   }
-  if (process.argv.includes('--require-catch')) {
-    if (!process.argv.includes('--trace-shots')) throw new Error('--require-catch requires --trace-shots');
+  if (catchFixture) {
+    if (!process.argv.includes('--trace-shots')) throw new Error('catch fixtures require --trace-shots');
     const trace = await page.evaluate(() => window.__playerShotTrace);
     const caught = trace.find(shot => shot.caughtBy && shot.wicket && shot.runs === 0 && shot.wicketReason === `Caught by ${shot.caughtBy}`);
     const toasts = await page.evaluate(() => window.__fieldingToasts ?? []);
     if (!caught || !toasts.some(toast => toast.title === 'WICKET!' && toast.description === caught.wicketReason)) {
       throw new Error(`Reachable aerial catch did not resolve and display as a wicket: ${JSON.stringify(trace.map(shot => ({ caughtBy: shot.caughtBy, wicket: shot.wicket, wicketReason: shot.wicketReason, runs: shot.runs })))}`);
+    }
+    if (lowCatchFixture && !(caught.flightEndpoint?.y > 0.036 && caught.flightEndpoint.y <= 1.2 && caught.bounced === false)) {
+      throw new Error(`Catch did not occur below 1.2 m before bouncing: ${JSON.stringify(caught.flightEndpoint)}`);
     }
     console.log(`Aerial shot was caught by ${caught.caughtBy} and recorded as a wicket.`);
   }

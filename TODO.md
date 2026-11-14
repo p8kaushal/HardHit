@@ -1,9 +1,14 @@
 # Gameplay to-do
 
+### Completed bounded increment — reachable low catches
+
+- **Finding:** both live play and simulation reject airborne catches at or below 1.2 m, even when the fielder reaches the ball before it bounces. A diagnostic with seed `0x51a7` found many airborne trajectories but no catches, including when fielders were held stationary. This does not establish that the height gap alone explains the distribution.
+- [x] **Acceptance:** reachable airborne balls above the ground can be caught at low heights; fixtures preserve ground and rope precedence and protected-delivery behavior. `npm test` passed 151 tests and the production build passed with the existing Babylon warning. A controlled browser low catch below 1.2 m and an all-preset ground-ball run-out each completed both innings and replayed 12 events against the scorecards. The 80-over-per-tier seed `0x51a7` now produces 2/4/1 catches and 5/5/13 ground stops for Rookie/Medium/Hard, respectively; these are synthetic results, not calibration targets. MCC Law 33 requires a fair catch before the ball touches the ground; hand positions, diving, control and boundary exceptions are not modeled.
+
 ### Completed bounded increment — unify live and simulated fielder movement
 
 - **Finding:** live fielders chase successive ball positions after reacting; the bot simulator tests a straight-line reach envelope from the starting position. A changing trajectory can therefore produce different catches and stops for identical inputs.
-- [x] **Acceptance:** live and simulated fielders now use the same per-step reaction, chase and interception logic. Fixtures cover a direction change that the old envelope falsely allowed, reaction, catches, ground stops, protected deliveries and rope precedence. `npm test` passed 150 tests and the production build passed with the existing Babylon bundle warning. Separate browser matches verified an all-preset keeper run-out and a controlled point catch, each replaying 12 events against the scorecards. The corrected 80-over-per-tier seeded sample has no catches with default layouts; investigate independently before using bot distributions for tuning or fairness claims.
+- [x] **Acceptance:** live and simulated fielders now use the same per-step reaction, chase and interception logic. Fixtures cover a direction change that the old envelope falsely allowed, reaction, catches, ground stops, protected deliveries and rope precedence. `npm test` passed 150 tests and the production build passed with the existing Babylon bundle warning. Separate browser matches verified an all-preset keeper run-out and a controlled point catch, each replaying 12 events against the scorecards. The subsequent low-catch increment above addresses an omitted catch height; distributions remain uncalibrated.
 
 ### Completed bounded increment — repeated-run turning delay
 
