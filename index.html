@@ -389,6 +389,27 @@
       <!-- 2D Opponent Detail Badge -->
       <div id="opponent-badge" class="opponent-badge">Opponent: Bot | RHB</div>
 
+      <aside id="field-radar" class="field-radar" aria-labelledby="field-radar-title">
+        <div class="field-radar-header">
+          <span id="field-radar-title">FIELD RADAR</span>
+          <button id="field-radar-toggle" type="button" aria-expanded="true" aria-controls="field-radar-body" aria-label="Collapse field radar">−</button>
+        </div>
+        <div id="field-radar-body" class="field-radar-body">
+          <svg id="field-radar-map" class="field-radar-map" viewBox="0 0 200 200" role="img" aria-label="Top-down stadium map, bowler end at top" aria-describedby="field-radar-player-list">
+            <circle class="field-radar-outfield" cx="100" cy="100" r="88" />
+            <circle class="field-radar-inner-ring" cx="100" cy="100" r="19" />
+            <rect class="field-radar-pitch" x="96" y="84" width="8" height="32" rx="1" />
+            <path class="field-radar-crease" d="M94 85h12 M94 115h12" />
+            <g id="field-radar-markers" aria-hidden="true"></g>
+          </svg>
+          <div class="field-radar-legend" aria-label="Team colors and player marker shapes">
+            <span><i class="radar-team-swatch batting" aria-hidden="true"></i><span id="field-radar-batting-team">Batting</span></span>
+            <span><i class="radar-team-swatch fielding" aria-hidden="true"></i><span id="field-radar-fielding-team">Fielding</span></span>
+          </div>
+          <ul id="field-radar-player-list" class="field-radar-sr-list" aria-label="Players shown on the field radar"></ul>
+        </div>
+      </aside>
+
       <!-- Floating Result Toast (Non-blocking top banner) -->
       <div id="result-toast" class="result-toast hidden" role="status" aria-live="polite">
         <span class="toast-kicker">HARDHIT · BALL RESULT</span>

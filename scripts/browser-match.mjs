@@ -9,7 +9,9 @@ try {
   await server.listen();
   browser = await puppeteer.launch({ headless: true, ...(process.env.HARDHIT_BROWSER_PROFILE ? { userDataDir: process.env.HARDHIT_BROWSER_PROFILE } : {}), args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1024, height: 768, isMobile: true, hasTouch: true });
+  const compactFieldRadar = process.argv.includes('--compact-field-radar');
+  const verifyFieldRadar = process.argv.includes('--verify-field-radar') || compactFieldRadar;
+  await page.setViewport({ width: compactFieldRadar ? 667 : 1024, height: compactFieldRadar ? 300 : 768, isMobile: true, hasTouch: true });
   await page.evaluateOnNewDocument(() => {
     let seed = 12345;
     window.__HARDHIT_MATCH_SEED = 12345;
@@ -26,10 +28,12 @@ try {
   const botBatsFast = process.argv.includes('--bot-bats-fast');
   const botBatsSpin = process.argv.includes('--bot-bats-spin');
   const fixtureWide = process.argv.includes('--fixture-wide');
-  const fieldingFixture = process.argv.includes('--require-fielding');
+  const runOutFixture = process.argv.includes('--require-runout');
+  const fieldingFixture = process.argv.includes('--require-fielding') || runOutFixture;
   const catchFixture = process.argv.includes('--require-catch');
   const verifyReplay = process.argv.includes('--verify-replay');
   const fieldPresetFixture = process.argv.find(argument => argument.startsWith('--field-setting='))?.split('=')[1];
+  if (runOutFixture && !process.argv.includes('--trace-shots')) throw new Error('--require-runout requires --trace-shots');
   if (fieldPresetFixture && !['attacking', 'balanced', 'deep', 'all'].includes(fieldPresetFixture)) throw new Error(`Unknown field setting: ${fieldPresetFixture}`);
   if ([botBatsFast, botBatsSpin, fixtureWide].filter(Boolean).length > 1) throw new Error('Choose only one bot batting delivery override');
   const pauseFlight = process.argv.includes('--pause-flight') || pauseVisibility || pauseRotation;
@@ -68,7 +72,7 @@ try {
             const button = document.querySelector(`[data-field-preset="${preset}"]`);
             if (!button) throw new Error(`Missing ${preset} field setting button`);
             button.click();
-            (window.__fieldPresetCycle ??= []).push({ preset, selected: button.getAttribute('aria-pressed') === 'true', positions: this.gameScene.getFielderPositions() });
+            (window.__fieldPresetCycle ??= []).push({ preset, selected: button.getAttribute('aria-pressed') === 'true', positions: this.gameScene.getFielderPositions(), radarPoint: document.querySelector('[data-player-key="fielder-point"]')?.getAttribute('transform') });
           }
           window.__fieldPresetSelected = document.querySelector(`[data-field-preset="${presets.at(-1)}"]`)?.getAttribute('aria-pressed') === 'true';
         }
@@ -81,7 +85,7 @@ try {
     const getShotCatcher = GameScene.prototype.getShotCatcher;
     const showResultToast = UIManager.prototype.showResultToast;
     UIManager.prototype.showResultToast = function (title, description, ...args) {
-      if ((fieldingFixture && title === 'Fielded') || (catchFixture && title === 'WICKET!')) (window.__fieldingToasts ??= []).push({ title, description });
+      if ((fieldingFixture && (title === 'Fielded' || title === 'WICKET!')) || (catchFixture && title === 'WICKET!')) (window.__fieldingToasts ??= []).push({ title, description });
       return showResultToast.call(this, title, description, ...args);
     };
     const setFieldingRatings = GameScene.prototype.setFieldingRatings;
@@ -170,13 +174,13 @@ try {
       return result;
     };
     const finalize = MatchController.prototype.finalizeBallOutcome;
-    MatchController.prototype.finalizeBallOutcome = function (distance, bounced, reachedBoundary, caughtBy, fieldedRuns) {
+    MatchController.prototype.finalizeBallOutcome = function (distance, bounced, reachedBoundary, caughtBy, fieldedRuns, runOutBy) {
       const playerBatting = this.getCurrentInnings().batter.id === this.state.player.id;
-      const runs = finalize.call(this, distance, bounced, reachedBoundary, caughtBy, fieldedRuns);
+      const runs = finalize.call(this, distance, bounced, reachedBoundary, caughtBy, fieldedRuns, runOutBy);
       const lastBall = this.getCurrentInnings().balls.at(-1);
       const replayEntry = window.__matchReplay.at(-1);
       if (replayEntry && !replayEntry.resolved) Object.assign(replayEntry, { resolved: true, flightDistance: distance, bounced, reachedBoundary, runs });
-      if (traceShots && playerBatting) Object.assign(window.__playerShotTrace.at(-1), { flightDistance: distance, bounced, reachedBoundary, runs, wicket: lastBall.isWicket, wicketReason: lastBall.wicketReason, fieldedRuns });
+      if (traceShots && playerBatting) Object.assign(window.__playerShotTrace.at(-1), { flightDistance: distance, bounced, reachedBoundary, runs, wicket: lastBall.isWicket, wicketReason: lastBall.wicketReason, fieldedRuns, runOutBy });
       return runs;
     };
     const animateHitPath = GameScene.prototype.animateHitPath;
@@ -335,6 +339,37 @@ try {
     await new Promise(resolve => setTimeout(resolve, 60));
   }
   await page.waitForSelector('#match-summary-modal.active', { timeout: 1000 });
+  if (verifyFieldRadar) {
+    const radar = await page.evaluate(() => {
+      const markers = [...document.querySelectorAll('#field-radar-markers .field-radar-marker')];
+      const expanded = document.querySelector('#field-radar-toggle')?.getAttribute('aria-expanded');
+      const batting = markers.filter(marker => marker.getAttribute('data-team') === 'batting');
+      const fielding = markers.filter(marker => marker.getAttribute('data-team') === 'fielding');
+      const roles = Object.fromEntries(['fielder', 'bowler', 'striker', 'non-striker'].map(role => [role, markers.filter(marker => marker.getAttribute('data-player-role') === role).length]));
+      const colors = { batting: getComputedStyle(batting[0]).fill, fielding: getComputedStyle(fielding[0]).fill };
+      const button = document.querySelector('#field-radar-toggle');
+      button?.click();
+      const expandedAfterClick = button?.getAttribute('aria-expanded');
+      const bodyVisible = getComputedStyle(document.querySelector('#field-radar-body')).display !== 'none';
+      button?.click();
+      return { count: markers.length, batting: batting.length, fielding: fielding.length, roles, expanded, expandedAfterClick, bodyVisible, collapsedAgain: button?.getAttribute('aria-expanded'), colors,
+        labels: [...markers].every(marker => !!marker.getAttribute('aria-label') && !!marker.querySelector('title')?.textContent) && document.querySelectorAll('#field-radar-player-list li').length === 12,
+        points: markers.map(marker => ({ role: marker.getAttribute('data-player-role'), team: marker.getAttribute('data-team'), transform: marker.getAttribute('transform') })) };
+    });
+    const expectedExpanded = compactFieldRadar ? 'false' : 'true';
+    const expectedAfterClick = compactFieldRadar ? 'true' : 'false';
+    const expectedVisibleAfterClick = compactFieldRadar;
+    if (radar.count !== 12 || radar.batting !== 2 || radar.fielding !== 10 || radar.roles.fielder !== 9 || radar.roles.bowler !== 1 || radar.roles.striker !== 1 || radar.roles['non-striker'] !== 1 || radar.expanded !== expectedExpanded || radar.expandedAfterClick !== expectedAfterClick || radar.bodyVisible !== expectedVisibleAfterClick || radar.collapsedAgain !== expectedExpanded || !radar.labels || radar.points.some(point => !point.transform) || radar.colors.batting !== 'rgb(53, 215, 244)' || radar.colors.fielding !== 'rgb(255, 196, 92)') {
+      throw new Error(`Field radar did not show all players or accessible collapse behavior: ${JSON.stringify(radar)}`);
+    }
+    if (fieldPresetFixture === 'all') {
+      const pointTransforms = await page.evaluate(() => (window.__fieldPresetCycle ?? []).map(item => item.radarPoint));
+      if (pointTransforms.length !== 3 || new Set(pointTransforms).size !== 3 || pointTransforms.some(transform => !transform)) {
+        throw new Error(`Field radar did not track all selected field plans: ${JSON.stringify(pointTransforms)}`);
+      }
+    }
+    console.log(`Field radar showed 9 fielders, bowler and both batters with team colors; collapse/expand worked${compactFieldRadar ? ' at 667×300' : ''}.`);
+  }
   if (verifyReplay) {
     const replay = await page.evaluate(async () => {
       const stored = JSON.parse(localStorage.getItem('six_hitting_contest_match_history') || 'null');
@@ -534,6 +569,15 @@ try {
       throw new Error(`Interception did not move the fielder, identify it, and reduce the unobstructed run estimate: ${JSON.stringify({ fielded, noFielder, fielderGap, resultToast })}`);
     }
     console.log(`Ground ball was stopped by ${fielded.fieldedBy} for ${fielded.runs} estimated run(s); without fielding it would score ${noFielder.runs} at ${noFielder.distance.toFixed(1)}m.`);
+  }
+  if (runOutFixture) {
+    const trace = await page.evaluate(() => window.__playerShotTrace);
+    const runOut = trace.find(shot => shot.runOutBy && shot.wicket && shot.wicketReason === `Run out by ${shot.runOutBy}`);
+    const toasts = await page.evaluate(() => window.__fieldingToasts ?? []);
+    if (!runOut || !toasts.some(toast => toast.title === 'WICKET!' && toast.description === runOut.wicketReason)) {
+      throw new Error(`A fielded ground shot did not resolve and display a run out: ${JSON.stringify(trace.map(shot => ({ fieldedBy: shot.fieldedBy, runs: shot.runs, runOutBy: shot.runOutBy, wicket: shot.wicket, wicketReason: shot.wicketReason })))}`);
+    }
+    console.log(`Ground shot was run out by ${runOut.runOutBy}; ${runOut.runs} run(s) counted before the wicket.`);
   }
   if (process.argv.includes('--require-catch')) {
     if (!process.argv.includes('--trace-shots')) throw new Error('--require-catch requires --trace-shots');

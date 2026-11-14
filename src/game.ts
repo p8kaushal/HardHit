@@ -453,10 +453,13 @@ export class MatchController {
     return outcome;
   }
 
-  public finalizeBallOutcome(rawDistance: number, hasBounced: boolean, reachedBoundary?: boolean, caughtBy?: string | null, fieldedRuns?: number): number {
+  public finalizeBallOutcome(rawDistance: number, hasBounced: boolean, reachedBoundary?: boolean, caughtBy?: string | null, fieldedRuns?: number, runOutBy?: string | null): number {
     try {
       if (fieldedRuns !== undefined && (!Number.isInteger(fieldedRuns) || fieldedRuns < 0 || fieldedRuns > 3)) {
         throw new Error('Fielded run estimate must be an integer from zero to three');
+      }
+      if (runOutBy && (fieldedRuns === undefined || !hasBounced || reachedBoundary)) {
+        throw new Error('A run out requires a fielded ground ball before the boundary');
       }
       let distance = rawDistance;
       if (isNaN(distance) || !isFinite(distance) || distance < 0) {
@@ -478,6 +481,22 @@ export class MatchController {
         this.handleInningsCompletion();
         return 0;
       }
+
+      // Run out remains a permitted dismissal on no-balls and free hits.
+      if (runOutBy && !reachedBoundary) {
+        const runs = fieldedRuns ?? 0;
+        lastBall.distance = distance;
+        lastBall.runs = runs;
+        lastBall.isWicket = true;
+        lastBall.wicketReason = `Run out by ${runOutBy}`;
+        lastBall.runOutBy = runOutBy;
+        innings.score += runs;
+        innings.wicketsLost += 1;
+        const runOutEvent = [...this.state.events].reverse().find(item => item.inningsIndex === this.state.currentInningsIndex && item.ballNumber === lastBall.ballNumber);
+        if (runOutEvent) Object.assign(runOutEvent, { distance, runs, isWicket: true, wicketReason: lastBall.wicketReason, resolved: true, flight: { hasBounced, reachedBoundary: false }, fieldedRuns: runs, runOutBy });
+        this.handleInningsCompletion();
+        return runs;
+      }
       
       // Evaluate outcome using formula
       // A fielder cannot erase a rope crossing that happened first in the flight.
@@ -498,6 +517,7 @@ export class MatchController {
         event.resolved = true;
         event.flight = { hasBounced, ...(reachedBoundary === undefined ? {} : { reachedBoundary }) };
         if (fieldedRuns !== undefined) event.fieldedRuns = fieldedRuns;
+        if (runOutBy) event.runOutBy = runOutBy;
       }
       
       console.log(`[GAME EVENT] Dynamic resolution: ${distance.toFixed(1)}m, bounced: ${hasBounced} => ${runs} runs. Score: ${innings.score}`);

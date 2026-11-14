@@ -4,7 +4,7 @@ import { evaluateWicket, checkExtraBall, resolveMissedDelivery, deliveryContactP
 import type { DeliveryType, FieldPreset } from './types';
 import { SeededRandom } from './random';
 import { stepBall, type BallState } from './ball-physics';
-import { createDefaultFieldLayout, estimateRunsBeforeReturnThrow, FIELDING_MAX_RUNS, FIELDING_SECONDS_PER_RUN, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, findEarliestFieldingEvent, isCatchDismissalAllowed, type RatedFielder } from './fielding';
+import { createDefaultFieldLayout, decideAutomatedRuns, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, findEarliestFieldingEvent, isCatchDismissalAllowed, type RatedFielder } from './fielding';
 
 export interface BotSimulationResult {
   tier: 'Rookie' | 'Medium' | 'Hard';
@@ -20,6 +20,7 @@ export interface BotSimulationResult {
   sixes: number;
   groundStops: number;
   catches: number;
+  runOuts: number;
   incompleteOvers: number;
   legalRate: number;
   wicketRate: number;
@@ -45,7 +46,7 @@ export function runBotSimulation(
     const random = new SeededRandom((seed + tierIndex * 0x9e3779b9) >>> 0).next;
     const bowler = createBotPlayer(tier);
     const batter = createBotPlayer('Rookie');
-    let attempts = 0, legalBalls = 0, wides = 0, noBalls = 0, wickets = 0, runs = 0, dots = 0, fours = 0, sixes = 0, groundStops = 0, catches = 0, incompleteOvers = 0;
+    let attempts = 0, legalBalls = 0, wides = 0, noBalls = 0, wickets = 0, runs = 0, dots = 0, fours = 0, sixes = 0, groundStops = 0, catches = 0, runOuts = 0, incompleteOvers = 0;
     let freeHit = false;
     const deliveryCounts: Record<DeliveryType, number> = { fast: 0, medium: 0, slow: 0, offspin: 0, legspin: 0 };
 
@@ -113,17 +114,16 @@ export function runBotSimulation(
             }
           } else if (fieldingEvent?.kind === 'ground_stop') {
             groundStops++;
-            const throwDistance = Math.min(
-              Math.hypot(fieldingEvent.fielderPosition.x, fieldingEvent.fielderPosition.z - 10),
-              Math.hypot(fieldingEvent.fielderPosition.x, fieldingEvent.fielderPosition.z + 10),
-            );
-            shotRuns = estimateRunsBeforeReturnThrow(
+            const runDecision = decideAutomatedRuns(
               fieldingEvent.timeSeconds,
-              throwDistance,
+              fieldingEvent.fielderPosition,
               fielderThrowSpeedFromRating(fieldingStats.throwing),
-              FIELDING_SECONDS_PER_RUN,
-              FIELDING_MAX_RUNS,
             );
+            shotRuns = runDecision.runs;
+            if (runDecision.runOut) {
+              wickets++;
+              runOuts++;
+            }
           }
           if (shotRuns !== null) {
             runs += shotRuns;
@@ -140,7 +140,7 @@ export function runBotSimulation(
     }
     const typeTotal = Object.values(deliveryCounts).reduce((sum, count) => sum + count, 0);
     return {
-      tier, overs: overCount, attempts, legalBalls, wides, noBalls, wickets, runs, dots, fours, sixes, groundStops, catches, incompleteOvers,
+      tier, overs: overCount, attempts, legalBalls, wides, noBalls, wickets, runs, dots, fours, sixes, groundStops, catches, runOuts, incompleteOvers,
       legalRate: attempts ? legalBalls / attempts : 0,
       wicketRate: legalBalls ? wickets / legalBalls : 0,
       deliveryShares: Object.fromEntries(Object.entries(deliveryCounts).map(([type, count]) => [type, typeTotal ? count / typeTotal : 0])) as Record<DeliveryType, number>,

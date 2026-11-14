@@ -88,6 +88,7 @@ export interface BallOutcome {
   isFreeHit: boolean;
   isExtra: boolean;
   extraType: 'wide' | 'noball' | null;
+  runOutBy?: string;
   ballTrajectory?: Vector3D[]; // Precomputed 3D path for rendering
 }
 
@@ -164,6 +165,7 @@ export interface MatchEvent {
   flight?: { hasBounced: boolean; reachedBoundary?: boolean };
   caughtBy?: string;
   fieldedRuns?: number;
+  runOutBy?: string;
   fieldPreset?: FieldPreset;
 }
 

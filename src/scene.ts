@@ -4,7 +4,7 @@ import { CameraMode, DeliveryChoice, DeliveryType, FieldPreset } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
-import { createDefaultFieldLayout, estimateRunsBeforeReturnThrow, FIELDING_MAX_RUNS, FIELDING_SECONDS_PER_RUN, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, hasFielderReacted, moveFielderTowardBall, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
+import { createDefaultFieldLayout, decideAutomatedRuns, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, hasFielderReacted, moveFielderTowardBall, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
@@ -479,6 +479,18 @@ export class GameScene {
     }));
   }
 
+  public getBatterPosition(): { x: number; z: number } {
+    return this.batterRoot
+      ? { x: this.batterRoot.position.x, z: this.batterRoot.position.z }
+      : { x: this.playerCreaseOffset.x, z: -8.8 + this.playerCreaseOffset.z };
+  }
+
+  public getBowlerPosition(): { x: number; z: number } {
+    return this.bowlerRoot
+      ? { x: this.bowlerRoot.position.x, z: this.bowlerRoot.position.z }
+      : { x: 0, z: 11.5 };
+  }
+
   public setFieldPreset(preset: FieldPreset): void {
     const layout = createDefaultFieldLayout(this.batterHand, preset);
     this.fieldPreset = preset;
@@ -506,13 +518,12 @@ export class GameScene {
     return this.shotCaughtBy;
   }
 
-  public getShotRunEstimate(): number | null {
+  public getShotRunDecision(): (AutomatedRunDecision & { fielderName: FieldingPosition['name'] }) | null {
     if (!this.shotFieldedBy) return null;
     const root = this.fielderRoots.get(this.shotFieldedBy);
     if (!root) return null;
-    const stumpsDistance = Math.min(Math.hypot(root.position.x, root.position.z - 10), Math.hypot(root.position.x, root.position.z + 10));
     const throwSpeed = fielderThrowSpeedFromRating(this.fieldingRatings.throwing);
-    return estimateRunsBeforeReturnThrow(this.shotElapsedSeconds, stumpsDistance, throwSpeed, FIELDING_SECONDS_PER_RUN, FIELDING_MAX_RUNS);
+    return { ...decideAutomatedRuns(this.shotElapsedSeconds, { x: root.position.x, z: root.position.z }, throwSpeed), fielderName: this.shotFieldedBy };
   }
 
   private buildFielders(): void {

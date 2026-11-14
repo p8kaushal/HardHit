@@ -5,7 +5,7 @@ import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchContro
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
-import { createDefaultFieldLayout, estimateRunsBeforeReturnThrow, fielderReachProfileFromRatings, findEarliestFieldingEvent, findEarliestInterception, fielderThrowSpeedFromRating, hasFielderReacted, isCatchDismissalAllowed, moveFielderTowardBall } from '../src/fielding';
+import { createDefaultFieldLayout, decideAutomatedRuns, fielderReachProfileFromRatings, findEarliestFieldingEvent, findEarliestInterception, fielderThrowSpeedFromRating, hasFielderReacted, isCatchDismissalAllowed, moveFielderTowardBall } from '../src/fielding';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
@@ -20,6 +20,7 @@ import { UIManager, opponentBadgeText } from '../src/ui';
 import { GameScene } from '../src/scene';
 import { battingTimingFeedback } from '../src/batting-timing';
 import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryBounceProgress, deliveryContactPoint, deliveryHitsPad, deliveryProgressAtZ, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
+import { fieldRadarPoint } from '../src/field-radar';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
 import type { BallOutcome, DeliveryChoice, Player, ShotType } from '../src/types';
@@ -72,6 +73,20 @@ test('rendered stumps match the wicket dimensions used for decisions', () => {
     scene.dispose();
     engine.dispose();
   }
+});
+
+test('field radar maps stadium coordinates bowler-end-up and keeps the rope inside its frame', () => {
+  assert.deepEqual(fieldRadarPoint(0, 0), { x: 100, y: 100 });
+  const positiveX = fieldRadarPoint(10, 0);
+  const positiveZ = fieldRadarPoint(0, 10);
+  assert.ok(positiveX.x > 100 && positiveX.y === 100);
+  assert.ok(positiveZ.y < 100 && positiveZ.x === 100);
+  for (const [x, z] of [[65, 0], [-65, 0], [0, 65], [0, -65]] as const) {
+    const point = fieldRadarPoint(x, z);
+    assert.ok(point.x >= 12 && point.x <= 188);
+    assert.ok(point.y >= 12 && point.y <= 188);
+  }
+  assert.throws(() => fieldRadarPoint(Number.NaN, 0), /must be finite/);
 });
 
 test('opponent badge reflects handedness without revealing the next delivery', () => {
@@ -1024,6 +1039,7 @@ test('bot distribution simulation is reproducible, bounded and reports the right
   assert.deepEqual(first, second);
   assert.ok(first.some(tier => tier.groundStops > 0), 'seeded scenario should exercise ground fielding');
   assert.ok(first.some(tier => tier.catches > 0), 'seeded scenario should exercise catches');
+  assert.ok(first.some(tier => tier.runOuts > 0), 'seeded scenario should exercise run outs');
   assert.ok(first.some((tier, index) => tier.runs !== withoutFielding[index].runs || tier.wickets !== withoutFielding[index].wickets), 'fielding should change simulated outcomes');
   assert.ok(first.some((tier, index) => tier.runs !== deepField[index].runs || tier.wickets !== deepField[index].wickets), 'the selected field preset should change simulated outcomes');
   for (const tier of first) {
@@ -1035,12 +1051,14 @@ test('bot distribution simulation is reproducible, bounded and reports the right
     assert.ok(tier.dots >= 0 && tier.fours >= 0 && tier.sixes >= 0);
     assert.ok(tier.groundStops >= 0 && tier.groundStops <= tier.legalBalls);
     assert.ok(tier.catches >= 0 && tier.catches <= tier.legalBalls);
+    assert.ok(tier.runOuts >= 0 && tier.runOuts <= tier.groundStops);
     assert.ok(tier.dots + tier.fours + tier.sixes <= tier.legalBalls);
     assert.ok(tier.legalRate >= 0 && tier.legalRate <= 1);
     assert.ok(tier.wicketRate >= 0 && tier.wicketRate <= 1);
     assert.ok(Math.abs(Object.values(tier.deliveryShares).reduce((sum, share) => sum + share, 0) - 1) < 1e-9);
     assert.ok(tier.incompleteOvers < tier.overs);
   }
+  assert.ok(first.some(tier => tier.runOuts > 0), 'seeded scenario should exercise run outs');
 });
 
 test('fielding reachability respects reaction time, speed and earliest trajectory sample', () => {
@@ -1113,15 +1131,12 @@ test('fielder movement begins only after its rated reaction delay', () => {
   assert.throws(() => hasFielderReacted(profile, -0.1), /Invalid fielder reaction/);
 });
 
-test('run decision counts completed runs before the return throw, mirrors both hands, and preserves rope precedence', () => {
-  assert.equal(estimateRunsBeforeReturnThrow(1, 10, 20, 3), 0);
-  assert.equal(estimateRunsBeforeReturnThrow(2.5, 10, 20, 3), 1);
-  assert.equal(estimateRunsBeforeReturnThrow(20, 10, 20, 3), 3);
+test('automated run decisions mirror both field layouts, preserve rope precedence, and bound throwing skill', () => {
   const rightPoint = createDefaultFieldLayout('RHB').find(fielder => fielder.name === 'point')!;
   const leftPoint = createDefaultFieldLayout('LHB').find(fielder => fielder.name === 'point')!;
   const stumpDistance = (position: { x: number; z: number }) => Math.min(Math.hypot(position.x, position.z - 10), Math.hypot(position.x, position.z + 10));
   assert.equal(stumpDistance(rightPoint.position), stumpDistance(leftPoint.position));
-  assert.equal(estimateRunsBeforeReturnThrow(4, stumpDistance(rightPoint.position), 18, 2.8), estimateRunsBeforeReturnThrow(4, stumpDistance(leftPoint.position), 18, 2.8));
+  assert.deepEqual(decideAutomatedRuns(2.2, rightPoint.position, 18), decideAutomatedRuns(2.2, leftPoint.position, 18));
   const game = match();
   game.recordBall(delivery(0.5), { direction: 0, type: 'grounded', timing: 0.5, contactZone: 0.5 });
   assert.equal(game.finalizeBallOutcome(58, false, true, null, 0), 6, 'a rope crossing remains a six even if a fielder estimate was supplied');
@@ -1129,10 +1144,34 @@ test('run decision counts completed runs before the return throw, mirrors both h
   invalidEstimate.recordBall(delivery(0.5), { direction: 0, type: 'grounded', timing: 0.5, contactZone: 0.5 });
   assert.equal(invalidEstimate.finalizeBallOutcome(8, true, false, null, -1), 0);
   assert.equal(invalidEstimate.getCurrentInnings().score, 0);
-  assert.throws(() => estimateRunsBeforeReturnThrow(1, 10, 0, 3), /Invalid run decision/);
   assert.equal(fielderThrowSpeedFromRating(0), 12);
   assert.equal(fielderThrowSpeedFromRating(100), 24);
   assert.throws(() => fielderThrowSpeedFromRating(101), /Throwing rating/);
+});
+
+test('automated runners complete crossings or are run out at the threatened wicket', () => {
+  const quickThrowAtStriker = { x: 0, z: -10 };
+  const safeDot = decideAutomatedRuns(0.5, quickThrowAtStriker, 20);
+  assert.equal(safeDot.runs, 0);
+  assert.equal(safeDot.runOut, false);
+  assert.equal(safeDot.threatenedEnd, 'striker');
+
+  const oneSafeRun = decideAutomatedRuns(2.2, quickThrowAtStriker, 20);
+  assert.equal(oneSafeRun.runs, 1);
+  assert.equal(oneSafeRun.runOut, false);
+
+  const runOutAfterOne = decideAutomatedRuns(4, quickThrowAtStriker, 20);
+  assert.equal(runOutAfterOne.runs, 1, 'a run completed before the wicket is broken still counts');
+  assert.equal(runOutAfterOne.runOut, true);
+  assert.equal(runOutAfterOne.threatenedEnd, 'striker');
+
+  const rightPoint = createDefaultFieldLayout('RHB').find(fielder => fielder.name === 'point')!;
+  const leftPoint = createDefaultFieldLayout('LHB').find(fielder => fielder.name === 'point')!;
+  const right = decideAutomatedRuns(2.2, rightPoint.position, 18);
+  const left = decideAutomatedRuns(2.2, leftPoint.position, 18);
+  assert.deepEqual({ runs: left.runs, runOut: left.runOut, threatenedEnd: left.threatenedEnd },
+    { runs: right.runs, runOut: right.runOut, threatenedEnd: right.threatenedEnd });
+  assert.throws(() => decideAutomatedRuns(-1, quickThrowAtStriker, 20), /Invalid automated run decision/);
 });
 
 test('fielding trajectory picks the first reachable catch or ground stop before rope crossing', () => {
@@ -1220,11 +1259,13 @@ test('saved regular match events replay through controller adjudication', () => 
     const result = game.recordBall(delivery(0.5), { direction: 2, type: ball === 0 ? 'lofted' : 'grounded', timing: 0.5, contactZone: 0.5 }, ball === 0 ? 'deep' : undefined);
     assert.equal(result.isWicket, false);
     if (ball === 0) game.finalizeBallOutcome(8, false, false, 'point');
-    else game.finalizeBallOutcome(20 + ball, true, false, null, ball === 1 ? 0 : undefined);
+    else if (ball === 1) game.finalizeBallOutcome(21, true, false, null, 0, 'point');
+    else game.finalizeBallOutcome(20 + ball, true, false);
   }
   assert.equal(game.state.events[0].caughtBy, 'point');
   assert.equal(game.state.events[0].fieldPreset, 'deep');
   assert.equal(game.state.events[1].fieldedRuns, 0);
+  assert.equal(game.state.events[1].runOutBy, 'point');
   game.state.currentInningsIndex = 1;
   for (let ball = 0; ball < 6; ball++) {
     game.recordBall({ ...delivery(0.5, -0.25), type: 'legspin', turn: 1 }, null);
@@ -1245,6 +1286,7 @@ test('saved regular match events replay through controller adjudication', () => 
   const replay = replayMatchRecord(record);
   assert.equal(replay.state.status, 'completed');
   assert.equal(replay.state.winnerId, game.state.winnerId);
+  assert.equal(replay.state.events[1].runOutBy, 'point');
   assert.deepEqual(replay.state.innings.map(innings => ({ score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled })),
     game.state.innings.map(innings => ({ score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled })));
 });
@@ -2199,6 +2241,27 @@ test('aerial catch on a free hit does not dismiss the batter', () => {
   assert.equal(innings.balls[1].isWicket, false);
 });
 
+test('run outs remain possible on no-balls and free hits while preserving run penalties', () => {
+  const noBallGame = match();
+  const noBallInnings = noBallGame.getCurrentInnings();
+  noBallGame.recordBall({ ...delivery(0.5), frontFootHeel: 0.01 }, { direction: 2, type: 'grounded', timing: 0.5, contactZone: 0.5 });
+  assert.equal(noBallGame.finalizeBallOutcome(8, true, false, null, 0, 'point'), 0);
+  assert.equal(noBallInnings.score, 1, 'the no-ball penalty remains on the score');
+  assert.equal(noBallInnings.wicketsLost, 1);
+  assert.equal(noBallInnings.balls[0].isWicket, true);
+  assert.equal(noBallInnings.balls[0].wicketReason, 'Run out by point');
+
+  const freeHitGame = match();
+  const freeHitInnings = freeHitGame.getCurrentInnings();
+  freeHitGame.recordBall({ ...delivery(0.5), frontFootHeel: 0.01 }, { direction: 2, type: 'grounded', timing: 0.5, contactZone: 0.5 });
+  freeHitGame.finalizeBallOutcome(8, true, false, null, 0);
+  const freeHit = freeHitGame.recordBall(delivery(0.5), { direction: 2, type: 'grounded', timing: 0.5, contactZone: 0.5 });
+  assert.equal(freeHit.isFreeHit, true);
+  freeHitGame.finalizeBallOutcome(8, true, false, null, 0, 'point');
+  assert.equal(freeHitInnings.wicketsLost, 1);
+  assert.equal(freeHitInnings.balls[1].isWicket, true);
+});
+
 test('the result banner uses the same finalized distance as the score', () => {
   const game = match();
   game.setTossResult(game.state.player.id, 'bowl');
@@ -2236,7 +2299,7 @@ test('the result banner uses the same finalized distance as the score', () => {
       getShotDistance: () => 150,
       getShotFielder: () => null,
       getShotCatcher: () => null,
-      getShotRunEstimate: () => null,
+      getShotRunDecision: () => null,
       shotBoundaryOnFull: true,
       shotReachedBoundary: true
     };

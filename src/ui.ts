@@ -12,6 +12,7 @@ import { addLeaderboardEntry, readLeaderboard } from './leaderboard';
 import { saveMatchRecord } from './match-history';
 import { clearGameTimeout, gameNow, isGamePaused, setGameTimeout } from './game-clock';
 import { gameSound } from './sound';
+import { renderFieldRadarMarkers, type FieldRadarPlayer } from './field-radar';
 
 export function opponentBadgeText(opponent: Player, isPlayerBatting: boolean): string {
   const role = isPlayerBatting ? `${opponent.bowlingArm || 'Right'}-arm bowler` : (opponent.batterHand || 'RHB');
@@ -66,6 +67,60 @@ export class UIManager {
     this.botDeliveryTimer = null;
   }
 
+  private initFieldRadar(): void {
+    const radar = document.getElementById('field-radar');
+    const toggle = document.getElementById('field-radar-toggle') as HTMLButtonElement | null;
+    if (!radar || !toggle) return;
+    if (window.matchMedia('(orientation: landscape) and (max-height: 360px)').matches) {
+      radar.classList.add('is-collapsed');
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-label', 'Expand field radar');
+      toggle.textContent = '+';
+    }
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      radar.classList.toggle('is-collapsed', expanded);
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      toggle.setAttribute('aria-label', `${expanded ? 'Expand' : 'Collapse'} field radar`);
+      toggle.textContent = expanded ? '+' : '−';
+      this.updateFieldRadar();
+    });
+    window.setInterval(() => this.updateFieldRadar(), 50);
+    this.updateFieldRadar();
+  }
+
+  private updateFieldRadar(): void {
+    if (!document.getElementById('screen-gameplay')?.classList.contains('active')) return;
+    const markers = document.querySelector<SVGGElement>('#field-radar-markers');
+    if (!markers) return;
+    const innings = this.controller.getCurrentInnings();
+    const players: FieldRadarPlayer[] = this.gameScene.getFielderPositions().map(fielder => ({
+      key: `fielder-${fielder.name}`,
+      label: `${fielder.name.replace(/[A-Z]/g, letter => ` ${letter.toLowerCase()}`)} · fielding team`,
+      role: 'fielder', team: 'fielding', x: fielder.position.x, z: fielder.position.z,
+    }));
+    const bowler = this.gameScene.getBowlerPosition();
+    const striker = this.gameScene.getBatterPosition();
+    players.push(
+      { key: 'bowler', label: `${innings.bowler.name} · bowler`, role: 'bowler', team: 'fielding', ...bowler },
+      { key: 'striker', label: `${innings.batter.name} · striker`, role: 'striker', team: 'batting', ...striker },
+      { key: 'non-striker', label: 'Non-striker · batting team', role: 'non-striker', team: 'batting', x: 0, z: 8.8 },
+    );
+    renderFieldRadarMarkers(markers, players);
+    const accessibleList = document.getElementById('field-radar-player-list');
+    if (accessibleList) {
+      accessibleList.replaceChildren(...players.map(player => {
+        const item = document.createElement('li');
+        item.textContent = `${player.label}; ${player.team} team`;
+        return item;
+      }));
+    }
+    const battingLabel = document.getElementById('field-radar-batting-team');
+    const fieldingLabel = document.getElementById('field-radar-fielding-team');
+    if (battingLabel) battingLabel.textContent = innings.batter.name;
+    if (fieldingLabel) fieldingLabel.textContent = innings.bowler.name;
+  }
+
   public setController(controller: MatchController) {
     this.cancelPendingDelivery();
     this.batterPosition = { x: 0, z: 0 };
@@ -73,6 +128,7 @@ export class UIManager {
     this.controller = controller;
     this.gameScene.setFieldPreset('balanced');
     this.updateFieldPresetButtons('balanced');
+    this.updateFieldRadar();
   }
 
   constructor(controller: MatchController) {
@@ -96,6 +152,7 @@ export class UIManager {
       (direction, type) => this.executeBattingSwingGesture(direction, type)
     );
     this.updateHUD();
+    this.initFieldRadar();
 
     this.gameScene.botBattingTriggerCallback = () => {
       const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
@@ -181,6 +238,7 @@ export class UIManager {
         const preset = button.dataset.fieldPreset as FieldPreset;
         this.gameScene.setFieldPreset(preset);
         this.updateFieldPresetButtons(preset);
+        this.updateFieldRadar();
       });
     });
     const bowlTypeButtons = document.querySelectorAll('#bowl-type-group .btn');
@@ -766,8 +824,10 @@ export class UIManager {
         const rawDistance = this.gameScene.getShotDistance();
         const hasBounced = this.gameScene.shotBoundaryOnFull ? false : (globalAutoAssistConfig.hasBounced || false);
         const caughtBy = this.gameScene.getShotCatcher();
-        const fieldedRuns = this.gameScene.getShotRunEstimate();
-        const runs = this.controller.finalizeBallOutcome(rawDistance, hasBounced, this.gameScene.shotReachedBoundary, caughtBy, fieldedRuns ?? undefined);
+        const runDecision = this.gameScene.getShotRunDecision();
+        const fieldedRuns = runDecision?.runs ?? null;
+        const runOutBy = runDecision?.runOut ? runDecision.fielderName : null;
+        const runs = this.controller.finalizeBallOutcome(rawDistance, hasBounced, this.gameScene.shotReachedBoundary, caughtBy, fieldedRuns ?? undefined, runOutBy);
         const shotDistanceMeters = lastBall.distance;
         const fieldedBy = this.gameScene.getShotFielder();
 
@@ -1116,6 +1176,7 @@ export class UIManager {
       // Bot opponents use the neutral field policy until measured strategy is defined.
       this.gameScene.setFieldPreset('balanced');
       this.updateFieldPresetButtons('balanced');
+      this.updateFieldRadar();
       // Auto trigger bot delivery
       this.activeDelivery = botChooseDelivery(state.bot, this.controller.botDifficulty, innings.batter.batterHand || 'RHB', this.controller.random);
       this.gameScene.setBowlerSide(this.activeDelivery.overTheWicket ?? true, this.activeDelivery.bowlingArm || 'Right');

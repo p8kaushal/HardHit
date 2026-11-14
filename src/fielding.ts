@@ -19,8 +19,10 @@ export interface FieldingPosition {
   position: { x: number; z: number };
 }
 
-export const FIELDING_SECONDS_PER_RUN = 2.8;
 export const FIELDING_MAX_RUNS = 3;
+export const FIELDING_RUNNER_SPEED_METERS_PER_SECOND = 7;
+export const FIELDING_RUNNER_PICKUP_DELAY_SECONDS = 0.7;
+export const WICKET_TO_WICKET_METERS = 20.12;
 
 /** A caught ball dismisses only when the delivery's modeled protections allow it. */
 export function isCatchDismissalAllowed(isNoBall: boolean, isFreeHit: boolean): boolean {
@@ -139,21 +141,59 @@ export function fielderThrowSpeedFromRating(throwing: number): number {
   return 12 + throwing * 0.12;
 }
 
-/** Estimate completed end-to-end runs before a fielder's return throw arrives. */
-export function estimateRunsBeforeReturnThrow(
+export interface AutomatedRunDecision {
+  runs: number;
+  runOut: boolean;
+  threatenedEnd: 'striker' | 'nonStriker';
+  strikerPositionZ: number;
+  nonStrikerPositionZ: number;
+  throwArrivalSeconds: number;
+  runnerArrivalSeconds: number;
+}
+
+function runnerDistanceFromStartingCrease(distanceMeters: number): number {
+  const lap = WICKET_TO_WICKET_METERS * 2;
+  const progress = distanceMeters % lap;
+  return progress <= WICKET_TO_WICKET_METERS ? progress : lap - progress;
+}
+
+/** Resolve two automated runners against a fielder's return throw after a ground stop.
+ * The runners travel during flight and while the fielder gathers and throws. If either
+ * runner nearest the targeted wicket cannot regain its crease before the throw arrives,
+ * the batting side is run out. Speeds and gather delay are provisional game parameters.
+ */
+export function decideAutomatedRuns(
   flightSeconds: number,
-  returnThrowDistanceMeters: number,
+  fielderPosition: { x: number; z: number },
   throwSpeedMetersPerSecond: number,
-  secondsPerRun: number,
-  maximumRuns = 3,
-): number {
-  if (![flightSeconds, returnThrowDistanceMeters, throwSpeedMetersPerSecond, secondsPerRun, maximumRuns].every(Number.isFinite) ||
-      flightSeconds < 0 || returnThrowDistanceMeters < 0 || throwSpeedMetersPerSecond <= 0 || secondsPerRun <= 0 ||
+  runnerSpeedMetersPerSecond = FIELDING_RUNNER_SPEED_METERS_PER_SECOND,
+  pickupDelaySeconds = FIELDING_RUNNER_PICKUP_DELAY_SECONDS,
+  maximumRuns = FIELDING_MAX_RUNS,
+): AutomatedRunDecision {
+  if (![flightSeconds, fielderPosition.x, fielderPosition.z, throwSpeedMetersPerSecond, runnerSpeedMetersPerSecond, pickupDelaySeconds, maximumRuns].every(Number.isFinite) ||
+      flightSeconds < 0 || throwSpeedMetersPerSecond <= 0 || runnerSpeedMetersPerSecond <= 0 || pickupDelaySeconds < 0 ||
       !Number.isInteger(maximumRuns) || maximumRuns < 0) {
-    throw new Error('Invalid run decision input');
+    throw new Error('Invalid automated run decision input');
   }
-  const throwSeconds = returnThrowDistanceMeters / throwSpeedMetersPerSecond;
-  return Math.min(maximumRuns, Math.floor((flightSeconds + throwSeconds) / secondsPerRun));
+
+  const strikerStump = { x: 0, z: -10 };
+  const nonStrikerStump = { x: 0, z: 10 };
+  const distanceToStriker = Math.hypot(fielderPosition.x - strikerStump.x, fielderPosition.z - strikerStump.z);
+  const distanceToNonStriker = Math.hypot(fielderPosition.x - nonStrikerStump.x, fielderPosition.z - nonStrikerStump.z);
+  const threatenedEnd = distanceToStriker <= distanceToNonStriker ? 'striker' : 'nonStriker';
+  const throwDistance = Math.min(distanceToStriker, distanceToNonStriker);
+  const throwArrivalSeconds = pickupDelaySeconds + throwDistance / throwSpeedMetersPerSecond;
+
+  const progress = runnerDistanceFromStartingCrease(runnerSpeedMetersPerSecond * flightSeconds);
+  const strikerPositionZ = -10 + progress;
+  const nonStrikerPositionZ = 10 - progress;
+  const targetZ = threatenedEnd === 'striker' ? -10 : 10;
+  const nearestRunnerDistance = Math.min(Math.abs(strikerPositionZ - targetZ), Math.abs(nonStrikerPositionZ - targetZ));
+  const runnerArrivalSeconds = nearestRunnerDistance / runnerSpeedMetersPerSecond;
+  const runOut = flightSeconds > 0 && runnerArrivalSeconds > throwArrivalSeconds + 1e-10;
+  const runs = Math.min(maximumRuns, Math.floor((flightSeconds + throwArrivalSeconds) * runnerSpeedMetersPerSecond / WICKET_TO_WICKET_METERS));
+
+  return { runs, runOut, threatenedEnd, strikerPositionZ, nonStrikerPositionZ, throwArrivalSeconds, runnerArrivalSeconds };
 }
 
 /** Return the earliest sampled ball position a fielder can reach after reacting. */
