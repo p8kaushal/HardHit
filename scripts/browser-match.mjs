@@ -67,8 +67,8 @@ try {
       return showResultToast.call(this, title, description, ...args);
     };
     const setFieldingRatings = GameScene.prototype.setFieldingRatings;
-    GameScene.prototype.setFieldingRatings = function (agility, reaction, catching) {
-      return setFieldingRatings.call(this, (fieldingFixture || catchFixture) ? 100 : agility, (fieldingFixture || catchFixture) ? 100 : reaction, catchFixture ? 100 : catching);
+    GameScene.prototype.setFieldingRatings = function (agility, reaction, catching, throwing) {
+      return setFieldingRatings.call(this, (fieldingFixture || catchFixture) ? 100 : agility, (fieldingFixture || catchFixture) ? 100 : reaction, catchFixture ? 100 : catching, throwing);
     };
     const deliverBall3D = UIManager.prototype.deliverBall3D;
     UIManager.prototype.deliverBall3D = function (...args) {
@@ -145,13 +145,13 @@ try {
       return result;
     };
     const finalize = MatchController.prototype.finalizeBallOutcome;
-    MatchController.prototype.finalizeBallOutcome = function (distance, bounced, reachedBoundary, caughtBy) {
+    MatchController.prototype.finalizeBallOutcome = function (distance, bounced, reachedBoundary, caughtBy, fieldedRuns) {
       const playerBatting = this.getCurrentInnings().batter.id === this.state.player.id;
-      const runs = finalize.call(this, distance, bounced, reachedBoundary, caughtBy);
+      const runs = finalize.call(this, distance, bounced, reachedBoundary, caughtBy, fieldedRuns);
       const lastBall = this.getCurrentInnings().balls.at(-1);
       const replayEntry = window.__matchReplay.at(-1);
       if (replayEntry && !replayEntry.resolved) Object.assign(replayEntry, { resolved: true, flightDistance: distance, bounced, reachedBoundary, runs });
-      if (traceShots && playerBatting) Object.assign(window.__playerShotTrace.at(-1), { flightDistance: distance, bounced, reachedBoundary, runs, wicket: lastBall.isWicket, wicketReason: lastBall.wicketReason });
+      if (traceShots && playerBatting) Object.assign(window.__playerShotTrace.at(-1), { flightDistance: distance, bounced, reachedBoundary, runs, wicket: lastBall.isWicket, wicketReason: lastBall.wicketReason, fieldedRuns });
       return runs;
     };
     const animateHitPath = GameScene.prototype.animateHitPath;

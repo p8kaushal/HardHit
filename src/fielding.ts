@@ -88,6 +88,23 @@ export function hasFielderReacted(profile: FielderReachProfile, elapsedSeconds: 
   return elapsedSeconds + 1e-10 >= profile.reactionSeconds;
 }
 
+/** Estimate completed end-to-end runs before a fielder's return throw arrives. */
+export function estimateRunsBeforeReturnThrow(
+  flightSeconds: number,
+  returnThrowDistanceMeters: number,
+  throwSpeedMetersPerSecond: number,
+  secondsPerRun: number,
+  maximumRuns = 3,
+): number {
+  if (![flightSeconds, returnThrowDistanceMeters, throwSpeedMetersPerSecond, secondsPerRun, maximumRuns].every(Number.isFinite) ||
+      flightSeconds < 0 || returnThrowDistanceMeters < 0 || throwSpeedMetersPerSecond <= 0 || secondsPerRun <= 0 ||
+      !Number.isInteger(maximumRuns) || maximumRuns < 0) {
+    throw new Error('Invalid run decision input');
+  }
+  const throwSeconds = returnThrowDistanceMeters / throwSpeedMetersPerSecond;
+  return Math.min(maximumRuns, Math.floor((flightSeconds + throwSeconds) / secondsPerRun));
+}
+
 /** Return the earliest sampled ball position a fielder can reach after reacting. */
 export function findEarliestInterception(
   trajectory: readonly FieldingTrajectorySample[],

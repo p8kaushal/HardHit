@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — fielder return-throw run estimates
+
+- **Scope:** replace stopped-distance scoring for fielded low balls with an automated estimate of completed runs before the return throw, using the elapsed flight, the fielder's final position and throwing rating. Retain the distance-estimate label for shots that are not fielded. The human controls only their own all-rounder; fielders and running decisions remain automated.
+- [x] **Acceptance:** deterministic tests cover zero, one and capped completed runs, invalid estimates, mirrored fielder-to-stump distances for both batting hands, and rope precedence even when a fielded-run estimate is supplied. `npm test` passed 136 tests; production build passed with the existing ~1.09 MB gzip Babylon chunk warning; `git diff --check` passed. `node scripts/browser-match.mjs --bat-first --swing --square --require-fielding --trace-shots --verify-replay` completed both innings, replayed all 13 persisted events against matching scorecards, and verified the point fielder reduced a controlled shot from one run to zero at 7.6 m. The estimate uses a provisional 2.8 seconds per run, throw speed `12 + 0.12 × throwing rating` m/s, and a three-run cap. It does not animate batter running or model unsafe run-outs; those remain open.
+
 ### Completed bounded increment — reachable aerial catches
 
 - **Scope:** model catching as a separate fielding skill; allow a fielder to catch only a reachable airborne ball before rope crossing, resolve a legal catch as a wicket, and preserve no-ball/free-hit protections.

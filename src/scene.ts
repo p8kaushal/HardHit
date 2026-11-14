@@ -4,7 +4,7 @@ import { CameraMode, DeliveryChoice, DeliveryType } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
-import { createDefaultFieldLayout, fielderReachProfileFromRatings, hasFielderReacted, moveFielderTowardBall, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
+import { createDefaultFieldLayout, estimateRunsBeforeReturnThrow, fielderReachProfileFromRatings, hasFielderReacted, moveFielderTowardBall, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
@@ -41,7 +41,7 @@ export class GameScene {
   private batPivot: BABYLON.TransformNode | null = null;
   private readonly fielderRoots = new Map<FieldingPosition['name'], BABYLON.TransformNode>();
   private readonly fielderProfiles = new Map<FieldingPosition['name'], FielderReachProfile>();
-  private fieldingRatings = { agility: 50, reaction: 50, catching: 50 };
+  private fieldingRatings = { agility: 50, reaction: 50, catching: 50, throwing: 50 };
   private shotFieldedBy: FieldingPosition['name'] | null = null;
   private shotCaughtBy: FieldingPosition['name'] | null = null;
 
@@ -478,11 +478,12 @@ export class GameScene {
     }));
   }
 
-  public setFieldingRatings(agility: number, reaction: number, catching = 50): void {
+  public setFieldingRatings(agility: number, reaction: number, catching = 50, throwing = 50): void {
     // Validate against the same bounded scale used to build movement profiles.
     fielderReachProfileFromRatings({ x: 0, z: 0 }, agility, reaction);
     if (!Number.isFinite(catching) || catching < 0 || catching > 100) throw new Error('Catching rating must be between 0 and 100');
-    this.fieldingRatings = { agility, reaction, catching };
+    if (!Number.isFinite(throwing) || throwing < 0 || throwing > 100) throw new Error('Throwing rating must be between 0 and 100');
+    this.fieldingRatings = { agility, reaction, catching, throwing };
   }
 
   public getShotFielder(): FieldingPosition['name'] | null {
@@ -491,6 +492,15 @@ export class GameScene {
 
   public getShotCatcher(): FieldingPosition['name'] | null {
     return this.shotCaughtBy;
+  }
+
+  public getShotRunEstimate(): number | null {
+    if (!this.shotFieldedBy) return null;
+    const root = this.fielderRoots.get(this.shotFieldedBy);
+    if (!root) return null;
+    const stumpsDistance = Math.min(Math.hypot(root.position.x, root.position.z - 10), Math.hypot(root.position.x, root.position.z + 10));
+    const throwSpeed = 12 + this.fieldingRatings.throwing * 0.12;
+    return estimateRunsBeforeReturnThrow(this.shotElapsedSeconds, stumpsDistance, throwSpeed, 2.8, 3);
   }
 
   private buildFielders(): void {

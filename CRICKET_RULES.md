@@ -11,7 +11,7 @@ As of 13 November 2026, the current MCC Laws reference is the 2017 Code, 4th Edi
 - Each player receives six **legal** deliveries in the regular innings. A dismissal increases wickets lost but does not end that player's over early.
 - The longest six is the primary result. If the longest sixes are tied, fewer wickets wins. When neither player has a six and wickets are level, runs decide. Otherwise, equal wickets and biggest six lead to six count, then total distance. A remaining tie starts a one-legal-ball sudden death for each player.
 - Sudden death currently compares survival first, then the distance of the legal delivery. It can finish as a draw. Extras still add runs and do not consume that legal delivery.
-- A boundary crossed before the shot first bounces is six; one crossed after a bounce is four. Runs inside the rope are estimated from distance. There are no fielders or manual running yet. Stands do not obstruct the simulated shot; obstacle collisions and projected landings are not yet modeled.
+- A boundary crossed before the shot first bounces is six; one crossed after a bounce is four. Unfielded runs inside the rope are estimated from distance. A reachable fielder can stop a low bounced ball, catch a reachable airborne ball (subject to no-ball/free-hit protections), and change the estimated score. After a ground stop, completed runs are estimated from flight time and return-throw travel time. There is no batter running animation, unsafe run-out decision, or manual field setting. Stands do not obstruct the simulated shot; obstacle collisions and projected landings are not yet modeled.
 
 ## No-balls and free hits
 

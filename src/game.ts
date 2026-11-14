@@ -68,7 +68,7 @@ export function resolveShot(delta_t: number, botTier: string, shotType: string, 
 const DEFAULT_STATS: PlayerStats = {
   batting: { power: 50, timing: 50, placement: 50, technique: 50, stamina: 50 },
   bowling: { pace: 50, swing: 50, spin: 50, accuracy: 50, stamina: 50, variation: 50 },
-  fielding: { agility: 50, reaction: 50, catching: 50 }
+  fielding: { agility: 50, reaction: 50, catching: 50, throwing: 50 }
 };
 
 let sessionPlayer: Player | null = null;
@@ -104,7 +104,7 @@ function normalizePlayer(value: unknown): Player {
     }
   }
   const fielding = stats.fielding && typeof stats.fielding === 'object' ? stats.fielding as Record<string, unknown> : {};
-  for (const key of ['agility', 'reaction', 'catching'] as const) {
+  for (const key of ['agility', 'reaction', 'catching', 'throwing'] as const) {
     const stat = fielding[key];
     if (typeof stat === 'number' && Number.isFinite(stat)) player.stats.fielding![key] = Math.max(0, Math.min(100, stat));
   }
@@ -172,7 +172,8 @@ export function createBotPlayer(difficulty: 'Rookie' | 'Medium' | 'Hard'): Playe
     fielding: {
       agility: Math.min(100, Math.round(50 * statsMultiplier)),
       reaction: Math.min(100, Math.round(50 * statsMultiplier)),
-      catching: Math.min(100, Math.round(50 * statsMultiplier))
+      catching: Math.min(100, Math.round(50 * statsMultiplier)),
+      throwing: Math.min(100, Math.round(50 * statsMultiplier))
     },
   };
 
@@ -450,8 +451,11 @@ export class MatchController {
     return outcome;
   }
 
-  public finalizeBallOutcome(rawDistance: number, hasBounced: boolean, reachedBoundary?: boolean, caughtBy?: string | null): number {
+  public finalizeBallOutcome(rawDistance: number, hasBounced: boolean, reachedBoundary?: boolean, caughtBy?: string | null, fieldedRuns?: number): number {
     try {
+      if (fieldedRuns !== undefined && (!Number.isInteger(fieldedRuns) || fieldedRuns < 0 || fieldedRuns > 3)) {
+        throw new Error('Fielded run estimate must be an integer from zero to three');
+      }
       let distance = rawDistance;
       if (isNaN(distance) || !isFinite(distance) || distance < 0) {
         distance = 0.0;
@@ -468,13 +472,15 @@ export class MatchController {
         lastBall.wicketReason = `Caught by ${caughtBy}`;
         innings.wicketsLost += 1;
         const catchEvent = [...this.state.events].reverse().find(item => item.inningsIndex === this.state.currentInningsIndex && item.ballNumber === lastBall.ballNumber);
-        if (catchEvent) Object.assign(catchEvent, { distance, runs: 0, isWicket: true, wicketReason: lastBall.wicketReason, resolved: true, flight: { hasBounced: false, reachedBoundary: false } });
+        if (catchEvent) Object.assign(catchEvent, { distance, runs: 0, isWicket: true, wicketReason: lastBall.wicketReason, resolved: true, flight: { hasBounced: false, reachedBoundary: false }, caughtBy });
         this.handleInningsCompletion();
         return 0;
       }
       
       // Evaluate outcome using formula
-      const runs = evaluateFinalOutcome(distance, hasBounced, reachedBoundary);
+      // A fielder cannot erase a rope crossing that happened first in the flight.
+      const runs = reachedBoundary ? evaluateFinalOutcome(distance, hasBounced, reachedBoundary) :
+        fieldedRuns === undefined ? evaluateFinalOutcome(distance, hasBounced, reachedBoundary) : fieldedRuns;
       
       innings.score += runs;
       if (runs === 6) {
@@ -489,6 +495,7 @@ export class MatchController {
         event.runs = runs;
         event.resolved = true;
         event.flight = { hasBounced, ...(reachedBoundary === undefined ? {} : { reachedBoundary }) };
+        if (fieldedRuns !== undefined) event.fieldedRuns = fieldedRuns;
       }
       
       console.log(`[GAME EVENT] Dynamic resolution: ${distance.toFixed(1)}m, bounced: ${hasBounced} => ${runs} runs. Score: ${innings.score}`);

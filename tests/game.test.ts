@@ -5,7 +5,7 @@ import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchContro
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
-import { createDefaultFieldLayout, fielderReachProfileFromRatings, findEarliestInterception, hasFielderReacted, moveFielderTowardBall } from '../src/fielding';
+import { createDefaultFieldLayout, estimateRunsBeforeReturnThrow, fielderReachProfileFromRatings, findEarliestInterception, hasFielderReacted, moveFielderTowardBall } from '../src/fielding';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
@@ -586,7 +586,7 @@ test('partially saved profiles retain progress while missing stats get defaults'
   assert.equal(player.rank, 'Silver');
   assert.equal(player.stats.batting.power, 72);
   assert.equal(player.stats.bowling.accuracy, 50);
-  assert.deepEqual(player.stats.fielding, { agility: 50, reaction: 50, catching: 50 });
+  assert.deepEqual(player.stats.fielding, { agility: 50, reaction: 50, catching: 50, throwing: 50 });
 });
 
 test('a match can start when browser storage is unavailable', () => {
@@ -1097,6 +1097,25 @@ test('fielder movement begins only after its rated reaction delay', () => {
   assert.throws(() => hasFielderReacted(profile, -0.1), /Invalid fielder reaction/);
 });
 
+test('run decision counts completed runs before the return throw, mirrors both hands, and preserves rope precedence', () => {
+  assert.equal(estimateRunsBeforeReturnThrow(1, 10, 20, 3), 0);
+  assert.equal(estimateRunsBeforeReturnThrow(2.5, 10, 20, 3), 1);
+  assert.equal(estimateRunsBeforeReturnThrow(20, 10, 20, 3), 3);
+  const rightPoint = createDefaultFieldLayout('RHB').find(fielder => fielder.name === 'point')!;
+  const leftPoint = createDefaultFieldLayout('LHB').find(fielder => fielder.name === 'point')!;
+  const stumpDistance = (position: { x: number; z: number }) => Math.min(Math.hypot(position.x, position.z - 10), Math.hypot(position.x, position.z + 10));
+  assert.equal(stumpDistance(rightPoint.position), stumpDistance(leftPoint.position));
+  assert.equal(estimateRunsBeforeReturnThrow(4, stumpDistance(rightPoint.position), 18, 2.8), estimateRunsBeforeReturnThrow(4, stumpDistance(leftPoint.position), 18, 2.8));
+  const game = match();
+  game.recordBall(delivery(0.5), { direction: 0, type: 'grounded', timing: 0.5, contactZone: 0.5 });
+  assert.equal(game.finalizeBallOutcome(58, false, true, null, 0), 6, 'a rope crossing remains a six even if a fielder estimate was supplied');
+  const invalidEstimate = match();
+  invalidEstimate.recordBall(delivery(0.5), { direction: 0, type: 'grounded', timing: 0.5, contactZone: 0.5 });
+  assert.equal(invalidEstimate.finalizeBallOutcome(8, true, false, null, -1), 0);
+  assert.equal(invalidEstimate.getCurrentInnings().score, 0);
+  assert.throws(() => estimateRunsBeforeReturnThrow(1, 10, 0, 3), /Invalid run decision/);
+});
+
 test('bot fielding ratings scale with difficulty and remain bounded', () => {
   const rookie = createBotPlayer('Rookie').stats.fielding!;
   const medium = createBotPlayer('Medium').stats.fielding!;
@@ -1143,10 +1162,13 @@ test('saved regular match events replay through controller adjudication', () => 
   game.setTossResult(game.state.player.id, 'bat');
   game.startMatch();
   for (let ball = 0; ball < 6; ball++) {
-    const result = game.recordBall(delivery(0.5), { direction: 2, type: 'grounded', timing: 0.5, contactZone: 0.5 });
+    const result = game.recordBall(delivery(0.5), { direction: 2, type: ball === 0 ? 'lofted' : 'grounded', timing: 0.5, contactZone: 0.5 });
     assert.equal(result.isWicket, false);
-    game.finalizeBallOutcome(20 + ball, true, false);
+    if (ball === 0) game.finalizeBallOutcome(8, false, false, 'point');
+    else game.finalizeBallOutcome(20 + ball, true, false, null, ball === 1 ? 0 : undefined);
   }
+  assert.equal(game.state.events[0].caughtBy, 'point');
+  assert.equal(game.state.events[1].fieldedRuns, 0);
   game.state.currentInningsIndex = 1;
   for (let ball = 0; ball < 6; ball++) {
     game.recordBall({ ...delivery(0.5, -0.25), type: 'legspin', turn: 1 }, null);
@@ -2145,6 +2167,7 @@ test('the result banner uses the same finalized distance as the score', () => {
       getShotDistance: () => 150,
       getShotFielder: () => null,
       getShotCatcher: () => null,
+      getShotRunEstimate: () => null,
       shotBoundaryOnFull: true,
       shotReachedBoundary: true
     };

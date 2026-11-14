@@ -52,14 +52,14 @@ export function replayMatchRecord(record: MatchHistoryRecord): MatchController {
 
     const outcome = game.recordBall(event.delivery, event.shot);
     assertSame({ missed: outcome.missed ?? false, isWicket: outcome.isWicket, wicketReason: outcome.wicketReason, isFreeHit: outcome.isFreeHit, isExtra: outcome.isExtra, extraType: outcome.extraType },
-      { missed: event.missed, isWicket: event.isWicket, wicketReason: event.wicketReason, isFreeHit: event.isFreeHit, isExtra: event.isExtra, extraType: event.extraType }, `decision ${event.sequence}`);
+      { missed: event.missed, isWicket: event.caughtBy ? false : event.isWicket, wicketReason: event.caughtBy ? '' : event.wicketReason, isFreeHit: event.isFreeHit, isExtra: event.isExtra, extraType: event.extraType }, `decision ${event.sequence}`);
     if (event.flight) {
-      const runs = game.finalizeBallOutcome(event.distance, event.flight.hasBounced, event.flight.reachedBoundary);
+      const runs = game.finalizeBallOutcome(event.distance, event.flight.hasBounced, event.flight.reachedBoundary, event.caughtBy, event.fieldedRuns);
       assertSame(runs, event.runs, `flight score ${event.sequence}`);
     }
     const replayed = game.state.events[game.state.events.length - 1];
-    assertSame({ distance: replayed.distance, runs: replayed.runs, resolved: replayed.resolved },
-      { distance: event.distance, runs: event.runs, resolved: event.resolved }, `event ${event.sequence}`);
+    assertSame({ distance: replayed.distance, runs: replayed.runs, resolved: replayed.resolved, isWicket: replayed.isWicket, wicketReason: replayed.wicketReason },
+      { distance: event.distance, runs: event.runs, resolved: event.resolved, isWicket: event.isWicket, wicketReason: event.wicketReason }, `event ${event.sequence}`);
   }
 
   if (game.state.currentInningsIndex === 1 && game.getCurrentInnings().finished) {

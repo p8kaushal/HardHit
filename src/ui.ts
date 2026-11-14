@@ -748,7 +748,8 @@ export class UIManager {
         const rawDistance = this.gameScene.getShotDistance();
         const hasBounced = this.gameScene.shotBoundaryOnFull ? false : (globalAutoAssistConfig.hasBounced || false);
         const caughtBy = this.gameScene.getShotCatcher();
-        const runs = this.controller.finalizeBallOutcome(rawDistance, hasBounced, this.gameScene.shotReachedBoundary, caughtBy);
+        const fieldedRuns = this.gameScene.getShotRunEstimate();
+        const runs = this.controller.finalizeBallOutcome(rawDistance, hasBounced, this.gameScene.shotReachedBoundary, caughtBy, fieldedRuns ?? undefined);
         const shotDistanceMeters = lastBall.distance;
         const fieldedBy = this.gameScene.getShotFielder();
 
@@ -760,7 +761,7 @@ export class UIManager {
         
         let title = `${runs} RUNS`;
         let desc = fieldedBy
-          ? `Fielded by ${fieldedBy}; estimated from the stopped distance: ${runs} run${runs === 1 ? '' : 's'}.`
+          ? `Fielded by ${fieldedBy}; completed ${runs} run${runs === 1 ? '' : 's'} before the return throw.`
           : `Estimated from shot distance: ${runs} run${runs === 1 ? '' : 's'}.`;
         if (runs === 6) {
            gameSound.play('boundary');
@@ -875,8 +876,8 @@ export class UIManager {
       const quality = shotFlightQuality(outcome.shot, outcome.delivery, assist);
       const batterPower = innings.batter.stats.batting.power;
       const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, deliveryVelocityAtCrease(outcome.delivery), {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower);
-      const fielding = innings.bowler.stats.fielding ?? { agility: 50, reaction: 50, catching: 50 };
-      this.gameScene.setFieldingRatings(fielding.agility, fielding.reaction, fielding.catching ?? 50);
+      const fielding = innings.bowler.stats.fielding ?? { agility: 50, reaction: 50, catching: 50, throwing: 50 };
+      this.gameScene.setFieldingRatings(fielding.agility, fielding.reaction, fielding.catching ?? 50, fielding.throwing ?? 50);
       this.gameScene.animateHitPath(outcome.distance, outcome.shot.direction, vOut);
       this.controller.setCameraMode('follow_shot');
       // Result toast is deferred to onBallResolvedCallback

@@ -19,6 +19,7 @@ export interface FieldingStats {
   agility: number;    // 0 - 100
   reaction: number;   // 0 - 100
   catching: number;   // 0 - 100
+  throwing: number;   // 0 - 100
 }
 
 export interface PlayerStats {
@@ -160,6 +161,8 @@ export interface MatchEvent {
   runs?: number;
   resolved: boolean;
   flight?: { hasBounced: boolean; reachedBoundary?: boolean };
+  caughtBy?: string;
+  fieldedRuns?: number;
 }
 
 export interface InputIntent {
