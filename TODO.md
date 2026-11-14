@@ -1,5 +1,11 @@
 # Gameplay to-do
 
+### Completed bounded increment — replay run-outs on protected deliveries
+
+- **Finding:** direct match tests verify run-outs remain legal on no-balls/free hits, and saved-match replay separately verifies an ordinary fielded run-out. Add an end-to-end saved-event fixture for both combinations so extras, free-hit state, wicket reason, `runOutBy`, score and legal-ball count are checked together.
+- **Scope:** test the existing replay contract; change implementation only if replay diverges from live scoring. Keep normal no-ball/free-hit protections for catches, bowled and LBW unchanged.
+- [x] **Acceptance:** a serialized-match fixture replays a no-ball run-out followed by a free-hit run-out and verifies extras/free-hit state, dismissal reason and fielder, score, wickets, six legal balls, and match result against the live record. The test exposed and fixed a replay-validator mismatch: the pre-flight reason on the no-ball is still its no-ball explanation even though final scoring records a run-out. `npm test` passed 143 tests; `npm run build` passed with the existing ~1.09 MB gzip Babylon chunk warning; `git diff --check` passed. No browser rerun was needed because the adjudication is covered in the replay fixture and the separate live run-out browser match already passed.
+
 ### Completed bounded increment — align automated runs with crease geometry
 
 - **Finding:** `decideAutomatedRuns` currently measures the runner's full crossing and safety position from stump to stump (20.12 m), although HardHit's popping creases are rendered at z=±8.8 m. MCC Law 30 defines a batter as safe when part of their bat/person is grounded behind the popping crease. A cricket-specific sprint-with-bat study reports 2.83±0.15 s over 17.68 m between popping creases (Lockie et al., 2013; n=17), equivalent to about 6.25 m/s average over that test.

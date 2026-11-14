@@ -1305,6 +1305,60 @@ test('saved regular match events replay through controller adjudication', () => 
     game.state.innings.map(innings => ({ score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled })));
 });
 
+test('saved replay preserves no-ball and free-hit run-outs with extras and legal-ball accounting', () => {
+  const game = new MatchController('Medium', 0x38a7);
+  game.setTossResult(game.state.player.id, 'bat');
+  game.startMatch();
+
+  const point = 'point';
+  const shot = { direction: 2, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
+  const noBall = game.recordBall({ ...delivery(0.5), frontFootHeel: 0.01 }, shot);
+  assert.equal(noBall.extraType, 'noball');
+  game.finalizeBallOutcome(8, true, false, null, 0, point);
+
+  const freeHit = game.recordBall(delivery(0.5), shot);
+  assert.equal(freeHit.isFreeHit, true);
+  game.finalizeBallOutcome(8, true, false, null, 0, point);
+  for (let legalBall = 2; legalBall <= 6; legalBall++) {
+    game.recordBall(delivery(0.5), shot);
+    game.finalizeBallOutcome(8, true, false, null, 0);
+  }
+
+  assert.equal(game.getCurrentInnings().score, 1);
+  assert.equal(game.getCurrentInnings().wicketsLost, 2);
+  assert.equal(game.getCurrentInnings().ballsBowled, 6);
+  game.state.currentInningsIndex = 1;
+  for (let ball = 0; ball < 6; ball++) game.recordBall(delivery(0.5, -0.25), null);
+  (game as any).resolveMatch(false);
+
+  const setup = {
+    difficulty: game.botDifficulty,
+    player: structuredClone(game.state.player),
+    bot: structuredClone(game.state.bot),
+    tossWinnerId: game.state.tossWinnerId,
+    tossChoice: game.state.tossChoice,
+  };
+  const record = {
+    id: 'replay-protected-runouts', seed: game.state.randomSeed, createdAt: 1,
+    outcome: game.state.winnerId === setup.player.id ? 'WON' as const : game.state.winnerId === setup.bot.id ? 'LOST' as const : 'TIED' as const,
+    setup, events: structuredClone(game.state.events),
+  };
+  const replay = replayMatchRecord(record);
+  assert.deepEqual(replay.state.events.slice(0, 2).map(event => ({
+    extraType: event.extraType,
+    isFreeHit: event.isFreeHit,
+    isWicket: event.isWicket,
+    wicketReason: event.wicketReason,
+    runOutBy: event.runOutBy,
+    runs: event.runs,
+  })), [
+    { extraType: 'noball', isFreeHit: false, isWicket: true, wicketReason: 'Run out by point', runOutBy: 'point', runs: 0 },
+    { extraType: null, isFreeHit: true, isWicket: true, wicketReason: 'Run out by point', runOutBy: 'point', runs: 0 },
+  ]);
+  assert.deepEqual(replay.state.innings.map(innings => ({ score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled })),
+    game.state.innings.map(innings => ({ score: innings.score, wickets: innings.wicketsLost, legal: innings.ballsBowled })));
+});
+
 test('saved dismissal-heavy match replay preserves wickets and match result', () => {
   const game = new MatchController('Hard', 0x7711);
   game.setTossResult(game.state.player.id, 'bat');

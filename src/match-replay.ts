@@ -51,8 +51,11 @@ export function replayMatchRecord(record: MatchHistoryRecord): MatchController {
     }
 
     const outcome = game.recordBall(event.delivery, event.shot, event.fieldPreset);
+    const expectedDecisionReason = event.runOutBy && event.extraType === 'noball'
+      ? 'Front-foot no-ball! (Free hit next)'
+      : event.caughtBy || event.runOutBy ? '' : event.wicketReason;
     assertSame({ missed: outcome.missed ?? false, isWicket: outcome.isWicket, wicketReason: outcome.wicketReason, isFreeHit: outcome.isFreeHit, isExtra: outcome.isExtra, extraType: outcome.extraType },
-      { missed: event.missed, isWicket: event.caughtBy || event.runOutBy ? false : event.isWicket, wicketReason: event.caughtBy || event.runOutBy ? '' : event.wicketReason, isFreeHit: event.isFreeHit, isExtra: event.isExtra, extraType: event.extraType }, `decision ${event.sequence}`);
+      { missed: event.missed, isWicket: event.caughtBy || event.runOutBy ? false : event.isWicket, wicketReason: expectedDecisionReason, isFreeHit: event.isFreeHit, isExtra: event.isExtra, extraType: event.extraType }, `decision ${event.sequence}`);
     if (event.flight) {
       const runs = game.finalizeBallOutcome(event.distance, event.flight.hasBounced, event.flight.reachedBoundary, event.caughtBy, event.fieldedRuns, event.runOutBy);
       assertSame(runs, event.runs, `flight score ${event.sequence}`);
