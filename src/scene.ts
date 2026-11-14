@@ -4,7 +4,7 @@ import { CameraMode, DeliveryChoice, DeliveryType, FieldPreset } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
-import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_RUNNER_PICKUP_DELAY_SECONDS, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
+import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_RUNNER_PICKUP_DELAY_SECONDS, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, sampleAutomatedRunners, sampleAutomatedReturn, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
@@ -37,6 +37,8 @@ export class GameScene {
   private bowlerRunUpSide: { overTheWicket: boolean; bowlingArm: 'Right' | 'Left' } = { overTheWicket: true, bowlingArm: 'Right' };
   public batterRoot: BABYLON.TransformNode | null = null;
   private nonStrikerRoot: BABYLON.TransformNode | null = null;
+  private batterLegs: BABYLON.Mesh[] = [];
+  private nonStrikerLegs: BABYLON.Mesh[] = [];
   private batterHead: BABYLON.TransformNode | null = null;
   public batMesh: BABYLON.Mesh | null = null;
   private batPivot: BABYLON.TransformNode | null = null;
@@ -46,7 +48,8 @@ export class GameScene {
   private fieldPreset: FieldPreset = 'balanced';
   private shotFieldedBy: FieldingPosition['name'] | null = null;
   private shotCaughtBy: FieldingPosition['name'] | null = null;
-  private fieldingReturn: { startedAt: number; pickup: BABYLON.Vector3; hand: BABYLON.Vector3; wicket: BABYLON.Vector3; arrivalSeconds: number } | null = null;
+  private shotRunDecision: (AutomatedRunDecision & { fielderName: FieldingPosition['name'] }) | null = null;
+  private fieldingReturn: { startedAt: number; pickup: BABYLON.Vector3; hand: BABYLON.Vector3; wicket: BABYLON.Vector3; arrivalSeconds: number; decision: AutomatedRunDecision } | null = null;
 
 
   // Animation state
@@ -146,6 +149,7 @@ export class GameScene {
 
     globalAutoAssistConfig.resetSceneForInnings = () => {
       this.fieldingReturn = null;
+      this.resetRunnerVisuals();
       // Reposition single camera to Player Anchor
       this.resetCameraToPlayerView(!this.isBotBatting);
       // Reset ball mesh to bowler release point
@@ -440,9 +444,10 @@ export class GameScene {
     cap.scaling.y = 0.75;
     box('helmetPeak', head, helmet, 0, 0.05, 0.15, 0.26, 0.035, 0.16);
     [-1, 1].forEach((side, i) => {
-      limb(`batterLeg${i}`, batter, trousers, side * 0.13, 0.48, 0, 0.86, 0.17);
-      box(`batterPad${i}`, batter, pads, side * 0.13, 0.38, 0.095, 0.19, 0.57, 0.1);
-      box(`batterShoe${i}`, batter, shoes, side * 0.13, 0.06, 0.06, 0.18, 0.1, 0.3);
+      const leg = limb(`batterLeg${i}`, batter, trousers, side * 0.13, 0.48, 0, 0.86, 0.17);
+      this.batterLegs.push(leg);
+      box(`batterPad${i}`, leg, pads, 0, -0.10, 0.095, 0.19, 0.57, 0.1);
+      box(`batterShoe${i}`, leg, shoes, 0, -0.42, 0.06, 0.18, 0.1, 0.3);
       const arm = limb(`batterArm${i}`, batter, blue, side * 0.27, 1.18, 0.07, 0.58, 0.13);
       arm.rotation.z = side * 0.24;
       ball(`batterGlove${i}`, batter, pads, side * 0.3, 0.89, 0.13, 0.16);
@@ -470,9 +475,10 @@ export class GameScene {
     const nonStrikerHelmet = ball('nonStrikerHelmet', nonStriker, helmet, 0, 1.84, 0, 0.29);
     nonStrikerHelmet.scaling.y = 0.75;
     [-1, 1].forEach((side, i) => {
-      limb(`nonStrikerLeg${i}`, nonStriker, trousers, side * 0.13, 0.48, 0, 0.86, 0.17);
-      box(`nonStrikerPad${i}`, nonStriker, pads, side * 0.13, 0.38, 0.095, 0.19, 0.57, 0.1);
-      box(`nonStrikerShoe${i}`, nonStriker, shoes, side * 0.13, 0.06, 0.06, 0.18, 0.1, 0.3);
+      const leg = limb(`nonStrikerLeg${i}`, nonStriker, trousers, side * 0.13, 0.48, 0, 0.86, 0.17);
+      this.nonStrikerLegs.push(leg);
+      box(`nonStrikerPad${i}`, leg, pads, 0, -0.10, 0.095, 0.19, 0.57, 0.1);
+      box(`nonStrikerShoe${i}`, leg, shoes, 0, -0.42, 0.06, 0.18, 0.1, 0.3);
       const arm = limb(`nonStrikerArm${i}`, nonStriker, blue, side * 0.27, 1.18, 0.07, 0.58, 0.13);
       arm.rotation.z = side * 0.24;
       ball(`nonStrikerGlove${i}`, nonStriker, pads, side * 0.3, 0.89, 0.13, 0.16);
@@ -496,6 +502,7 @@ export class GameScene {
     this.batterRoot.setEnabled(true);
 
     this.updateBatterPosition();
+    this.resetRunnerVisuals();
   }
 
   public getFielderPositions(): Array<{ name: FieldingPosition['name']; position: { x: number; z: number } }> {
@@ -551,11 +558,29 @@ export class GameScene {
   }
 
   public getShotRunDecision(): (AutomatedRunDecision & { fielderName: FieldingPosition['name'] }) | null {
+    if (this.shotRunDecision) return { ...this.shotRunDecision };
     if (!this.shotFieldedBy) return null;
     const root = this.fielderRoots.get(this.shotFieldedBy);
     if (!root) return null;
     const throwSpeed = fielderThrowSpeedFromRating(this.fieldingRatings.throwing);
     return { ...decideAutomatedRuns(this.shotElapsedSeconds, { x: root.position.x, z: root.position.z }, throwSpeed), fielderName: this.shotFieldedBy };
+  }
+
+  private resetRunnerVisuals(): void {
+    this.updateBatterPosition();
+    if (this.nonStrikerRoot) this.nonStrikerRoot.position.z = -BATTER_CREASE_Z;
+    for (const leg of [...(this.batterLegs ?? []), ...(this.nonStrikerLegs ?? [])]) leg.rotation.x = 0;
+  }
+
+  private setRunnerVisuals(positions: { strikerPositionZ: number; nonStrikerPositionZ: number }, timeSeconds: number): void {
+    const previous = this.batterRoot?.position.z;
+    if (this.batterRoot) this.batterRoot.position.z = positions.strikerPositionZ;
+    if (this.nonStrikerRoot) this.nonStrikerRoot.position.z = positions.nonStrikerPositionZ;
+    const moving = previous !== undefined && Math.abs(previous - positions.strikerPositionZ) > 1e-6;
+    const stride = moving ? Math.sin(timeSeconds * 12) * 0.5 : 0;
+    for (const legs of [this.batterLegs ?? [], this.nonStrikerLegs ?? []]) {
+      legs.forEach((leg, index) => { leg.rotation.x = index === 0 ? stride : -stride; });
+    }
   }
 
   private buildFielders(): void {
@@ -1020,6 +1045,7 @@ export class GameScene {
     const decision = this.getShotRunDecision();
     const fielder = this.shotFieldedBy && this.fielderRoots.get(this.shotFieldedBy);
     if (!decision || !fielder || !this.ballMesh || !this.currentBallPos) return false;
+    this.shotRunDecision = { ...decision };
     this.clearBallTrail();
     this.fieldingReturn = {
       startedAt: gameNow(),
@@ -1027,6 +1053,7 @@ export class GameScene {
       hand: new BABYLON.Vector3(fielder.position.x, 1, fielder.position.z),
       wicket: new BABYLON.Vector3(0, 0.35, decision.threatenedEnd === 'striker' ? BATTER_STUMPS_Z : -BATTER_STUMPS_Z),
       arrivalSeconds: decision.throwArrivalSeconds,
+      decision,
     };
     return true;
   }
@@ -1035,6 +1062,7 @@ export class GameScene {
     const returning = this.fieldingReturn;
     if (!returning || !this.ballMesh) return;
     const elapsed = Math.max(0, (gameNow() - returning.startedAt) / 1000);
+    this.setRunnerVisuals(sampleAutomatedReturn(this.shotElapsedSeconds, returning.decision, elapsed), this.shotElapsedSeconds + elapsed);
     const gather = FIELDING_RUNNER_PICKUP_DELAY_SECONDS;
     if (elapsed < gather) {
       this.ballMesh.position.copyFrom(BABYLON.Vector3.Lerp(returning.pickup, returning.hand, elapsed / gather));
@@ -1119,6 +1147,7 @@ export class GameScene {
 
       this.physicsAccumulator = advanceBallFrame(this.shotPhysics, this.physicsAccumulator, this.engine.getDeltaTime() / 1000, (state, stepSeconds) => {
         this.shotElapsedSeconds += stepSeconds;
+        this.setRunnerVisuals(sampleAutomatedRunners(this.shotElapsedSeconds), this.shotElapsedSeconds);
         this.shotTrajectory.push({
           timeSeconds: this.shotElapsedSeconds,
           position: { x: state.position.x, y: state.position.y, z: state.position.z },
@@ -1180,6 +1209,7 @@ export class GameScene {
 
   public animateHitPath(distance: number, direction: number, V_out?: { x: number, y: number, z: number }): void {
     this.fieldingReturn = null;
+    this.shotRunDecision = null;
     this.isAnimatingBall = false;
     this.updateMissedAnimation = null;
     this.clearBallTrail();

@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — visible automated runners
+
+- **Scope:** render both batters' movement during shot flight and the fielding return using the same crossing, turn and run-out timing as adjudication; keep the ground map tied to scene positions and restore the crease setup for the next ball.
+- [x] **Acceptance:** deterministic fixtures cover crossings, turn pauses, a completed single, return-to-safety and a run-out. Desktop and 667×300 browser matches verified both models and their ground-map markers follow the shared timeline, leg motion, a direct clock pause during a return, pending scoring, crease resets, a run-out and 12-event replay. A desktop screenshot was visually inspected. `npm test` passed 153 tests; build passed with the existing Babylon warning. On unfielded shots motion is illustrative and runs remain distance estimates. Running speed, stride, turns, throws and grounding remain approximate; physical-device validation is open.
+
 ### Completed bounded increment — timed fielding return
 
 - **Finding:** ground-ball scoring waits numerically for a gather and throw, but the scene immediately ends when a fielder stops the ball, so the result appears before the modeled return.
@@ -242,7 +247,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [x] **Phase 2 rule-matrix increment:** Reconciled the documented no-ball/wide/free-hit/LBW fixtures to the 2026 MCC Laws and ICC Men's T20I conditions effective July 2025. Added a six-case mirrored batter-movement wide regression; `npm test` passed 118 tests and `npm run build` passed with the existing Babylon chunk warning. Body/foot ordering, other faults and out-of-model dismissal exceptions remain explicit open gaps; this does not establish law compliance or physical calibration.
 - [ ] **Phase 3:** Reconcile modeled release/crease/contact/stump coordinates with the rendered pitch, then use one trajectory for pitch marker, flight, bounce, contact and wicket projection.
 - [ ] **Phase 4:** Replace separate timing-only contact estimates with a spatial bat/ball model and verify the same shot produces the displayed, scored and replayed trajectory; define how distance is measured around stadium obstructions.
-- [ ] **Phase 5:** Use seeded distributions to identify simulator errors and establish fair delivery variety, then agree human-tested difficulty targets. AI fielders now have provisional placement, reaction, interception, catches, throws and numerical runner/run-out adjudication; batter movement animation and calibrated field strategy remain open. Teammate ratings have transparent, bounded performance progression. Synthetic results are not calibration or fairness evidence.
+- [ ] **Phase 5:** Use seeded distributions to identify simulator errors and establish fair delivery variety, then agree human-tested difficulty targets. AI fielders now have provisional placement, reaction, interception, catches, throws and numerical runner/run-out adjudication; detailed running biomechanics and calibrated field strategy remain open. Teammate ratings have transparent, bounded performance progression. Synthetic results are not calibration or fairness evidence.
 - [ ] **Phase 6:** Profile actual frame time, input latency, memory, loading and sound on physical devices; verify broadcast cameras remain out of the way during decisions and test reduced motion.
 - [ ] **Phase 7:** Specify server-authoritative inputs and event ordering before implementing private rooms, reconnection, validation and adverse-network tests.
 - [ ] **Phase 8:** Record CI, staging/production destination, deployment credentials, costs, monitoring, versioning and rollback; no production target is assumed.
@@ -300,7 +305,7 @@ The detailed tasks below map to these phases. Completed sub-tasks do not imply a
 - [x] Document current contest scoring, modeled cricket decisions and known simplifications against MCC laws and ICC T20I free-hit conditions.
 - [ ] Expand decision-table tests and implementation for both hands, offered/no shot, bat/pad order and unmodeled faults; compare each against the chosen playing conditions.
 - [x] Identify non-boundary runs as distance estimates in the shot result.
-- [x] Model automated runners crossing between wickets, completed runs and run-out risk for fielded ground balls. The model is shared by live scoring, replay and seeded simulation; its numerical runner speed and gather/throw timing remain provisional, and batter movement is not animated.
+- [x] Model automated runners crossing between wickets, completed runs and run-out risk for fielded ground balls. The model is shared by live scoring, replay and seeded simulation; its runner speed, turn and gather/throw timing remain provisional, and batter movement is schematic.
 - [ ] Consolidate authored delivery, contact, shot flight and wicket projection around shared coordinates, time, units and sampled inputs; eliminate competing legacy distance paths where safe.
 - [ ] Build traceable calibration fixtures for pace, bounce, swing, spin, contact speed, launch angle and six carry, including symmetry and frame-rate checks; document assumptions and confidence.
 - [ ] Model landing/obstructions or label estimated unobstructed carry, and review hard distance caps and boundary geometry.

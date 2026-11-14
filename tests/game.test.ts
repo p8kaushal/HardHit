@@ -5,7 +5,7 @@ import { createBotPlayer, getOrCreatePlayer, globalAutoAssistConfig, MatchContro
 import { KeyboardInputManager } from '../src/input';
 import { directionFromStick, suggestedShotDirection, TouchBattingControls } from '../src/touch-controls';
 import { advanceBallFrame, stepBall, type BallState } from '../src/ball-physics';
-import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, FIELDING_RUNNER_TURN_DELAY_SECONDS, fielderReachProfileFromRatings, findEarliestFieldingEvent, findEarliestInterception, fielderThrowSpeedFromRating, hasFielderReacted, isCatchDismissalAllowed, moveFielderTowardBall, RUNNER_CREASE_TO_CREASE_METERS } from '../src/fielding';
+import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, FIELDING_RUNNER_TURN_DELAY_SECONDS, fielderReachProfileFromRatings, findEarliestFieldingEvent, findEarliestInterception, fielderThrowSpeedFromRating, hasFielderReacted, isCatchDismissalAllowed, moveFielderTowardBall, RUNNER_CREASE_TO_CREASE_METERS, sampleAutomatedRunners, sampleAutomatedReturn } from '../src/fielding';
 import { botChooseDelivery, botChooseShot } from '../src/bot';
 import { runBotSimulation } from '../src/simulate';
 import { SeededRandom } from '../src/random';
@@ -1301,6 +1301,7 @@ test('fielded return reaches the adjudicated wicket before resolving and pauses 
   scene.shotFieldedBy = 'point';
   scene.fielderRoots = new Map([['point', { position: { x: 4, z: 2 } }]]);
   scene.currentBallPos = new Vector3(3.5, BALL_RADIUS_METERS, 2);
+  scene.shotElapsedSeconds = 0;
   scene.ballMesh = { position: new Vector3() };
   scene.clearBallTrail = () => {};
   scene.getShotRunDecision = () => ({ threatenedEnd: 'nonStriker', throwArrivalSeconds: 2 });
@@ -1331,6 +1332,32 @@ test('fielded return reaches the adjudicated wicket before resolving and pauses 
     setGamePaused(false);
     Object.assign(globalThis, { performance: originalPerformance });
   }
+});
+
+test('visual runner positions follow completed runs and the return-to-safety race', () => {
+  const wicket = { x: 0, z: -10 };
+  const runOut = decideAutomatedRuns(0.9, wicket, 20);
+  const pickup = sampleAutomatedRunners(0.9);
+  assert.equal(runOut.runOut, true);
+  assert.equal(runOut.runs, 0);
+  assert.deepEqual(sampleAutomatedReturn(0.9, runOut, 0), { strikerPositionZ: pickup.strikerPositionZ, nonStrikerPositionZ: pickup.nonStrikerPositionZ });
+  const outAtThrow = sampleAutomatedReturn(0.9, runOut, runOut.throwArrivalSeconds);
+  assert.ok(outAtThrow.strikerPositionZ < pickup.strikerPositionZ);
+  assert.ok(outAtThrow.strikerPositionZ > BATTER_CREASE_Z, 'runner has not reached the threatened crease');
+  assert.equal(outAtThrow.nonStrikerPositionZ, -outAtThrow.strikerPositionZ);
+
+  const safeSingle = decideAutomatedRuns(2.2, wicket, 20);
+  assert.equal(safeSingle.runOut, false);
+  assert.equal(safeSingle.runs, 1);
+  const completed = sampleAutomatedReturn(2.2, safeSingle, safeSingle.throwArrivalSeconds);
+  assert.equal(completed.strikerPositionZ, -BATTER_CREASE_Z);
+  assert.equal(completed.nonStrikerPositionZ, BATTER_CREASE_Z);
+  const backToSafety = decideAutomatedRuns(0.5, wicket, 20);
+  assert.equal(backToSafety.runOut, false);
+  assert.equal(backToSafety.runs, 0);
+  assert.equal(sampleAutomatedReturn(0.5, backToSafety, backToSafety.throwArrivalSeconds).strikerPositionZ, BATTER_CREASE_Z);
+  const crossing = RUNNER_CREASE_TO_CREASE_METERS / FIELDING_RUNNER_SPEED_METERS_PER_SECOND;
+  assert.equal(sampleAutomatedRunners(crossing + FIELDING_RUNNER_TURN_DELAY_SECONDS / 2).strikerPositionZ, -BATTER_CREASE_Z);
 });
 
 test('repeated runs wait at the crease between completed crossings', () => {

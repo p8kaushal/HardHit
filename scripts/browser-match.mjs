@@ -29,6 +29,8 @@ try {
   const botBatsSpin = process.argv.includes('--bot-bats-spin');
   const fixtureWide = process.argv.includes('--fixture-wide');
   const runOutFixture = process.argv.includes('--require-runout');
+  const pauseReturn = process.argv.includes('--pause-return');
+  if (pauseReturn && !runOutFixture) throw new Error('--pause-return requires --require-runout');
   const fieldingFixture = process.argv.includes('--require-fielding') || runOutFixture;
   const lowCatchFixture = process.argv.includes('--require-low-catch');
   const catchFixture = process.argv.includes('--require-catch') || lowCatchFixture;
@@ -57,7 +59,7 @@ try {
       }, { timeout: 5000 }, portrait);
     });
   }
-  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, lowCatchFixture, fieldPresetFixture }) => {
+  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, pauseReturn, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, lowCatchFixture, fieldPresetFixture }) => {
     const { GameScene } = await import('/src/scene.ts');
     const { UIManager } = await import('/src/ui.ts');
     const { globalAutoAssistConfig } = await import('/src/game.ts');
@@ -65,6 +67,7 @@ try {
     const { gameNow, setGamePaused, isGamePaused } = await import('/src/game-clock.ts');
     const { deliveryContactPoint, BALL_RADIUS_METERS } = await import('/src/formula.ts');
     const { fieldRadarPoint } = await import('/src/field-radar.ts');
+    const { sampleAutomatedRunners, sampleAutomatedReturn } = await import('/src/fielding.ts');
     if (fieldPresetFixture) {
       const startBowling = UIManager.prototype.startUserBowlingDelivery;
       UIManager.prototype.startUserBowlingDelivery = function (...args) {
@@ -84,6 +87,7 @@ try {
     const animateDelivery = GameScene.prototype.animateDelivery;
     const endDeliveryCycle = GameScene.prototype.endDeliveryCycle;
     const beginFieldingReturn = GameScene.prototype.beginFieldingReturn;
+    const setRunnerVisuals = GameScene.prototype.setRunnerVisuals;
     const getShotFielder = GameScene.prototype.getShotFielder;
     const getShotCatcher = GameScene.prototype.getShotCatcher;
     const showResultToast = UIManager.prototype.showResultToast;
@@ -138,6 +142,34 @@ try {
     window.__matchReplay = [];
     window.__fielderSceneChecks = [];
     window.__fieldingReturns = [];
+    window.__runnerChecks = { flightSamples: 0, returnSamples: 0, maxMovement: 0, maxError: 0, legMotion: false, legHierarchy: false, radarSamples: 0, radarErrors: 0 };
+    const updateFieldRadar = UIManager.prototype.updateFieldRadar;
+    UIManager.prototype.updateFieldRadar = function (...args) {
+      const result = updateFieldRadar.apply(this, args);
+      if (window.__runnerChecks && globalAutoAssistConfig.isBallInPlay) {
+        for (const [key, position] of [['striker', this.gameScene.getBatterPosition()], ['non-striker', this.gameScene.getNonStrikerPosition()]]) {
+          const marker = document.querySelector(`[data-player-key="${key}"]`);
+          if (!marker) continue;
+          const point = fieldRadarPoint(position.x, position.z);
+          window.__runnerChecks.radarSamples++;
+          if (marker.getAttribute('transform') !== `translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})`) window.__runnerChecks.radarErrors++;
+        }
+      }
+      return result;
+    };
+    GameScene.prototype.setRunnerVisuals = function (positions, timeSeconds) {
+      const result = setRunnerVisuals.call(this, positions, timeSeconds);
+      const expected = this.fieldingReturn
+        ? sampleAutomatedReturn(this.shotElapsedSeconds, this.fieldingReturn.decision, Math.max(0, timeSeconds - this.shotElapsedSeconds))
+        : sampleAutomatedRunners(this.shotElapsedSeconds);
+      const checks = window.__runnerChecks;
+      if (this.fieldingReturn) checks.returnSamples++; else checks.flightSamples++;
+      checks.maxMovement = Math.max(checks.maxMovement, Math.abs(this.batterRoot.position.z + 8.8), Math.abs(this.nonStrikerRoot.position.z - 8.8));
+      checks.maxError = Math.max(checks.maxError, Math.abs(this.batterRoot.position.z - expected.strikerPositionZ), Math.abs(this.nonStrikerRoot.position.z - expected.nonStrikerPositionZ));
+      checks.legMotion ||= this.batterLegs.some(leg => Math.abs(leg.rotation.x) > 0.01) && this.nonStrikerLegs.some(leg => Math.abs(leg.rotation.x) > 0.01);
+      checks.legHierarchy ||= [...this.batterLegs, ...this.nonStrikerLegs].every(leg => leg.getChildMeshes().length === 2);
+      return result;
+    };
     let playerBatting = false;
     let playerController;
     GameScene.prototype.getShotFielder = function (...args) {
@@ -278,6 +310,15 @@ try {
       if (started) {
         this.fieldingReturn.pendingAtStart = window.__liveMatchController?.state.events.at(-1)?.resolved === false;
         this.fieldingReturn.scoreAtStart = window.__liveMatchController?.getCurrentInnings().score;
+        if (pauseReturn && !window.__returnPause) {
+          const snapshot = () => ({ ball: this.ballMesh.position.asArray(), strikerZ: this.batterRoot.position.z,
+            nonStrikerZ: this.nonStrikerRoot.position.z, score: window.__liveMatchController.getCurrentInnings().score,
+            pending: window.__liveMatchController.state.events.at(-1)?.resolved === false });
+          setGamePaused(true);
+          const before = snapshot();
+          window.__returnPause = { before };
+          window.setTimeout(() => { window.__returnPause.after = snapshot(); setGamePaused(false); }, 600);
+        }
       }
       return started;
     };
@@ -289,7 +330,7 @@ try {
         arrived();
       }, ...rest);
     };
-  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, lowCatchFixture, fieldPresetFixture });
+  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, pauseReturn, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture, lowCatchFixture, fieldPresetFixture });
   if (process.argv.includes('--force-tie')) {
     // Test-only fixture: make regular-innings deliveries legal dots so the
     // real UI must play both sudden-death innings. Production code is unchanged.
@@ -630,6 +671,18 @@ try {
       throw new Error(`Fielding return did not reach its wicket before resolution: ${JSON.stringify(returns)}`);
     }
     console.log(`Verified ${returns.length} timed fielding return(s) reached the modeled wicket before scoring.`);
+    const runners = await page.evaluate(() => window.__runnerChecks);
+    if (!runners.flightSamples || !runners.returnSamples || !runners.radarSamples || runners.radarErrors || runners.maxMovement < 0.5 || runners.maxError > 1e-8 || !runners.legMotion || !runners.legHierarchy) {
+      throw new Error(`Runner visuals did not follow the modeled flight and return: ${JSON.stringify(runners)}`);
+    }
+    console.log(`Runner models followed flight and return positions; maximum movement ${runners.maxMovement.toFixed(2)} m.`);
+    if (pauseReturn) {
+      const paused = await page.evaluate(() => window.__returnPause);
+      if (!paused?.after || !paused.before.pending || JSON.stringify(paused.before) !== JSON.stringify(paused.after)) {
+        throw new Error(`Fielding return or score changed while paused: ${JSON.stringify(paused)}`);
+      }
+      console.log('Fielding return, runners and pending score remained fixed during a direct clock pause.');
+    }
     console.log(`Ground shot was run out by ${runOut.runOutBy}; ${runOut.runs} run(s) counted before the wicket.`);
   }
   if (catchFixture) {

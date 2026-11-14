@@ -179,6 +179,44 @@ function runnerDistanceFromStartingCrease(distanceMeters: number): number {
   return progress <= RUNNER_CREASE_TO_CREASE_METERS ? progress : lap - progress;
 }
 
+/** Positions and completed crossings at a time after bat contact. */
+export function sampleAutomatedRunners(
+  timeSeconds: number,
+  speed = FIELDING_RUNNER_SPEED_METERS_PER_SECOND,
+  maximumRuns = FIELDING_MAX_RUNS,
+  turnDelaySeconds = FIELDING_RUNNER_TURN_DELAY_SECONDS,
+): { completed: number; strikerPositionZ: number; nonStrikerPositionZ: number } {
+  if (![timeSeconds, speed, maximumRuns, turnDelaySeconds].every(Number.isFinite) || timeSeconds < 0 || speed <= 0 ||
+      !Number.isInteger(maximumRuns) || maximumRuns < 0 || turnDelaySeconds < 0) throw new Error('Invalid automated runner sample');
+  const crossing = RUNNER_CREASE_TO_CREASE_METERS / speed;
+  const cycle = crossing + turnDelaySeconds;
+  const cycles = Math.floor(timeSeconds / cycle);
+  const within = timeSeconds - cycles * cycle;
+  const completed = Math.min(maximumRuns, cycles + (within >= crossing ? 1 : 0));
+  const distance = Math.min(maximumRuns * RUNNER_CREASE_TO_CREASE_METERS,
+    cycles * RUNNER_CREASE_TO_CREASE_METERS + Math.min(within, crossing) * speed);
+  const progress = runnerDistanceFromStartingCrease(distance);
+  return { completed, strikerPositionZ: BATTER_CREASE_Z + progress, nonStrikerPositionZ: -BATTER_CREASE_Z - progress };
+}
+
+/** Visual runner positions during the modeled gather and return throw. */
+export function sampleAutomatedReturn(
+  flightSeconds: number, decision: AutomatedRunDecision, elapsedSeconds: number,
+): { strikerPositionZ: number; nonStrikerPositionZ: number } {
+  if (!Number.isFinite(elapsedSeconds) || elapsedSeconds < 0) throw new Error('Invalid return elapsed time');
+  const pickup = sampleAutomatedRunners(flightSeconds);
+  const elapsed = Math.min(elapsedSeconds, decision.throwArrivalSeconds);
+  if (!decision.runOut && decision.runs > pickup.completed) {
+    return sampleAutomatedRunners(flightSeconds + elapsed, FIELDING_RUNNER_SPEED_METERS_PER_SECOND, decision.runs);
+  }
+  // If the next run cannot be completed, both runners head for their nearer
+  // crease; the adjudicator uses this same distance and constant speed.
+  const target = pickup.strikerPositionZ <= 0 ? BATTER_CREASE_Z : -BATTER_CREASE_Z;
+  const distance = Math.min(Math.abs(target - pickup.strikerPositionZ), elapsed * FIELDING_RUNNER_SPEED_METERS_PER_SECOND);
+  const strikerPositionZ = pickup.strikerPositionZ + Math.sign(target - pickup.strikerPositionZ) * distance;
+  return { strikerPositionZ, nonStrikerPositionZ: -strikerPositionZ };
+}
+
 /** Resolve two automated runners against a fielder's return throw after a ground stop.
  * The runners travel during flight and while the fielder gathers and throws. If either
  * runner nearest the targeted wicket cannot regain its crease before the throw arrives,
@@ -207,25 +245,13 @@ export function decideAutomatedRuns(
   const throwDistance = Math.min(distanceToStriker, distanceToNonStriker);
   const throwArrivalSeconds = pickupDelaySeconds + throwDistance / throwSpeedMetersPerSecond;
 
-  const crossingSeconds = RUNNER_CREASE_TO_CREASE_METERS / runnerSpeedMetersPerSecond;
-  const runnerAt = (timeSeconds: number) => {
-    const cycle = crossingSeconds + turnDelaySeconds;
-    const completedCycles = Math.floor(timeSeconds / cycle);
-    const withinCycle = timeSeconds - completedCycles * cycle;
-    const completed = Math.min(maximumRuns, completedCycles + (withinCycle >= crossingSeconds ? 1 : 0));
-    const distance = Math.min(maximumRuns * RUNNER_CREASE_TO_CREASE_METERS,
-      completedCycles * RUNNER_CREASE_TO_CREASE_METERS + Math.min(withinCycle, crossingSeconds) * runnerSpeedMetersPerSecond);
-    return { completed, progress: runnerDistanceFromStartingCrease(distance) };
-  };
   // Runners wait at the crease between crossings and after the configured cap.
-  const progress = runnerAt(flightSeconds).progress;
-  const strikerPositionZ = BATTER_CREASE_Z + progress;
-  const nonStrikerPositionZ = -BATTER_CREASE_Z - progress;
+  const { strikerPositionZ, nonStrikerPositionZ } = sampleAutomatedRunners(flightSeconds, runnerSpeedMetersPerSecond, maximumRuns, turnDelaySeconds);
   const targetCreaseZ = threatenedEnd === 'striker' ? BATTER_CREASE_Z : -BATTER_CREASE_Z;
   const nearestRunnerDistance = Math.min(Math.abs(strikerPositionZ - targetCreaseZ), Math.abs(nonStrikerPositionZ - targetCreaseZ));
   const runnerArrivalSeconds = nearestRunnerDistance / runnerSpeedMetersPerSecond;
   const runOut = flightSeconds > 0 && runnerArrivalSeconds > throwArrivalSeconds + 1e-10;
-  const runs = runnerAt(flightSeconds + throwArrivalSeconds).completed;
+  const runs = sampleAutomatedRunners(flightSeconds + throwArrivalSeconds, runnerSpeedMetersPerSecond, maximumRuns, turnDelaySeconds).completed;
 
   return { runs, runOut, threatenedEnd, strikerPositionZ, nonStrikerPositionZ, throwArrivalSeconds, runnerArrivalSeconds };
 }
