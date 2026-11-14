@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — visible non-striker
+
+- **Scope:** add a non-striker model at the bowler's end and source the ground-map marker from its scene position. Keep it off the bowling sightline and identify it by role, without inventing a squad identity.
+- [x] **Acceptance:** the model and map agree in both innings of batting-first and bowling-first matches. The desktop match verified all presets, a run-out, 12-event replay and accessible map; the 667×300 match verified compact map behavior and 13-event replay. Screenshots checked the batting view and compact bowling sightline. `npm test` passed 151 tests and the production build passed with the existing Babylon warning. The model is stationary and has no named identity; synchronized running animation remains open.
+
 ### Completed bounded increment — reachable low catches
 
 - **Finding:** both live play and simulation reject airborne catches at or below 1.2 m, even when the fielder reaches the ball before it bounces. A diagnostic with seed `0x51a7` found many airborne trajectories but no catches, including when fielders were held stationary. This does not establish that the height gap alone explains the distribution.

@@ -114,10 +114,11 @@ export class UIManager {
     }));
     const bowler = this.gameScene.getBowlerPosition();
     const striker = this.gameScene.getBatterPosition();
+    const nonStriker = this.gameScene.getNonStrikerPosition();
     players.push(
       { key: 'bowler', label: `${innings.bowler.name} · bowler`, shortLabel: 'B', role: 'bowler', team: 'fielding', ...bowler },
       { key: 'striker', label: `${innings.batter.name} · striker`, shortLabel: 'S', role: 'striker', team: 'batting', ...striker },
-      { key: 'non-striker', label: 'Non-striker · batting team · crease marker', shortLabel: 'N', role: 'non-striker', team: 'batting', x: 0, z: 8.8 },
+      { key: 'non-striker', label: 'Non-striker · batting team', shortLabel: 'N', role: 'non-striker', team: 'batting', ...nonStriker },
     );
     renderFieldRadarMarkers(markers, players);
     const accessibleList = document.getElementById('field-radar-player-list');

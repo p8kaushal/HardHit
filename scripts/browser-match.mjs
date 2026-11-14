@@ -64,6 +64,7 @@ try {
     const { MatchController } = await import('/src/game.ts');
     const { setGamePaused, isGamePaused } = await import('/src/game-clock.ts');
     const { deliveryContactPoint, BALL_RADIUS_METERS } = await import('/src/formula.ts');
+    const { fieldRadarPoint } = await import('/src/field-radar.ts');
     if (fieldPresetFixture) {
       const startBowling = UIManager.prototype.startUserBowlingDelivery;
       UIManager.prototype.startUserBowlingDelivery = function (...args) {
@@ -96,6 +97,8 @@ try {
     const deliverBall3D = UIManager.prototype.deliverBall3D;
     UIManager.prototype.deliverBall3D = function (...args) {
       const playerIsBowling = this.controller.getCurrentInnings().batter.id !== this.controller.state.player.id;
+      const nonStriker = this.gameScene.getNonStrikerPosition();
+      const nonStrikerPoint = fieldRadarPoint(nonStriker.x, nonStriker.z);
       const fieldCheck = {
         playerIsBowling,
         hand: this.controller.getCurrentInnings().batter.batterHand || 'RHB',
@@ -105,6 +108,11 @@ try {
           pickable: mesh.isPickable,
           visible: mesh.isVisible && mesh.isEnabled(),
         })),
+        nonStriker: { position: nonStriker,
+          visible: this.gameScene.nonStrikerRoot?.isEnabled() && this.gameScene.nonStrikerRoot.getChildMeshes().every(mesh => mesh.isVisible && mesh.isEnabled() && !mesh.isPickable),
+          meshCount: this.gameScene.nonStrikerRoot?.getChildMeshes().length ?? 0,
+          marker: document.querySelector('[data-player-key="non-striker"]')?.getAttribute('transform'),
+          expectedMarker: `translate(${nonStrikerPoint.x.toFixed(2)} ${nonStrikerPoint.y.toFixed(2)})` },
       };
       window.__fielderSceneCheck = fieldCheck;
       (window.__fielderSceneChecks ??= []).push(fieldCheck);
@@ -446,6 +454,13 @@ try {
     throw new Error(`Visible default fielder setup is incomplete: ${JSON.stringify(fielders)}`);
   }
   console.log(`Visible fielding setup has ${fielders.positions.length} players in range with ${fielders.meshes.length} enabled, non-pickable meshes.`);
+  const supportingBatters = await page.evaluate(() => window.__fielderSceneChecks);
+  if (![true, false].every(playerIsBowling => supportingBatters.some(check => check.playerIsBowling === playerIsBowling &&
+      check.nonStriker.visible && check.nonStriker.meshCount >= 10 && check.nonStriker.position.x === 3.2 &&
+      check.nonStriker.position.z === 8.8 && check.nonStriker.marker === check.nonStriker.expectedMarker))) {
+    throw new Error(`Non-striker model or map marker missing in an innings: ${JSON.stringify(supportingBatters)}`);
+  }
+  console.log('Visible non-striker and matching ground-map marker verified in both innings.');
   if (fieldPresetFixture) {
     const fieldingSetups = await page.evaluate(() => ({ selected: window.__fieldPresetSelected, checks: window.__fielderSceneChecks, cycle: window.__fieldPresetCycle ?? [] }));
     const requestedPresets = fieldPresetFixture === 'all' ? ['attacking', 'balanced', 'deep'] : [fieldPresetFixture];

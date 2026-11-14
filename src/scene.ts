@@ -36,6 +36,7 @@ export class GameScene {
   private bowlerArms: BABYLON.Mesh[] = [];
   private bowlerRunUpSide: { overTheWicket: boolean; bowlingArm: 'Right' | 'Left' } = { overTheWicket: true, bowlingArm: 'Right' };
   public batterRoot: BABYLON.TransformNode | null = null;
+  private nonStrikerRoot: BABYLON.TransformNode | null = null;
   private batterHead: BABYLON.TransformNode | null = null;
   public batMesh: BABYLON.Mesh | null = null;
   private batPivot: BABYLON.TransformNode | null = null;
@@ -455,6 +456,28 @@ export class GameScene {
     batter.rotation.y = this.batterStanceAngle();
     this.batterRoot = batter;
     this.updateBatterPosition();
+
+    // A supporting batter stands clear of the bowler's approach and camera.
+    // This is a role representation; the game does not yet model a full squad.
+    const nonStriker = new BABYLON.TransformNode('nonStrikerRoot', this.scene);
+    nonStriker.position.set(3.2, 0, -BATTER_CREASE_Z);
+    nonStriker.rotation.y = Math.PI;
+    limb('nonStrikerTorso', nonStriker, blue, 0, 1.23, 0, 0.67, 0.42);
+    ball('nonStrikerHead', nonStriker, skin, 0, 1.76, 0, 0.27);
+    const nonStrikerHelmet = ball('nonStrikerHelmet', nonStriker, helmet, 0, 1.84, 0, 0.29);
+    nonStrikerHelmet.scaling.y = 0.75;
+    [-1, 1].forEach((side, i) => {
+      limb(`nonStrikerLeg${i}`, nonStriker, trousers, side * 0.13, 0.48, 0, 0.86, 0.17);
+      box(`nonStrikerPad${i}`, nonStriker, pads, side * 0.13, 0.38, 0.095, 0.19, 0.57, 0.1);
+      box(`nonStrikerShoe${i}`, nonStriker, shoes, side * 0.13, 0.06, 0.06, 0.18, 0.1, 0.3);
+      const arm = limb(`nonStrikerArm${i}`, nonStriker, blue, side * 0.27, 1.18, 0.07, 0.58, 0.13);
+      arm.rotation.z = side * 0.24;
+      ball(`nonStrikerGlove${i}`, nonStriker, pads, side * 0.3, 0.89, 0.13, 0.16);
+    });
+    const nonStrikerBat = box('nonStrikerBat', nonStriker, batWood, 0.37, 0.46, 0.19, 0.2, 0.65, 0.06);
+    nonStrikerBat.rotation.z = -0.14;
+    limb('nonStrikerBatHandle', nonStriker, grip, 0.32, 0.88, 0.19, 0.24, 0.05);
+    this.nonStrikerRoot = nonStriker;
   }
 
   public setBatterHandedness(hand: 'RHB' | 'LHB'): void {
@@ -489,6 +512,12 @@ export class GameScene {
     return this.bowlerRoot
       ? { x: this.bowlerRoot.position.x, z: this.bowlerRoot.position.z }
       : { x: 0, z: 11.5 };
+  }
+
+  public getNonStrikerPosition(): { x: number; z: number } {
+    return this.nonStrikerRoot
+      ? { x: this.nonStrikerRoot.position.x, z: this.nonStrikerRoot.position.z }
+      : { x: 3.2, z: -BATTER_CREASE_Z };
   }
 
   public setFieldPreset(preset: FieldPreset): void {
