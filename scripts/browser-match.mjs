@@ -30,6 +30,7 @@ try {
   const fixtureWide = process.argv.includes('--fixture-wide');
   const runOutFixture = process.argv.includes('--require-runout');
   const recoveryFixture = process.argv.includes('--require-recovery');
+  const padDeflectionFixture = process.argv.includes('--require-pad-deflection');
   const pauseReturn = process.argv.includes('--pause-return');
   if (pauseReturn && !runOutFixture) throw new Error('--pause-return requires --require-runout');
   const fieldingFixture = process.argv.includes('--require-fielding') || runOutFixture || recoveryFixture;
@@ -60,7 +61,7 @@ try {
       }, { timeout: 5000 }, portrait);
     });
   }
-  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, pauseReturn, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, recoveryFixture, catchFixture, lowCatchFixture, fieldPresetFixture }) => {
+  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, pauseReturn, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, recoveryFixture, padDeflectionFixture, catchFixture, lowCatchFixture, fieldPresetFixture }) => {
     const { GameScene } = await import('/src/scene.ts');
     const { UIManager } = await import('/src/ui.ts');
     const { globalAutoAssistConfig } = await import('/src/game.ts');
@@ -88,6 +89,20 @@ try {
     const animateDelivery = GameScene.prototype.animateDelivery;
     const endDeliveryCycle = GameScene.prototype.endDeliveryCycle;
     const beginFieldingReturn = GameScene.prototype.beginFieldingReturn;
+    const animateMissWicket = GameScene.prototype.animateMissWicket;
+    GameScene.prototype.animateMissWicket = function (isWicket, continuingDelivery, padImpactDelivery) {
+      const result = animateMissWicket.call(this, isWicket, continuingDelivery, padImpactDelivery);
+      if (padDeflectionFixture && padImpactDelivery) {
+        const startZ = this.ballMesh.position.z;
+        const update = this.updateMissedAnimation;
+        window.__padDeflection = { startZ, maxZ: startZ, wicket: isWicket };
+        this.updateMissedAnimation = () => {
+          update?.call(this);
+          window.__padDeflection.maxZ = Math.max(window.__padDeflection.maxZ, this.ballMesh.position.z);
+        };
+      }
+      return result;
+    };
     const setRunnerVisuals = GameScene.prototype.setRunnerVisuals;
     const getShotFielder = GameScene.prototype.getShotFielder;
     const getShotCatcher = GameScene.prototype.getShotCatcher;
@@ -129,6 +144,11 @@ try {
           Object.assign(this.activeDelivery, { aimTarget: { x: 1.65, z: -3.5 }, line: 'off', length: 'good', frontFootHeel: -0.1, swing: 0, turn: 0 });
           window.__wideInjected = true;
         }
+        globalAutoAssistConfig.currentDelivery = this.activeDelivery;
+      }
+      if (!playerIsBowling && padDeflectionFixture && !window.__padDeliveryInjected && this.activeDelivery) {
+        Object.assign(this.activeDelivery, { aimTarget: { x: 0.35, z: -3.5 }, line: 'middle', length: 'good', type: 'offspin', pace: 0.65, swing: 0, turn: 1, frontFootHeel: -0.1 });
+        window.__padDeliveryInjected = true;
         globalAutoAssistConfig.currentDelivery = this.activeDelivery;
       }
       if (!playerIsBowling && noBallFixture && !window.__noBallInjected && this.activeDelivery) {
@@ -338,7 +358,7 @@ try {
         arrived();
       }, ...rest);
     };
-  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, pauseReturn, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, recoveryFixture, catchFixture, lowCatchFixture, fieldPresetFixture });
+  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, pauseReturn, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, recoveryFixture, padDeflectionFixture, catchFixture, lowCatchFixture, fieldPresetFixture });
   if (process.argv.includes('--force-tie')) {
     // Test-only fixture: make regular-innings deliveries legal dots so the
     // real UI must play both sudden-death innings. Production code is unchanged.
@@ -701,6 +721,11 @@ try {
       throw new Error(`Stopped ball was not recovered before its timed return and score: ${JSON.stringify(returns)}`);
     }
     console.log(`Stopped ball was recovered by ${recovered.fielder} ${(recovered.flightSeconds - recovered.restStartedAt).toFixed(2)} s after rest.`);
+  }
+  if (padDeflectionFixture) {
+    const pad = await page.evaluate(() => window.__padDeflection);
+    if (!pad || !(pad.maxZ > pad.startZ + 0.05)) throw new Error(`Pad impact did not visibly rebound toward the bowler: ${JSON.stringify(pad)}`);
+    console.log(`Pad impact visibly rebounded ${(pad.maxZ - pad.startZ).toFixed(2)} m toward the bowler.`);
   }
   if (catchFixture) {
     if (!process.argv.includes('--trace-shots')) throw new Error('catch fixtures require --trace-shots');

@@ -14,7 +14,13 @@
 
 ### Next priority — model impact and pad deflection against evidence
 
-- Sample incoming position/velocity at first body contact, resolve bowled/LBW eligibility from that same event, and continue a pad-deflected trajectory instead of stopping the visual. First establish traceable parameter sources or a reproducible test dataset; avoid claiming Law 36 accuracy without first-contact and genuine-attempt inputs.
+- **Evidence found:** Stretch et al. (1998) report rebound distances for four pad types at four impact speeds (15.34, 22.97, 30.68, 34.45 m/s), with pad-specific means from 7.16 to 12.52 m. Their lab used a ball projected at about 45° onto a pad fixed vertically over astroturf; it reports range, not a general outgoing velocity vector or restitution coefficient. The measures can inform a fixture, but cannot directly calibrate the in-game 3D deflection.
+- Sample incoming position/velocity at first body contact, resolve bowled/LBW eligibility from that same event, and continue a pad-deflected trajectory. Preserve the measured data by pad type and impact speed; do not collapse it into a universal coefficient. Establish how the test geometry maps to the game before choosing a response law. Avoid claiming Law 36 accuracy without first-contact and genuine-attempt inputs.
+
+### Completed bounded increment — evidence-based pad rebound response
+
+- Added the paper's P2 rebound-distance samples and infer a normal restitution per measured impact speed assuming its approximately 45° incidence, vertical pad and same-height ballistic return; interpolate between observations and preserve tangential velocity as an explicit frictionless assumption. The live missed-ball visual now reflects the incoming normal velocity at the stance-adjusted impact plane and continues under gravity. The wicket verdict still evaluates the incoming path.
+- [x] `npm test` passed 158 tests, including reconstruction of all four measured P2 ranges and a scene-level post-impact direction check. `npm run build` passed with the existing Babylon bundle warning; `git diff --check` and browser harness syntax check passed. `node scripts/browser-match.mjs --require-pad-deflection --trace-shots --verify-replay` completed both innings and lobby; the forced pad impact visibly rebounded 4.05 m toward the bowler, and the 14-event replay matched scorecards. The outgoing-angle mapping is grounded only for the study's geometry; no actual player-pad measurements, bat-first ordering or genuine-attempt evidence are modeled.
 
 ### Completed bounded increment — recover stopped balls
 

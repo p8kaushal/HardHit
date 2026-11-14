@@ -2,10 +2,11 @@ import * as BABYLON from 'babylonjs';
 import { gameNow, isGamePaused, setGameTimeout } from './game-clock';
 import { CameraMode, DeliveryChoice, DeliveryType, FieldPreset } from './types';
 import { globalAutoAssistConfig } from './game';
-import { BALL_RADIUS_METERS, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, sampleDeliveryPath } from './formula';
+import { BALL_RADIUS_METERS, BATTER_CONTACT_Z, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryBatterImpactPoint, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, deliveryVelocityAtProgress, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
 import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_MAX_RECOVERY_SECONDS, FIELDING_RUNNER_PICKUP_DELAY_SECONDS, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, sampleAutomatedRunners, sampleAutomatedReturn, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
+import { deflectFromReferencePad } from './pad-impact';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
 const BALL_VISUAL_RADIUS = 0.075;
@@ -1281,13 +1282,31 @@ export class GameScene {
     return this.shotTrajectory.map(sample => ({ ...sample, position: { ...sample.position } }));
   }
 
-  public animateMissWicket(isWicket: boolean, continuingDelivery?: DeliveryChoice): void {
+  public animateMissWicket(isWicket: boolean, continuingDelivery?: DeliveryChoice, padImpactDelivery?: DeliveryChoice): void {
     this.isAnimatingBall = false;
     this.updateMissedAnimation = null;
     this.clearBallTrail();
     this.bounceMarker?.setEnabled(false);
     const ball = this.ballMesh;
-    if (ball && continuingDelivery) {
+    if (ball && padImpactDelivery) {
+      const impactProgress = deliveryProgressAtZ(padImpactDelivery, BATTER_CONTACT_Z + (padImpactDelivery.batterPosition?.z ?? 0));
+      const impact = deliveryBatterImpactPoint(padImpactDelivery);
+      const velocity = deflectFromReferencePad(deliveryVelocityAtProgress(padImpactDelivery, impactProgress));
+      const state: BallState = { position: { ...impact }, velocity, hasBounced: false, reachedBoundary: false, stopped: false };
+      let accumulator = 0;
+      let elapsed = 0;
+      ball.setEnabled(true);
+      this.updateMissedAnimation = () => {
+        const dt = Math.min(this.engine.getDeltaTime() / 1000, 0.25);
+        elapsed += dt;
+        accumulator = advanceBallFrame(state, accumulator, dt, undefined, true);
+        ball.position.set(state.position.x, state.position.y + BALL_VISUAL_OFFSET, state.position.z);
+        if (state.stopped || elapsed >= 1.5) {
+          ball.setEnabled(false);
+          this.updateMissedAnimation = null;
+        }
+      };
+    } else if (ball && continuingDelivery) {
       const wicketProgress = deliveryProgressAtZ(continuingDelivery, BATTER_STUMPS_Z);
       const startProgress = Math.max(0, Math.min(wicketProgress, deliveryProgressAtZ(continuingDelivery, ball.position.z)));
       const startTime = gameNow();

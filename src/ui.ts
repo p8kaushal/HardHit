@@ -952,13 +952,13 @@ export class UIManager {
       desc = outcome.extraType === 'noball'
         ? `Front foot ${((outcome.delivery.frontFootHeel ?? 0) * 100).toFixed(1)} cm over the line. Extra ball and free hit.`
         : 'Wide delivery. One penalty run and an extra ball.';
-      this.gameScene.animateMissWicket(false, deliveryHitsPad(outcome.delivery) ? undefined : outcome.delivery);
+      this.gameScene.animateMissWicket(false, deliveryHitsPad(outcome.delivery) ? undefined : outcome.delivery, deliveryHitsPad(outcome.delivery) ? outcome.delivery : undefined);
       this.showResultToast(title, desc);
     } else if (outcome.isWicket) {
       gameSound.play(outcome.wicketReason === 'LBW' ? 'bounce' : 'wicket');
       title = 'WICKET!';
       desc = outcome.wicketReason;
-      this.gameScene.animateMissWicket(true, outcome.wicketReason === 'Bowled' ? outcome.delivery : undefined);
+      this.gameScene.animateMissWicket(true, outcome.wicketReason === 'Bowled' ? outcome.delivery : undefined, outcome.wicketReason === 'LBW' ? outcome.delivery : undefined);
       this.showResultToast(title, desc);
     } else if (outcome.shot && !outcome.missed) {
       gameSound.play('bat');
@@ -976,7 +976,7 @@ export class UIManager {
     } else {
       title = 'Dot Ball';
       desc = outcome.wicketReason || 'A swing and a miss!';
-      this.gameScene.animateMissWicket(false, deliveryHitsPad(outcome.delivery) ? undefined : outcome.delivery);
+      this.gameScene.animateMissWicket(false, deliveryHitsPad(outcome.delivery) ? undefined : outcome.delivery, deliveryHitsPad(outcome.delivery) ? outcome.delivery : undefined);
       this.showResultToast(title, desc);
     }
   }

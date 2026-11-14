@@ -21,6 +21,7 @@ import { GameScene } from '../src/scene';
 import { battingTimingFeedback } from '../src/batting-timing';
 import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryBatterImpactPoint, deliveryBounceProgress, deliveryContactPoint, deliveryHitsPad, deliveryProgressAtZ, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
 import { fieldRadarPoint } from '../src/field-radar';
+import { deflectFromReferencePad, PAD_P2_REBOUND_DATA } from '../src/pad-impact';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
 import type { BallOutcome, DeliveryChoice, Player, ShotType } from '../src/types';
@@ -694,6 +695,20 @@ test('pad interception and LBW use the same stance-adjusted batter-plane sample'
   }
 });
 
+test('reference pad response reproduces measured 45-degree rebound ranges', () => {
+  for (const sample of PAD_P2_REBOUND_DATA) {
+    const component = sample.impactSpeed / Math.sqrt(2);
+    const outgoing = deflectFromReferencePad({ x: 0, y: component, z: -component });
+    const predictedRange = 2 * outgoing.y * outgoing.z / 9.81;
+    assert.ok(outgoing.z > 0, 'pad response reverses the normal velocity');
+    assert.ok(Math.abs(predictedRange - sample.reboundDistance) < 1e-9, 'measured range anchors the inferred response');
+  }
+  const oblique = deflectFromReferencePad({ x: 3, y: 4, z: -12 });
+  assert.equal(oblique.x, 3, 'frictionless tangential components are preserved as an explicit assumption');
+  assert.equal(oblique.y, 4);
+  assert.ok(oblique.z > 0);
+});
+
 test('missed-delivery decision table holds for mirrored batters', () => {
   const turning: DeliveryChoice = { ...delivery(0.5, 0.35), type: 'offspin', turn: 1 };
   const cases: Array<{ name: string; ball: DeliveryChoice; pad: boolean; offered: boolean; result: 'lbw' | 'bowled' | null }> = [
@@ -816,6 +831,31 @@ test('missed deliveries continue only when the modeled pad does not intercept th
     ui.controller = { recordBall: () => ({ delivery: choice, shot: null, missed: true, isWicket: false, isExtra: false, wicketReason: '', extraType: null }) };
     ui.handleBallArrivalAtStumps();
     assert.equal(continuation, choice === clearBall ? choice : undefined);
+  }
+});
+
+test('a pad impact continues the visual with reflected incoming velocity', () => {
+  const originalWindow = globalThis.window;
+  Object.assign(globalThis, { window: { setTimeout: () => 1 } });
+  try {
+    const padBall = { ...delivery(0.5, 0.35), type: 'offspin' as const, turn: 1 };
+    const impact = deliveryBatterImpactPoint(padBall);
+    const ball = { position: new Vector3(impact.x, impact.y, impact.z), setEnabled: (_value: boolean) => {} };
+    const scene = Object.create(GameScene.prototype) as any;
+    scene.ballMesh = ball;
+    scene.ballTrail = null;
+    scene.bounceMarker = null;
+    scene.batterRoot = null;
+    scene.engine = { getDeltaTime: () => 16 };
+    scene.clearBallTrail = () => {};
+    scene.onBallResolvedCallback = null;
+    scene.animateMissWicket(false, undefined, padBall);
+    assert.equal(typeof scene.updateMissedAnimation, 'function');
+    scene.updateMissedAnimation();
+    assert.ok(ball.position.z > impact.z, 'outgoing ball travels back toward the bowler after pad contact');
+    assert.ok(ball.position.y >= impact.y, 'the incoming vertical component is retained at first');
+  } finally {
+    Object.assign(globalThis, { window: originalWindow });
   }
 });
 

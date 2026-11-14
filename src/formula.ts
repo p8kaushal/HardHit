@@ -155,11 +155,18 @@ export function deliveryContactPoint(delivery: DeliveryChoice): { x: number; y: 
 
 /** Approximate incoming velocity at contact from the same path used on screen. */
 export function deliveryVelocityAtCrease(delivery: DeliveryChoice): { x: number; y: number; z: number } {
-  const contact = batterContactProgress(delivery);
-  const before = sampleDeliveryPath(delivery, Math.max(0, contact - 0.01));
-  const atCrease = sampleDeliveryPath(delivery, contact);
-  const seconds = deliveryDurationMs(delivery.type, delivery.pace) / 1000 * 0.01;
-  return { x: (atCrease.x - before.x) / seconds, y: (atCrease.y - before.y) / seconds, z: (atCrease.z - before.z) / seconds };
+  return deliveryVelocityAtProgress(delivery, batterContactProgress(delivery));
+}
+
+export function deliveryVelocityAtProgress(delivery: DeliveryChoice, progress: number): { x: number; y: number; z: number } {
+  const deltaProgress = 0.001;
+  const beforeProgress = Math.max(0, progress - deltaProgress);
+  const before = sampleDeliveryPath(delivery, beforeProgress);
+  const atPoint = sampleDeliveryPath(delivery, progress);
+  const seconds = deliveryDurationMs(delivery.type, delivery.pace) / 1000 * (progress - beforeProgress);
+  return seconds > 0
+    ? { x: (atPoint.x - before.x) / seconds, y: (atPoint.y - before.y) / seconds, z: (atPoint.z - before.z) / seconds }
+    : { x: 0, y: 0, z: 0 };
 }
 
 /** Shared authored-path sample at the batter's modeled pad/impact plane. */
