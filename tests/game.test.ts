@@ -586,7 +586,7 @@ test('partially saved profiles retain progress while missing stats get defaults'
   assert.equal(player.rank, 'Silver');
   assert.equal(player.stats.batting.power, 72);
   assert.equal(player.stats.bowling.accuracy, 50);
-  assert.deepEqual(player.stats.fielding, { agility: 50, reaction: 50 });
+  assert.deepEqual(player.stats.fielding, { agility: 50, reaction: 50, catching: 50 });
 });
 
 test('a match can start when browser storage is unavailable', () => {
@@ -2086,6 +2086,28 @@ test('finalizing a six records its runs and biggest hit consistently', () => {
   assert.equal(innings.balls[0].distance, 58);
 });
 
+test('a reachable legal aerial catch is a wicket and scores no shot runs', () => {
+  const game = match();
+  const innings = game.getCurrentInnings();
+  game.recordBall(delivery(0.5), { direction: 0, type: 'lofted', timing: 0.5, contactZone: 0.5 });
+  assert.equal(game.finalizeBallOutcome(12, false, false, 'point'), 0);
+  assert.equal(innings.wicketsLost, 1);
+  assert.equal(innings.score, 0);
+  assert.equal(innings.balls[0].isWicket, true);
+  assert.equal(innings.balls[0].wicketReason, 'Caught by point');
+});
+
+test('aerial catch on a no-ball stops the shot without dismissing the batter', () => {
+  const game = match();
+  const innings = game.getCurrentInnings();
+  game.recordBall({ ...delivery(0.5), frontFootHeel: 0.01 }, { direction: 0, type: 'lofted', timing: 0.5, contactZone: 0.5 });
+  game.finalizeBallOutcome(8, false, false, 'cover');
+  assert.equal(innings.wicketsLost, 0);
+  assert.equal(innings.score, 2, 'one penalty run plus one estimated run');
+  assert.equal(innings.balls[0].isWicket, false);
+  assert.equal(innings.balls[0].runs, 1);
+});
+
 test('the result banner uses the same finalized distance as the score', () => {
   const game = match();
   game.setTossResult(game.state.player.id, 'bowl');
@@ -2122,6 +2144,7 @@ test('the result banner uses the same finalized distance as the score', () => {
       animateDelivery: (_aim: unknown, _length: unknown, _type: unknown, _arrived: unknown, resolved: () => void) => { resolveBall = resolved; },
       getShotDistance: () => 150,
       getShotFielder: () => null,
+      getShotCatcher: () => null,
       shotBoundaryOnFull: true,
       shotReachedBoundary: true
     };

@@ -41,8 +41,9 @@ export class GameScene {
   private batPivot: BABYLON.TransformNode | null = null;
   private readonly fielderRoots = new Map<FieldingPosition['name'], BABYLON.TransformNode>();
   private readonly fielderProfiles = new Map<FieldingPosition['name'], FielderReachProfile>();
-  private fieldingRatings = { agility: 50, reaction: 50 };
+  private fieldingRatings = { agility: 50, reaction: 50, catching: 50 };
   private shotFieldedBy: FieldingPosition['name'] | null = null;
+  private shotCaughtBy: FieldingPosition['name'] | null = null;
 
 
   // Animation state
@@ -477,14 +478,19 @@ export class GameScene {
     }));
   }
 
-  public setFieldingRatings(agility: number, reaction: number): void {
+  public setFieldingRatings(agility: number, reaction: number, catching = 50): void {
     // Validate against the same bounded scale used to build movement profiles.
     fielderReachProfileFromRatings({ x: 0, z: 0 }, agility, reaction);
-    this.fieldingRatings = { agility, reaction };
+    if (!Number.isFinite(catching) || catching < 0 || catching > 100) throw new Error('Catching rating must be between 0 and 100');
+    this.fieldingRatings = { agility, reaction, catching };
   }
 
   public getShotFielder(): FieldingPosition['name'] | null {
     return this.shotFieldedBy;
+  }
+
+  public getShotCatcher(): FieldingPosition['name'] | null {
+    return this.shotCaughtBy;
   }
 
   private buildFielders(): void {
@@ -1020,7 +1026,7 @@ export class GameScene {
           timeSeconds: this.shotElapsedSeconds,
           position: { x: state.position.x, y: state.position.y, z: state.position.z },
         });
-        if (state.reachedBoundary || !state.hasBounced || state.position.y > 1.2) return false;
+        if (state.reachedBoundary) return false;
         for (const [name, profile] of this.fielderProfiles) {
           if (!hasFielderReacted(profile, this.shotElapsedSeconds)) continue;
           const root = this.fielderRoots.get(name);
@@ -1033,7 +1039,12 @@ export class GameScene {
           );
           root.position.x = next.x;
           root.position.z = next.z;
-          if (Math.hypot(state.position.x - next.x, state.position.z - next.z) <= profile.reachRadiusMeters) {
+          const gap = Math.hypot(state.position.x - next.x, state.position.z - next.z);
+          if (!state.hasBounced && state.position.y > 1.2 && state.position.y <= 1.65 + this.fieldingRatings.catching * 0.015 && gap <= profile.reachRadiusMeters) {
+            this.shotCaughtBy = name;
+            return true;
+          }
+          if (state.hasBounced && state.position.y <= 1.2 && gap <= profile.reachRadiusMeters) {
             this.shotFieldedBy = name;
             return true;
           }
@@ -1114,6 +1125,7 @@ export class GameScene {
     this.shotReachedBoundary = false;
     this.shotBoundaryOnFull = false;
     this.shotFieldedBy = null;
+    this.shotCaughtBy = null;
     this.fielderProfiles.clear();
     for (const fielder of createDefaultFieldLayout(this.batterHand)) {
       const root = this.fielderRoots.get(fielder.name);

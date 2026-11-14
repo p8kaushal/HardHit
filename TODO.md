@@ -1,5 +1,10 @@
 # Gameplay to-do
 
+### Completed bounded increment — reachable aerial catches
+
+- **Scope:** model catching as a separate fielding skill; allow a fielder to catch only a reachable airborne ball before rope crossing, resolve a legal catch as a wicket, and preserve no-ball/free-hit protections.
+- [x] **Acceptance:** unit tests verify legal catches add one wicket and zero shot runs, while no-ball catches add the penalty plus stopped-distance estimate without a dismissal. `npm test` passed 135 tests, build and `git diff --check` passed. `node scripts/browser-match.mjs --bat-first --swing --square --require-catch --trace-shots` completed a full match; the point fielder caught the controlled aerial shot and the wicket appeared in the result toast. The browser catch envelope and ratings are provisional; jumps/animations are not modeled.
+
 ### Completed bounded increment — rated live ground fielding
 
 - **Scope:** use the bowling-side player's provisional agility/reaction ratings to move visible fielders during fixed-step ball flight; stop a reachable, low ground ball at the fielding point so final distance-based runs decrease, and identify the fielder in the result message.

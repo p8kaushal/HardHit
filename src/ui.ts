@@ -747,9 +747,16 @@ export class UIManager {
       if (lastBall && lastBall.shot && !lastBall.missed && !lastBall.isWicket && lastBall.extraType !== 'wide') {
         const rawDistance = this.gameScene.getShotDistance();
         const hasBounced = this.gameScene.shotBoundaryOnFull ? false : (globalAutoAssistConfig.hasBounced || false);
-        const runs = this.controller.finalizeBallOutcome(rawDistance, hasBounced, this.gameScene.shotReachedBoundary);
+        const caughtBy = this.gameScene.getShotCatcher();
+        const runs = this.controller.finalizeBallOutcome(rawDistance, hasBounced, this.gameScene.shotReachedBoundary, caughtBy);
         const shotDistanceMeters = lastBall.distance;
         const fieldedBy = this.gameScene.getShotFielder();
+
+        if (lastBall.isWicket) {
+          this.showResultToast('WICKET!', lastBall.wicketReason);
+          this.updateHUD();
+          this.controller.handleInningsCompletion();
+        } else {
         
         let title = `${runs} RUNS`;
         let desc = fieldedBy
@@ -773,6 +780,7 @@ export class UIManager {
         // Step 2: Freeze the tracking camera target on ball's final location and display scoring result banner for exactly 2.0 seconds
         this.showResultToast(title, desc);
         this.updateHUD();
+        }
       } else if (lastBall) {
         this.controller.handleInningsCompletion();
       }
@@ -867,8 +875,8 @@ export class UIManager {
       const quality = shotFlightQuality(outcome.shot, outcome.delivery, assist);
       const batterPower = innings.batter.stats.batting.power;
       const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, deliveryVelocityAtCrease(outcome.delivery), {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower);
-      const fielding = innings.bowler.stats.fielding ?? { agility: 50, reaction: 50 };
-      this.gameScene.setFieldingRatings(fielding.agility, fielding.reaction);
+      const fielding = innings.bowler.stats.fielding ?? { agility: 50, reaction: 50, catching: 50 };
+      this.gameScene.setFieldingRatings(fielding.agility, fielding.reaction, fielding.catching ?? 50);
       this.gameScene.animateHitPath(outcome.distance, outcome.shot.direction, vOut);
       this.controller.setCameraMode('follow_shot');
       // Result toast is deferred to onBallResolvedCallback

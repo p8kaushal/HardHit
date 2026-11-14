@@ -27,6 +27,7 @@ try {
   const botBatsSpin = process.argv.includes('--bot-bats-spin');
   const fixtureWide = process.argv.includes('--fixture-wide');
   const fieldingFixture = process.argv.includes('--require-fielding');
+  const catchFixture = process.argv.includes('--require-catch');
   const verifyReplay = process.argv.includes('--verify-replay');
   if ([botBatsFast, botBatsSpin, fixtureWide].filter(Boolean).length > 1) throw new Error('Choose only one bot batting delivery override');
   const pauseFlight = process.argv.includes('--pause-flight') || pauseVisibility || pauseRotation;
@@ -49,7 +50,7 @@ try {
       }, { timeout: 5000 }, portrait);
     });
   }
-  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture }) => {
+  await page.evaluate(async ({ traceShots, noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture }) => {
     const { GameScene } = await import('/src/scene.ts');
     const { UIManager } = await import('/src/ui.ts');
     const { globalAutoAssistConfig } = await import('/src/game.ts');
@@ -59,14 +60,15 @@ try {
     const animateDelivery = GameScene.prototype.animateDelivery;
     const endDeliveryCycle = GameScene.prototype.endDeliveryCycle;
     const getShotFielder = GameScene.prototype.getShotFielder;
+    const getShotCatcher = GameScene.prototype.getShotCatcher;
     const showResultToast = UIManager.prototype.showResultToast;
     UIManager.prototype.showResultToast = function (title, description, ...args) {
-      if (fieldingFixture && title === 'Fielded') (window.__fieldingToasts ??= []).push({ title, description });
+      if ((fieldingFixture && title === 'Fielded') || (catchFixture && title === 'WICKET!')) (window.__fieldingToasts ??= []).push({ title, description });
       return showResultToast.call(this, title, description, ...args);
     };
     const setFieldingRatings = GameScene.prototype.setFieldingRatings;
-    GameScene.prototype.setFieldingRatings = function (agility, reaction) {
-      return setFieldingRatings.call(this, fieldingFixture ? 100 : agility, fieldingFixture ? 100 : reaction);
+    GameScene.prototype.setFieldingRatings = function (agility, reaction, catching) {
+      return setFieldingRatings.call(this, (fieldingFixture || catchFixture) ? 100 : agility, (fieldingFixture || catchFixture) ? 100 : reaction, catchFixture ? 100 : catching);
     };
     const deliverBall3D = UIManager.prototype.deliverBall3D;
     UIManager.prototype.deliverBall3D = function (...args) {
@@ -108,6 +110,12 @@ try {
       }
       return fieldedBy;
     };
+    GameScene.prototype.getShotCatcher = function (...args) {
+      const caughtBy = getShotCatcher.apply(this, args);
+      const trace = window.__playerShotTrace.at(-1);
+      if (traceShots && playerBatting && trace) trace.caughtBy = caughtBy;
+      return caughtBy;
+    };
     window.__flightPause = null;
     const recordBall = MatchController.prototype.recordBall;
     MatchController.prototype.recordBall = function (delivery, shot) {
@@ -137,17 +145,20 @@ try {
       return result;
     };
     const finalize = MatchController.prototype.finalizeBallOutcome;
-    MatchController.prototype.finalizeBallOutcome = function (distance, bounced, reachedBoundary) {
+    MatchController.prototype.finalizeBallOutcome = function (distance, bounced, reachedBoundary, caughtBy) {
       const playerBatting = this.getCurrentInnings().batter.id === this.state.player.id;
-      const runs = finalize.call(this, distance, bounced, reachedBoundary);
+      const runs = finalize.call(this, distance, bounced, reachedBoundary, caughtBy);
+      const lastBall = this.getCurrentInnings().balls.at(-1);
       const replayEntry = window.__matchReplay.at(-1);
       if (replayEntry && !replayEntry.resolved) Object.assign(replayEntry, { resolved: true, flightDistance: distance, bounced, reachedBoundary, runs });
-      if (traceShots && playerBatting) Object.assign(window.__playerShotTrace.at(-1), { flightDistance: distance, bounced, reachedBoundary, runs });
+      if (traceShots && playerBatting) Object.assign(window.__playerShotTrace.at(-1), { flightDistance: distance, bounced, reachedBoundary, runs, wicket: lastBall.isWicket, wicketReason: lastBall.wicketReason });
       return runs;
     };
     const animateHitPath = GameScene.prototype.animateHitPath;
     GameScene.prototype.animateHitPath = function (distance, direction, velocity, ...rest) {
-      if (fieldingFixture && playerBatting && velocity) {
+      if (catchFixture && playerBatting) {
+        velocity = { x: 10, y: 6, z: 0 };
+      } else if (fieldingFixture && playerBatting && velocity) {
         velocity = { ...velocity, x: velocity.x * 0.35, z: velocity.z * 0.35 };
       }
       const result = animateHitPath.call(this, distance, direction, velocity, ...rest);
@@ -155,6 +166,10 @@ try {
         const pointFielder = this.fielderRoots.get('point');
         pointFielder?.position.set(2.5, 0, -8.4);
         window.__fieldingFixtureSet = true;
+      }
+      if (catchFixture && playerBatting && !window.__catchFixtureSet) {
+        this.fielderRoots.get('point')?.position.set(3.8, 0, -8.4);
+        window.__catchFixtureSet = true;
       }
       const trace = window.__playerShotTrace.at(-1);
       if (traceShots && playerBatting && trace && !('launchVelocity' in trace)) {
@@ -214,7 +229,7 @@ try {
         arrived();
       }, ...rest);
     };
-  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture });
+  }, { traceShots: process.argv.includes('--trace-shots'), noBallFixture, pauseFlight, pauseVisibility, pauseRotation, botBatsFast, botBatsSpin, fixtureWide, fieldingFixture, catchFixture });
   if (process.argv.includes('--force-tie')) {
     // Test-only fixture: make regular-innings deliveries legal dots so the
     // real UI must play both sudden-death innings. Production code is unchanged.
@@ -473,6 +488,16 @@ try {
       throw new Error(`Interception did not move the fielder, identify it, and reduce the unobstructed run estimate: ${JSON.stringify({ fielded, noFielder, fielderGap, resultToast })}`);
     }
     console.log(`Ground ball was stopped by ${fielded.fieldedBy} for ${fielded.runs} estimated run(s); without fielding it would score ${noFielder.runs} at ${noFielder.distance.toFixed(1)}m.`);
+  }
+  if (process.argv.includes('--require-catch')) {
+    if (!process.argv.includes('--trace-shots')) throw new Error('--require-catch requires --trace-shots');
+    const trace = await page.evaluate(() => window.__playerShotTrace);
+    const caught = trace.find(shot => shot.caughtBy && shot.wicket && shot.runs === 0 && shot.wicketReason === `Caught by ${shot.caughtBy}`);
+    const toasts = await page.evaluate(() => window.__fieldingToasts ?? []);
+    if (!caught || !toasts.some(toast => toast.title === 'WICKET!' && toast.description === caught.wicketReason)) {
+      throw new Error(`Reachable aerial catch did not resolve and display as a wicket: ${JSON.stringify(trace.map(shot => ({ caughtBy: shot.caughtBy, wicket: shot.wicket, wicketReason: shot.wicketReason, runs: shot.runs })))}`);
+    }
+    console.log(`Aerial shot was caught by ${caught.caughtBy} and recorded as a wicket.`);
   }
   for (const selector of ['#summary-player-tracker .mini-dot', '#summary-bot-tracker .mini-dot']) {
     if (await page.$$eval(selector, els => els.length) < 6) throw new Error(`Incomplete scorecard: ${selector}`);

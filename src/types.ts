@@ -18,6 +18,7 @@ export interface BowlerStats {
 export interface FieldingStats {
   agility: number;    // 0 - 100
   reaction: number;   // 0 - 100
+  catching: number;   // 0 - 100
 }
 
 export interface PlayerStats {
