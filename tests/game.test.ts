@@ -24,7 +24,7 @@ import { fieldRadarPoint } from '../src/field-radar';
 import { deflectFromReferencePad, PAD_P2_REBOUND_DATA } from '../src/pad-impact';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
-import { BAT_BLADE_LENGTH_METERS, BAT_REACH_LIMIT_METERS, batBladeWorldPoint, batPivotLocalPosition, battingPivotPosition, batReachAtTime, batReachTarget, batSwingPose, batSwingStartSeconds, findBatBallContact } from '../src/bat-physics';
+import { BAT_BLADE_HALF_THICKNESS_METERS, BAT_BLADE_LENGTH_METERS, BAT_REACH_LIMIT_METERS, batBladeWorldPoint, batPivotLocalPosition, battingPivotPosition, batReachAtTime, batReachTarget, batSwingPose, batSwingStartSeconds, closestPointOnBladeBox, findBatBallContact } from '../src/bat-physics';
 import { BAT_SWEETSPOT_FROM_TOE_METERS, predictEmpiricalBatImpactLaunchSpeed } from '../src/bat-impact-response';
 import type { BallOutcome, DeliveryChoice, Player, ShotType } from '../src/types';
 
@@ -2216,6 +2216,33 @@ test('bat reach is bounded and returns to the stance for both hands', () => {
   }
 });
 
+test('blade-box distance respects width, thickness and finite toe', () => {
+  const shoulder = { x: 0, y: 0.8, z: 0 };
+  const toe = { x: 0, y: 0.16, z: 0 };
+  const face = closestPointOnBladeBox({ x: 0, y: 0.5, z: 0.08 }, shoulder, toe);
+  assert.ok(Math.abs(face.distance - (0.08 - BAT_BLADE_HALF_THICKNESS_METERS)) < 1e-12);
+  assert.ok(face.distance > BALL_RADIUS_METERS, 'a centerline capsule would report a premature overlap here');
+  assert.ok(0.08 < BALL_RADIUS_METERS + 0.054);
+  const edge = closestPointOnBladeBox({ x: 0.07, y: 0.5, z: 0 }, shoulder, toe);
+  assert.ok(Math.abs(edge.distance - 0.016) < 1e-12);
+  const beyondToe = closestPointOnBladeBox({ x: 0, y: 0.1, z: 0 }, shoulder, toe);
+  assert.ok(Math.abs(beyondToe.distance - 0.06) < 1e-12);
+  assert.equal(beyondToe.fraction, 1);
+  for (const hand of ['RHB', 'LHB'] as const) {
+    const pivot = battingPivotPosition(hand);
+    const angle = hand === 'RHB' ? -0.7 : 0.7;
+    const start = batBladeWorldPoint(pivot, 0, angle, hand);
+    const end = batBladeWorldPoint(pivot, BAT_BLADE_LENGTH_METERS, angle, hand);
+    const axisY = (end.y - start.y) / BAT_BLADE_LENGTH_METERS;
+    const axisZ = (end.z - start.z) / BAT_BLADE_LENGTH_METERS;
+    const center = batBladeWorldPoint(pivot, BAT_BLADE_LENGTH_METERS / 2, angle, hand);
+    const offset = BAT_BLADE_HALF_THICKNESS_METERS + 0.02;
+    const point = { x: center.x, y: center.y - axisZ * offset, z: center.z + axisY * offset };
+    assert.ok(Math.abs(closestPointOnBladeBox(point, start, end).distance - 0.02) < 1e-12, `${hand} rotated face distance`);
+  }
+  assert.throws(() => closestPointOnBladeBox(shoulder, shoulder, shoulder), RangeError);
+});
+
 test('effective swing timing uses the delivery clock and applies assistance to the input offset', () => {
   const incoming = { ...delivery(0.5), overTheWicket: true };
   const centered = batSwingStartSeconds(incoming, 0.5);
@@ -2289,7 +2316,6 @@ test('v2 collision pivot matches the Babylon batter transform for both hands', (
       const bat = MeshBuilder.CreateBox(`bat-${hand}`, { width: 0.041, height: 0.64, depth: 0.108 }, scene);
       bat.parent = pivot;
       bat.position.y = -0.43;
-      bat.rotation.y = Math.PI / 2;
       pivot.computeWorldMatrix(true);
       const actual = pivot.getAbsolutePosition();
       const modeled = battingPivotPosition(hand, batterPosition);
@@ -2301,6 +2327,10 @@ test('v2 collision pivot matches the Babylon batter transform for both hands', (
       assert.ok(Math.abs(actual.y - modeled.y) < 1e-6, `${hand} pivot Y: ${actual.y} vs ${modeled.y}`);
       assert.ok(Math.abs(actual.z - modeled.z) < 1e-6, `${hand} pivot Z: ${actual.z} vs ${modeled.z}`);
       bat.computeWorldMatrix(true);
+      const widthAxis = Vector3.TransformNormal(new Vector3(0, 0, 0.108), bat.getWorldMatrix());
+      const thicknessAxis = Vector3.TransformNormal(new Vector3(0.041, 0, 0), bat.getWorldMatrix());
+      assert.ok(Math.abs(Math.abs(widthAxis.x) - 0.108) < 1e-6, `${hand} bat face width must run across world X`);
+      assert.ok(Math.abs(thicknessAxis.x) < 1e-6, `${hand} bat thickness must lie in the swing plane`);
       const renderedShoulder = Vector3.TransformCoordinates(new Vector3(0, 0.32, 0), bat.getWorldMatrix());
       const renderedToe = Vector3.TransformCoordinates(new Vector3(0, -0.32, 0), bat.getWorldMatrix());
       const modeledShoulder = batBladeWorldPoint(modeled, 0, swingAngle, hand);

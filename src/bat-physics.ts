@@ -4,6 +4,8 @@ import type { BatBallContactEvent, DeliveryChoice, ShotChoice } from './types';
 /** Modeled blade dimensions in metres; width uses the MCC bat gauge maximum. */
 export const BAT_BLADE_LENGTH_METERS = 0.64;
 export const BAT_BLADE_HALF_WIDTH_METERS = 0.054;
+/** Candidate half-thickness for a 41 mm blade; not a calibrated bat profile. */
+export const BAT_BLADE_HALF_THICKNESS_METERS = 0.0205;
 export const BAT_SWING_DURATION_SECONDS = 0.3;
 /** Provisional maximum sideways movement of the grip from the starting stance. */
 export const BAT_REACH_LIMIT_METERS = 0.45;
@@ -101,6 +103,24 @@ function closestPointOnSegment(point: { x: number; y: number; z: number }, start
   const closest = { x: start.x + segment.x * fraction, y: start.y + segment.y * fraction, z: start.z + segment.z * fraction };
   const distance = Math.hypot(point.x - closest.x, point.y - closest.y, point.z - closest.z);
   return { closest, fraction, distance };
+}
+
+/** Closest point on a candidate blade box with width along world X. Diagnostic only. */
+export function closestPointOnBladeBox(
+  point: { x: number; y: number; z: number },
+  shoulder: { x: number; y: number; z: number },
+  toe: { x: number; y: number; z: number },
+) {
+  const length = Math.hypot(toe.y - shoulder.y, toe.z - shoulder.z);
+  if (length <= 0) throw new RangeError('Blade shoulder and toe must differ');
+  const axisY = (toe.y - shoulder.y) / length;
+  const axisZ = (toe.z - shoulder.z) / length;
+  const dy = point.y - shoulder.y, dz = point.z - shoulder.z;
+  const along = Math.max(0, Math.min(length, dy * axisY + dz * axisZ));
+  const normal = Math.max(-BAT_BLADE_HALF_THICKNESS_METERS, Math.min(BAT_BLADE_HALF_THICKNESS_METERS, -dy * axisZ + dz * axisY));
+  const across = Math.max(-BAT_BLADE_HALF_WIDTH_METERS, Math.min(BAT_BLADE_HALF_WIDTH_METERS, point.x - shoulder.x));
+  const closest = { x: shoulder.x + across, y: shoulder.y + along * axisY - normal * axisZ, z: shoulder.z + along * axisZ + normal * axisY };
+  return { closest, fraction: along / length, distance: Math.hypot(point.x - closest.x, point.y - closest.y, point.z - closest.z) };
 }
 
 /**

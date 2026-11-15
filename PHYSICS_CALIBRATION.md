@@ -30,6 +30,8 @@ The 239 analyzed trials came from forward-projected range shots by 20 male batte
 
 Static rendered contact poses for both hands were inspected for one off-line fast delivery from a custom oblique camera after the v3 reach fix. The enlarged visual ball was centered on the modeled ball for that review. This checks visible placement for those two poses, not motion accuracy, marker measurement agreement, face roll or human playability.
 
+The rendered bat's extra yaw has since been removed: its 108 mm face width now lies along world X for both stances, matching the v3 width convention, while its 41 mm thickness lies in the swing plane. The collision is still a capsule with a 54 mm radius around the blade centerline, not that rectangular box. An isolated oriented-box distance candidate and synthetic sweep comparison are documented in `TODO.md`; do not treat either the rendered box or the candidate as a measured cricket-bat profile.
+
 The live and seeded simulation authored shot response now samples incoming velocity at swept contact using a backward 1 ms difference bounded to the correct side of the modeled pitch bounce. At the exact bounce it uses the inbound side; immediately afterward it uses the post-bounce side. The stored contact event retains its original centered-difference velocity for replay compatibility, so that diagnostic field may differ and may average across a bounce. The new derivative is an internal approximation of the authored path, not a measurement or an empirical impact law. A grid of 124 modeled contacts found a mean vector difference of 0.061 m/s and maximum 0.201 m/s between the stored impact velocity and the old plane sample; this is not a population estimate.
 
 ## Automated running between wickets

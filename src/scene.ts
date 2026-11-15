@@ -468,7 +468,6 @@ export class GameScene {
     batPivot.position.set(batPivotPosition.x, batPivotPosition.y, batPivotPosition.z);
     batPivot.rotation.z = 0.2;
     const bat = box('batMesh', batPivot, batWood, 0, -0.43, 0, 0.041, 0.64, 0.108);
-    bat.rotation.y = Math.PI / 2;
     limb('batHandle', batPivot, grip, 0, -0.03, 0, 0.27, 0.05);
     this.batMesh = bat;
     this.batPivot = batPivot;
