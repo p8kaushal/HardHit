@@ -655,9 +655,8 @@ export class UIManager {
       this.showBattingTiming(this.activeShot.timing);
     }
 
-    this.gameScene.animateBatterSwing(direction, () => {
-      // Swing visual completes
-    });
+    const innings = this.controller.getCurrentInnings();
+    this.gameScene.setDeliverySwing(this.activeDelivery, this.activeShot, battingAssistanceMultiplier(innings.batter, innings.bowler, this.controller.botDifficulty));
   }
 
   // --- Ball Trajectory Animation Trigger ---
@@ -742,6 +741,7 @@ export class UIManager {
       recShotHud.innerText = '';
     }
     const isPlayerBatting = this.controller.getCurrentInnings().batter.id === this.controller.state.player.id;
+    if (!isPlayerBatting && this.pendingBotShot) this.gameScene.setDeliverySwing(this.activeDelivery, this.pendingBotShot, 0);
     const preContactCam = isPlayerBatting ? 'batter_eye' : 'bowler_eye';
     this.gameScene.setCameraMode(preContactCam);
     this.controller.setCameraMode(preContactCam);

@@ -5,6 +5,12 @@ import type { BatBallContactEvent, DeliveryChoice, ShotChoice } from './types';
 export const BAT_BLADE_LENGTH_METERS = 0.64;
 export const BAT_BLADE_HALF_WIDTH_METERS = 0.054;
 export const BAT_SWING_DURATION_SECONDS = 0.3;
+/** Provisional maximum sideways movement of the grip from the starting stance. */
+export const BAT_REACH_LIMIT_METERS = 0.45;
+/** Reach ramps up during the backswing and returns after the strike. */
+export const BAT_REACH_KEYS: ReadonlyArray<readonly [number, number]> = [
+  [0, 0], [0.1, 1], [0.17, 1], [BAT_SWING_DURATION_SECONDS, 0],
+];
 const BAT_BLADE_SHOULDER_METERS = 0.11;
 const SWEEP_STEP_SECONDS = 1 / 1200;
 /** Swing rotation keys in seconds/radians; scene animation uses these same values. */
@@ -14,7 +20,35 @@ export const BAT_SWING_KEYS: ReadonlyArray<readonly [number, number]> = [
   [0, -0.2], [4 / 60, -1.4], [0.13, 0], [0.17, 1.4293333333333333], [18 / 60, -0.2],
 ];
 
-function interpolateSwingAngle(elapsedSeconds: number, hand: 'RHB' | 'LHB', model: 'swept-blade-v1' | 'swept-blade-v2'): number {
+/** Signed world-X reach to the delivered line, bounded independently of assistance. */
+export function batReachTarget(delivery: DeliveryChoice, hand: 'RHB' | 'LHB'): number {
+  const delta = deliveryContactPoint(delivery).x - battingPivotPosition(hand, delivery.batterPosition).x;
+  return Math.max(-BAT_REACH_LIMIT_METERS, Math.min(BAT_REACH_LIMIT_METERS, delta));
+}
+
+/** Linear interpolation is shared with the scene's animation keys. */
+export function batReachAtTime(target: number, elapsedSeconds: number): number {
+  const time = Math.max(0, Math.min(BAT_SWING_DURATION_SECONDS, elapsedSeconds));
+  for (let index = 1; index < BAT_REACH_KEYS.length; index++) {
+    const [endTime, endValue] = BAT_REACH_KEYS[index];
+    if (time <= endTime) {
+      const [startTime, startValue] = BAT_REACH_KEYS[index - 1];
+      return target * (startValue + (endValue - startValue) * (time - startTime) / (endTime - startTime));
+    }
+  }
+  return 0;
+}
+
+/** Effective swing start on the incoming delivery clock, in seconds. */
+export function batSwingStartSeconds(delivery: DeliveryChoice, timing: number, assistMultiplier = 0, causal = false): number {
+  const contactTime = deliveryDurationMs(delivery.type, delivery.pace) / 1000 * batterContactProgress(delivery);
+  const assist = Math.max(0, Math.min(1, Number.isFinite(assistMultiplier) ? assistMultiplier : 0));
+  const input = Math.max(0, Math.min(1, Number.isFinite(timing) ? timing : 0.5));
+  const start = contactTime - 0.15 + (input - 0.5) * 0.5 * (1 - assist);
+  return causal ? Math.max(start, contactTime - 0.15 + (input - 0.5) * 0.5) : start;
+}
+
+export function interpolateSwingAngle(elapsedSeconds: number, hand: 'RHB' | 'LHB', model: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3'): number {
   const time = Math.max(0, Math.min(BAT_SWING_DURATION_SECONDS, elapsedSeconds));
   const keys = model === 'swept-blade-v1' ? BAT_SWING_KEYS_V1 : BAT_SWING_KEYS;
   let angle = keys[keys.length - 1][1];
@@ -29,6 +63,15 @@ function interpolateSwingAngle(elapsedSeconds: number, hand: 'RHB' | 'LHB', mode
   }
   // The same shoulder rotation mirrors in the two handed stances.
   return hand === 'RHB' ? -angle : angle;
+}
+
+/** Pose at a point on the delivery clock; usable by collision and rendering. */
+export function batSwingPose(delivery: DeliveryChoice, shot: ShotChoice, hand: 'RHB' | 'LHB', assist: number, deliveryTimeSeconds: number) {
+  const elapsed = deliveryTimeSeconds - batSwingStartSeconds(delivery, shot.timing, assist, true);
+  return {
+    angle: interpolateSwingAngle(elapsed, hand, 'swept-blade-v3'),
+    reachWorldX: batReachAtTime(batReachTarget(delivery, hand), elapsed),
+  };
 }
 
 function bladePoint(pivot: { x: number; y: number; z: number }, localY: number, angle: number, hand: 'RHB' | 'LHB') {
@@ -71,29 +114,30 @@ export function findBatBallContact(
   shot: ShotChoice,
   hand: 'RHB' | 'LHB',
   assistMultiplier = 0,
-  contactModel: 'swept-blade-v1' | 'swept-blade-v2' = 'swept-blade-v2',
+  contactModel: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' = 'swept-blade-v2',
 ): BatBallContactEvent | null {
   const durationSeconds = deliveryDurationMs(delivery.type, delivery.pace) / 1000;
   const contactTimeSeconds = durationSeconds * batterContactProgress(delivery);
-  const assist = Math.max(0, Math.min(1, Number.isFinite(assistMultiplier) ? assistMultiplier : 0));
-  const timing = Math.max(0, Math.min(1, Number.isFinite(shot.timing) ? shot.timing : 0.5));
-  const swingStartSeconds = contactTimeSeconds - 0.15 + (timing - 0.5) * 0.5 * (1 - assist);
+  const swingStartSeconds = batSwingStartSeconds(delivery, shot.timing, assistMultiplier, contactModel === 'swept-blade-v3');
   const startSeconds = Math.max(0, swingStartSeconds);
   const endSeconds = Math.min(contactTimeSeconds, swingStartSeconds + BAT_SWING_DURATION_SECONDS);
   if (endSeconds < startSeconds) return null;
 
   const pivot = contactModel === 'swept-blade-v1'
     ? { x: delivery.overTheWicket === undefined ? deliveryContactPoint(delivery).x : -0.24, y: 0.91, z: BATTER_CREASE_Z + 0.2 + (delivery.batterPosition?.z ?? 0) }
-    : delivery.overTheWicket === undefined
+    : delivery.overTheWicket === undefined && contactModel === 'swept-blade-v2'
       ? { ...battingPivotPosition(hand, delivery.batterPosition), x: deliveryContactPoint(delivery).x + (delivery.batterPosition?.x ?? 0) }
       : battingPivotPosition(hand, delivery.batterPosition);
   let timeSeconds = startSeconds;
+  const reachTarget = contactModel === 'swept-blade-v3' ? batReachTarget(delivery, hand) : 0;
+  const pivotAt = (time: number) => ({ ...pivot, x: pivot.x + batReachAtTime(reachTarget, time - swingStartSeconds) });
   while (timeSeconds <= endSeconds + 1e-10) {
     const progress = Math.min(1, timeSeconds / durationSeconds);
     const ballPosition = sampleDeliveryPath(delivery, progress);
     const angle = interpolateSwingAngle(timeSeconds - swingStartSeconds, hand, contactModel);
-    const shoulder = batBladeWorldPoint(pivot, 0, angle, hand);
-    const toe = batBladeWorldPoint(pivot, BAT_BLADE_LENGTH_METERS, angle, hand);
+    const currentPivot = pivotAt(timeSeconds);
+    const shoulder = batBladeWorldPoint(currentPivot, 0, angle, hand);
+    const toe = batBladeWorldPoint(currentPivot, BAT_BLADE_LENGTH_METERS, angle, hand);
     const closest = closestPointOnSegment(ballPosition, shoulder, toe);
     if (closest.distance <= BALL_RADIUS_METERS + BAT_BLADE_HALF_WIDTH_METERS) {
       const velocityStep = 0.001;
@@ -107,10 +151,10 @@ export function findBatBallContact(
       const velocityBeforeTime = Math.max(swingStartSeconds, timeSeconds - velocityStep);
       const velocityElapsed = timeSeconds - velocityBeforeTime;
       const priorAngle = interpolateSwingAngle(velocityBeforeTime - swingStartSeconds, hand, contactModel);
-      const priorBladePoint = batBladeWorldPoint(pivot, impactAlongBlade, priorAngle, hand);
-      const currentBladePoint = batBladeWorldPoint(pivot, impactAlongBlade, impactAngle, hand);
-      const priorTip = batBladeWorldPoint(pivot, BAT_BLADE_LENGTH_METERS, priorAngle, hand);
-      const currentTip = batBladeWorldPoint(pivot, BAT_BLADE_LENGTH_METERS, impactAngle, hand);
+      const priorBladePoint = batBladeWorldPoint(pivotAt(velocityBeforeTime), impactAlongBlade, priorAngle, hand);
+      const currentBladePoint = batBladeWorldPoint(currentPivot, impactAlongBlade, impactAngle, hand);
+      const priorTip = batBladeWorldPoint(pivotAt(velocityBeforeTime), BAT_BLADE_LENGTH_METERS, priorAngle, hand);
+      const currentTip = batBladeWorldPoint(currentPivot, BAT_BLADE_LENGTH_METERS, impactAngle, hand);
       return {
         timeSeconds,
         ballPosition: { ...ballPosition },
@@ -122,16 +166,16 @@ export function findBatBallContact(
         // The current collision model has no bat-face rotation about the blade
         // axis. Across-face offset is therefore the signed world-X offset;
         // along-blade position is measured from the shoulder toward the toe.
-        ...(contactModel === 'swept-blade-v2' ? {
+        ...(contactModel !== 'swept-blade-v1' ? {
           faceCoordinates: {
             alongBlade: Math.max(0, Math.min(1, closest.fraction)) * BAT_BLADE_LENGTH_METERS,
-            acrossBlade: Math.max(-BAT_BLADE_HALF_WIDTH_METERS, Math.min(BAT_BLADE_HALF_WIDTH_METERS, ballPosition.x - pivot.x)),
+            acrossBlade: Math.max(-BAT_BLADE_HALF_WIDTH_METERS, Math.min(BAT_BLADE_HALF_WIDTH_METERS, ballPosition.x - currentPivot.x)),
           },
           batVelocity: velocityElapsed > 0
-            ? { x: 0, y: (currentBladePoint.y - priorBladePoint.y) / velocityElapsed, z: (currentBladePoint.z - priorBladePoint.z) / velocityElapsed }
+            ? { x: (currentBladePoint.x - priorBladePoint.x) / velocityElapsed, y: (currentBladePoint.y - priorBladePoint.y) / velocityElapsed, z: (currentBladePoint.z - priorBladePoint.z) / velocityElapsed }
             : { x: 0, y: 0, z: 0 },
           batTipVelocity: velocityElapsed > 0
-            ? { x: 0, y: (currentTip.y - priorTip.y) / velocityElapsed, z: (currentTip.z - priorTip.z) / velocityElapsed }
+            ? { x: (currentTip.x - priorTip.x) / velocityElapsed, y: (currentTip.y - priorTip.y) / velocityElapsed, z: (currentTip.z - priorTip.z) / velocityElapsed }
             : { x: 0, y: 0, z: 0 },
         } : {}),
       };

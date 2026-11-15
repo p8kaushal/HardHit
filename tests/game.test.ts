@@ -24,7 +24,7 @@ import { fieldRadarPoint } from '../src/field-radar';
 import { deflectFromReferencePad, PAD_P2_REBOUND_DATA } from '../src/pad-impact';
 import { moveBatter } from '../src/batter-position';
 import { followShotPose, shotCameraDirection, shotResultPose } from '../src/camera-director';
-import { BAT_BLADE_LENGTH_METERS, batBladeWorldPoint, batPivotLocalPosition, battingPivotPosition, findBatBallContact } from '../src/bat-physics';
+import { BAT_BLADE_LENGTH_METERS, BAT_REACH_LIMIT_METERS, batBladeWorldPoint, batPivotLocalPosition, battingPivotPosition, batReachAtTime, batReachTarget, batSwingPose, batSwingStartSeconds, findBatBallContact } from '../src/bat-physics';
 import { BAT_SWEETSPOT_FROM_TOE_METERS, predictEmpiricalBatImpactLaunchSpeed } from '../src/bat-impact-response';
 import type { BallOutcome, DeliveryChoice, Player, ShotType } from '../src/types';
 
@@ -1171,7 +1171,7 @@ test('bot distribution simulation is reproducible, bounded and reports the right
   }
 });
 
-test('bot simulation scores no-ball contact and revokes a contacted wide', () => {
+test('bot simulation scores no-ball contact and counts unreachable wides', () => {
   const shot = { direction: 2, type: 'lofted' as const, timing: 0.5, contactZone: 0.5 };
   const [result] = runBotSimulation(1, 'Rookie', 7, {
     includeFielding: false,
@@ -1181,10 +1181,10 @@ test('bot simulation scores no-ball contact and revokes a contacted wide', () =>
   });
   assert.equal(result.noBalls, 1);
   assert.equal(result.noBallBatRuns > 0, true);
-  assert.equal(result.contactedWides, 1);
-  assert.equal(result.wides, 1);
+  assert.equal(result.contactedWides, 0);
+  assert.equal(result.wides, 2);
   assert.equal(result.legalBalls, 6);
-  assert.equal(result.attempts, 8);
+  assert.equal(result.attempts, 9);
   assert.ok(result.runs >= result.noBallBatRuns + 2);
 });
 
@@ -1611,7 +1611,7 @@ test('match event log copies delivery inputs and records final flight outcome', 
   const event = game.state.events[0];
   assert.equal(event.resolved, false);
   assert.ok(event.batContact, 'a recorded batting contact includes its swept point and incoming velocity');
-  assert.equal(event.contactModel, 'swept-blade-v2');
+  assert.equal(event.contactModel, 'swept-blade-v3');
   assert.ok(event.batContact!.faceCoordinates && event.batContact!.batVelocity);
   assert.ok(event.batContact!.timeSeconds >= 0);
   assert.ok(Math.hypot(...Object.values(event.batContact!.incomingVelocity)) > 0);
@@ -1656,7 +1656,7 @@ test('saved regular match events replay through controller adjudication', () => 
   game.setTossResult(game.state.player.id, 'bat');
   game.startMatch();
   for (let ball = 0; ball < 6; ball++) {
-    const result = game.recordBall(delivery(0.5), { direction: 2, type: ball === 0 ? 'lofted' : 'grounded', timing: 0.5, contactZone: 0.5 }, ball === 0 ? 'deep' : undefined, ball === 0 ? 'swept-blade-v1' : undefined);
+    const result = game.recordBall(delivery(0.5), { direction: 2, type: ball === 0 ? 'lofted' : 'grounded', timing: 0.5, contactZone: 0.5 }, ball === 0 ? 'deep' : undefined, ball === 0 ? 'swept-blade-v1' : ball === 1 ? 'swept-blade-v3' : undefined);
     assert.equal(result.isWicket, false);
     if (ball === 0) game.finalizeBallOutcome(8, false, false, 'point');
     else if (ball === 1) game.finalizeBallOutcome(21, true, false, null, 0, 'point');
@@ -2103,7 +2103,7 @@ test('summary tracker labels extras and free hits with their legal ball number',
 test('bat contact cancels a wide and counts the delivery as legal', () => {
   const game = match();
   const shot = { direction: 0, type: 'lofted' as const, timing: 0.5, contactZone: 0.5 };
-  const result = game.recordBall(delivery(0.5, 1), shot);
+  const result = game.recordBall(delivery(0.5, 1), shot, undefined, 'swept-blade-v2');
   assert.equal(result.isExtra, false);
   assert.equal(result.missed, false);
   assert.equal(game.getCurrentInnings().ballsBowled, 1);
@@ -2167,6 +2167,47 @@ test('shot trajectory follows all four cardinal directions with finite speed', (
   for (const velocity of [straight, right, back, left]) {
     assert.ok(Object.values(velocity).every(Number.isFinite));
     assert.ok(Math.hypot(velocity.x, velocity.y, velocity.z) <= 38.000001);
+  }
+});
+
+test('bat reach is bounded and returns to the stance for both hands', () => {
+  for (const hand of ['RHB', 'LHB'] as const) {
+    const farRight = { ...delivery(0.5, 2), overTheWicket: true };
+    const farLeft = { ...delivery(0.5, -2), overTheWicket: true };
+    assert.equal(batReachTarget(farRight, hand), BAT_REACH_LIMIT_METERS);
+    assert.equal(batReachTarget(farLeft, hand), -BAT_REACH_LIMIT_METERS);
+    assert.equal(batReachAtTime(BAT_REACH_LIMIT_METERS, 0), 0);
+    assert.ok(Math.abs(batReachAtTime(BAT_REACH_LIMIT_METERS, 0.05) - BAT_REACH_LIMIT_METERS / 2) < 1e-9);
+    assert.equal(batReachAtTime(BAT_REACH_LIMIT_METERS, 0.15), BAT_REACH_LIMIT_METERS);
+    assert.equal(batReachAtTime(BAT_REACH_LIMIT_METERS, 0.3), 0);
+    assert.ok(batReachTarget({ ...farRight, batterPosition: { x: 0.6, z: 0 } }, hand) <= BAT_REACH_LIMIT_METERS);
+  }
+});
+
+test('effective swing timing uses the delivery clock and applies assistance to the input offset', () => {
+  const incoming = { ...delivery(0.5), overTheWicket: true };
+  const centered = batSwingStartSeconds(incoming, 0.5);
+  assert.ok(Math.abs(batSwingStartSeconds(incoming, 0.3) - (centered - 0.1)) < 1e-9);
+  assert.ok(Math.abs(batSwingStartSeconds(incoming, 0.3, 0.8) - (centered - 0.02)) < 1e-9);
+  assert.ok(Math.abs(batSwingStartSeconds(incoming, 0.7, 0.8) - (centered + 0.02)) < 1e-9);
+  assert.ok(Math.abs(batSwingStartSeconds(incoming, 0.7, 0.8, true) - (centered + 0.1)) < 1e-9, 'a late input cannot trigger a swing before it occurs');
+  assert.ok(Math.abs(batSwingStartSeconds(incoming, 0.3, 0.8, true) - (centered - 0.02)) < 1e-9, 'early assistance may delay the swing');
+  assert.equal(batSwingStartSeconds(incoming, 0.3, 1), centered);
+});
+
+test('v3 reach can contact an off-line ball while keeping timing and reach limits', () => {
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
+  for (const hand of ['RHB', 'LHB'] as const) {
+    const incoming = { ...delivery(0.5, 0.15), overTheWicket: true };
+    assert.equal(findBatBallContact(incoming, shot, hand, 0, 'swept-blade-v2'), null);
+    assert.ok(findBatBallContact(incoming, shot, hand, 0, 'swept-blade-v3'));
+    const contact = findBatBallContact(incoming, shot, hand, 0, 'swept-blade-v3')!;
+    const pose = batSwingPose(incoming, shot, hand, 0, contact.timeSeconds);
+    const base = battingPivotPosition(hand);
+    const point = batBladeWorldPoint({ ...base, x: base.x + pose.reachWorldX }, contact.bladeFraction * BAT_BLADE_LENGTH_METERS, pose.angle, hand);
+    assert.ok(Math.hypot(point.x - contact.bladePosition.x, point.y - contact.bladePosition.y, point.z - contact.bladePosition.z) < 1e-9);
+    assert.equal(findBatBallContact(incoming, { ...shot, timing: 0 }, hand, 0, 'swept-blade-v3'), null);
+    assert.equal(findBatBallContact({ ...incoming, aimTarget: { ...incoming.aimTarget, x: 2 } }, shot, hand, 0, 'swept-blade-v3'), null);
   }
 });
 
@@ -2236,6 +2277,18 @@ test('v2 collision pivot matches the Babylon batter transform for both hands', (
         `${hand} shoulder pose differs: rendered ${renderedShoulder} modeled ${JSON.stringify(modeledShoulder)}`);
       assert.ok(Vector3.Distance(renderedToe, new Vector3(modeledToe.x, modeledToe.y, modeledToe.z)) < 1e-5,
         `${hand} toe pose differs: rendered ${renderedToe} modeled ${JSON.stringify(modeledToe)}`);
+      const deliveryAtStance = { ...delivery(0.5, 0.15), overTheWicket: true, batterPosition };
+      const shot = { direction: 0, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
+      const sampleTime = batSwingStartSeconds(deliveryAtStance, shot.timing, 0, true) + 0.12;
+      const pose = batSwingPose(deliveryAtStance, shot, hand, 0, sampleTime);
+      GameScene.prototype.setBatSwingPose.call({ batPivot: pivot, batterHand: hand } as unknown as GameScene, deliveryAtStance, shot, 0, sampleTime);
+      pivot.computeWorldMatrix(true);
+      bat.computeWorldMatrix(true);
+      const expectedPivot = { ...modeled, x: modeled.x + pose.reachWorldX };
+      const expectedToe = batBladeWorldPoint(expectedPivot, BAT_BLADE_LENGTH_METERS, pose.angle, hand);
+      const actualToe = Vector3.TransformCoordinates(new Vector3(0, -0.32, 0), bat.getWorldMatrix());
+      assert.ok(Vector3.Distance(actualToe, new Vector3(expectedToe.x, expectedToe.y, expectedToe.z)) < 1e-5,
+        `${hand} reached blade pose must agree with its collision geometry`);
       bat.dispose();
       root.dispose();
     }

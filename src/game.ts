@@ -313,7 +313,7 @@ export class MatchController {
     globalAutoAssistConfig.bowlerArm = innings.bowler.bowlingArm || 'Right';
   }
 
-  public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null, fieldPreset?: FieldPreset, contactModel: 'swept-blade-v1' | 'swept-blade-v2' | 'legacy-timing' = 'swept-blade-v2'): BallOutcome {
+  public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null, fieldPreset?: FieldPreset, contactModel: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' | 'legacy-timing' = 'swept-blade-v3'): BallOutcome {
     const innings = this.getCurrentInnings();
     if (this.state.status !== 'playing' || !innings || innings.finished) {
       throw new Error('Cannot record a delivery after the innings has finished');
@@ -345,7 +345,7 @@ export class MatchController {
 
     const wicketResult = shot ? evaluateWicket(innings.batter, innings.bowler, delivery, shot, assistMultiplier) : null;
     const batContact: BatBallContactEvent | null = shot
-      ? findBatBallContact(delivery, shot, innings.batter.batterHand || 'RHB', assistMultiplier, contactModel === 'swept-blade-v1' ? 'swept-blade-v1' : 'swept-blade-v2')
+      ? findBatBallContact(delivery, shot, innings.batter.batterHand || 'RHB', assistMultiplier, contactModel === 'legacy-timing' ? 'swept-blade-v2' : contactModel)
       : null;
     if (wicketResult) missed = contactModel === 'legacy-timing' ? (wicketResult.missed ?? false) : !batContact;
     const relativeLine = deliveryContactPoint(delivery).x - (delivery.batterPosition?.x ?? 0);

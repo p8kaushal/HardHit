@@ -82,7 +82,7 @@ export function runBotSimulation(
         const delivery = options.deliveryFixture?.(attempts) ?? botChooseDelivery(bowler, tier, hand, random);
         deliveryCounts[delivery.type]++;
         const shot = options.shotFixture?.(attempts) ?? botChooseShot(batter, bowler, delivery, 'Rookie', random);
-        const batContact = findBatBallContact(delivery, shot, hand);
+        const batContact = findBatBallContact(delivery, shot, hand, 0, 'swept-blade-v3');
         const missed = !batContact;
         const provisionalExtra = checkExtraBall(delivery, hand);
         const extra = resolveDeliveryExtra(delivery, hand, !missed);

@@ -210,11 +210,11 @@ try {
     };
     window.__flightPause = null;
     const recordBall = MatchController.prototype.recordBall;
-    MatchController.prototype.recordBall = function (delivery, shot, fieldPreset) {
-      if (window.__replayingMatch) return recordBall.call(this, delivery, shot, fieldPreset);
+    MatchController.prototype.recordBall = function (delivery, shot, fieldPreset, contactModel) {
+      if (window.__replayingMatch) return recordBall.call(this, delivery, shot, fieldPreset, contactModel);
       window.__liveMatchController = this;
       const contact = window.__matchContacts.at(-1);
-      const result = recordBall.call(this, delivery, shot, fieldPreset);
+      const result = recordBall.call(this, delivery, shot, fieldPreset, contactModel);
       window.__matchReplay.push({
         batter: this.getCurrentInnings().batter.id,
         delivery: structuredClone(delivery),
@@ -231,11 +231,15 @@ try {
       playerBatting = this.getCurrentInnings().batter.id === this.state.player.id;
       if (traceShots && playerBatting) {
         playerController = this;
-        window.__playerShotTrace.push({ delivery: structuredClone(delivery), shot: structuredClone(shot), missed: result.missed, wicket: result.isWicket, reason: result.wicketReason, extra: result.extraType, freeHit: result.isFreeHit, pendingDistance: result.distance });
+        window.__playerShotTrace.push({ delivery: structuredClone(delivery), shot: structuredClone(shot), batContact: structuredClone(this.state.events.at(-1)?.batContact ?? null), missed: result.missed, wicket: result.isWicket, reason: result.wicketReason, extra: result.extraType, freeHit: result.isFreeHit, pendingDistance: result.distance });
       }
       if (contact && !contact.recorded) {
         contact.recorded = true;
         contact.shot = !!shot && !!result.shot;
+        const event = this.state.events.at(-1);
+        const expected = !result.missed && event?.batContact ? event.batContact.ballPosition : deliveryContactPoint(delivery);
+        contact.error = Math.hypot(contact.position.x - expected.x, contact.position.y - expected.y - (0.075 - BALL_RADIUS_METERS), contact.position.z - expected.z);
+        delete contact.position;
       }
       return result;
     };
@@ -353,8 +357,7 @@ try {
     GameScene.prototype.animateDelivery = function (target, length, type, arrived, ...rest) {
       return animateDelivery.call(this, target, length, type, () => {
         const position = this.scene.getMeshByName('cricketBall').position;
-        const expected = deliveryContactPoint(globalAutoAssistConfig.currentDelivery);
-        window.__matchContacts.push({ error: Math.hypot(position.x - expected.x, position.y - expected.y - (0.075 - BALL_RADIUS_METERS), position.z - expected.z), swung: this.hasBotSwung });
+        window.__matchContacts.push({ position: { x: position.x, y: position.y, z: position.z }, swung: this.hasBotSwung });
         arrived();
       }, ...rest);
     };
@@ -610,6 +613,12 @@ try {
     }
     if (process.argv.includes('--trace-shots')) {
       const trace = await page.evaluate(() => window.__playerShotTrace);
+      for (const shot of trace) {
+        if (shot.launchPosition && shot.batContact) {
+          const p = shot.launchPosition, c = shot.batContact.ballPosition;
+          if (Math.hypot(p.x - c.x, p.y - c.y, p.z - c.z) > 1e-6) throw new Error(`Shot launch does not match recorded bat contact: ${JSON.stringify({ p, c })}`);
+        }
+      }
       const summarized = trace.map(({ flightSamples, ...shot }) => {
         const landing = flightSamples?.find(sample => sample.position.y <= 0.036 + 1e-6);
         const firstLandingDistance = landing && shot.launchPosition

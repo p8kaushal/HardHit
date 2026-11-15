@@ -1,13 +1,13 @@
 import * as BABYLON from 'babylonjs';
 import { gameNow, isGamePaused, setGameTimeout } from './game-clock';
-import { CameraMode, DeliveryChoice, DeliveryType, FieldPreset } from './types';
+import { BatBallContactEvent, CameraMode, DeliveryChoice, DeliveryType, FieldPreset, ShotChoice } from './types';
 import { globalAutoAssistConfig } from './game';
 import { BALL_RADIUS_METERS, BATTER_CONTACT_Z, BATTER_CREASE_Z, BATTER_STUMPS_Z, STUMP_HEIGHT_METERS, WICKET_WIDTH_METERS, batterContactProgress, deliveryAnimationStep, deliveryBounceProgress, deliveryBatterImpactPoint, deliveryDurationMs, deliveryPitchPoint, deliveryProgressAtZ, deliveryReleaseX, deliveryVelocityAtProgress, sampleDeliveryPath } from './formula';
 import { advanceBallFrame, type BallState } from './ball-physics';
 import { advanceFielder, createDefaultFieldLayout, decideAutomatedRuns, FIELDING_MAX_RECOVERY_SECONDS, FIELDING_RUNNER_PICKUP_DELAY_SECONDS, fielderReachProfileFromRatings, fielderThrowSpeedFromRating, sampleAutomatedRunners, sampleAutomatedReturn, type AutomatedRunDecision, type FieldingPosition, type FielderReachProfile, type FieldingTrajectorySample } from './fielding';
 import { followShotPose, shotCameraDirection, shotResultPose, type CameraVector } from './camera-director';
 import { deflectFromReferencePad } from './pad-impact';
-import { BAT_SWING_KEYS, batPivotLocalPosition } from './bat-physics';
+import { BAT_REACH_KEYS, BAT_SWING_DURATION_SECONDS, BAT_SWING_KEYS, batPivotLocalPosition, batSwingPose, batSwingStartSeconds, findBatBallContact } from './bat-physics';
 
 // A larger visible ball improves phone readability; physics uses the real radius.
 const BALL_VISUAL_RADIUS = 0.075;
@@ -59,6 +59,8 @@ export class GameScene {
   private ballAnimationTime = 0;
   private ballTrajectoryPoints: BABYLON.Vector3[] = [];
   private updateDeliveryAnimation: (() => void) | null = null;
+  private deliverySwing: { delivery: DeliveryChoice; shot: ShotChoice; assist: number; contact: BatBallContactEvent | null } | null = null;
+  private swingFollowThrough: { deliveryTime: number; startedAt: number } | null = null;
   private updateMissedAnimation: (() => void) | null = null;
   private onBallArrivedCallback: (() => void) | null = null;
   private onBallResolvedCallback: (() => void) | null = null;
@@ -105,6 +107,11 @@ export class GameScene {
       try {
         this.updateDeliveryAnimation?.();
         this.updateMissedAnimation?.();
+        if (this.swingFollowThrough && this.deliverySwing) {
+          const time = this.swingFollowThrough.deliveryTime + (gameNow() - this.swingFollowThrough.startedAt) / 1000;
+          this.setBatSwingPose(this.deliverySwing.delivery, this.deliverySwing.shot, this.deliverySwing.assist, time);
+          if (time >= batSwingStartSeconds(this.deliverySwing.delivery, this.deliverySwing.shot.timing, this.deliverySwing.assist, true) + BAT_SWING_DURATION_SECONDS) this.swingFollowThrough = null;
+        }
         if (globalAutoAssistConfig.isBallInPlay) {
           if (this.fieldingReturn) this.updateFieldingReturn();
           else this.updateBallPhysics();
@@ -495,6 +502,8 @@ export class GameScene {
 
   public setBatterHandedness(hand: 'RHB' | 'LHB'): void {
     this.batterHand = hand;
+    this.deliverySwing = null;
+    this.swingFollowThrough = null;
     const batPivotPosition = batPivotLocalPosition(hand);
     this.batPivot?.position.set(batPivotPosition.x, batPivotPosition.y, batPivotPosition.z);
     if (this.batPivot) this.batPivot.rotation.z = hand === 'RHB' ? 0.2 : -0.2;
@@ -889,10 +898,12 @@ export class GameScene {
 
       this.ballAnimationTime += deliveryAnimationStep(this.engine.getDeltaTime(), currentSpeedScale);
       const progress = Math.min(contactProgress, this.ballAnimationTime / 60);
+      if (this.deliverySwing) this.setBatSwingPose(this.deliverySwing.delivery, this.deliverySwing.shot, this.deliverySwing.assist, progress * deliveryDurationMs(deliveryType, pace) / 1000);
       this.notifyDeliveryBounce(progress, deliveryType, aimTarget.z);
       const index = Math.floor(this.ballAnimationTime);
 
-      if (this.isBotBatting && !this.hasBotSwung && progress >= botSwingProgress) {
+      const swingProgress = this.deliverySwing ? Math.max(0, batSwingStartSeconds(this.deliverySwing.delivery, this.deliverySwing.shot.timing, this.deliverySwing.assist, true) * 1000 / deliveryDurationMs(deliveryType, pace)) : botSwingProgress;
+      if (this.isBotBatting && !this.hasBotSwung && progress >= swingProgress) {
         this.hasBotSwung = true;
         this.botBattingTriggerCallback?.();
       }
@@ -925,8 +936,12 @@ export class GameScene {
         }
       }
 
-      if (progress >= contactProgress) {
-        const contact = sampleDeliveryPath(delivery, contactProgress);
+      const hit = this.deliverySwing?.contact;
+      const hitProgress = hit ? hit.timeSeconds * 1000 / deliveryDurationMs(deliveryType, pace) : Infinity;
+      if (progress >= Math.min(contactProgress, hitProgress)) {
+        const contact = hit && hitProgress <= contactProgress ? hit.ballPosition : sampleDeliveryPath(delivery, contactProgress);
+        if (hit && hitProgress <= contactProgress && this.deliverySwing) this.setBatSwingPose(this.deliverySwing.delivery, this.deliverySwing.shot, this.deliverySwing.assist, hit.timeSeconds);
+        if (this.deliverySwing) this.swingFollowThrough = { deliveryTime: Math.min(contactProgress, hitProgress) * deliveryDurationMs(deliveryType, pace) / 1000, startedAt: gameNow() };
         this.ballMesh?.position.set(contact.x, contact.y + BALL_VISUAL_OFFSET, contact.z);
         this.isAnimatingBall = false;
         this.updateDeliveryAnimation = null;
@@ -988,7 +1003,23 @@ export class GameScene {
     this.ballTrail.color.copyFrom(color);
   }
 
-  public animateBatterSwing(_directionAngle: number, successCallback: () => void): void {
+  /** Set the rendered bat from the same delivery-clock pose as swept contact. */
+  public setDeliverySwing(delivery: DeliveryChoice, shot: ShotChoice, assist: number): void {
+    const candidate = findBatBallContact(delivery, shot, this.batterHand, assist, 'swept-blade-v3');
+    const relativeLine = deliveryBatterImpactPoint(delivery).x - (delivery.batterPosition?.x ?? 0);
+    this.deliverySwing = { delivery, shot, assist, contact: Math.abs(relativeLine) <= 1.25 ? candidate : null };
+    this.swingFollowThrough = null;
+    if (this.batPivot) this.scene.stopAnimation(this.batPivot);
+  }
+
+  public setBatSwingPose(delivery: DeliveryChoice, shot: ShotChoice, assist: number, deliveryTimeSeconds: number): void {
+    if (!this.batPivot) return;
+    const pose = batSwingPose(delivery, shot, this.batterHand, assist, deliveryTimeSeconds);
+    this.batPivot.rotation.z = pose.angle;
+    this.batPivot.position.z = batPivotLocalPosition(this.batterHand).z + pose.reachWorldX * (this.batterHand === 'RHB' ? 1 : -1);
+  }
+
+  public animateBatterSwing(_directionAngle: number, successCallback: () => void, reachWorldX = 0): void {
     if (this.batPivot && this.batterRoot) {
       const batter = this.batterRoot;
       const pivot = this.batPivot;
@@ -998,7 +1029,12 @@ export class GameScene {
       const handMirror = this.batterHand === 'RHB' ? -1 : 1;
       const animationKeys = BAT_SWING_KEYS.map(([seconds, angle]) => ({ frame: seconds * 60, value: angle * handMirror }));
       swing.setKeys(animationKeys);
-      this.scene.beginDirectAnimation(pivot, [swing], 0, BAT_SWING_KEYS[BAT_SWING_KEYS.length - 1][0] * 60, false, 1, () => {
+      const reach = new BABYLON.Animation('batReach', 'position.z', 60, BABYLON.Animation.ANIMATIONTYPE_FLOAT);
+      const baseZ = batPivotLocalPosition(this.batterHand).z;
+      // Root yaw maps local Z to world X with opposite signs for the two hands.
+      const localReach = reachWorldX * (this.batterHand === 'RHB' ? 1 : -1);
+      reach.setKeys(BAT_REACH_KEYS.map(([seconds, fraction]) => ({ frame: seconds * 60, value: baseZ + localReach * fraction })));
+      this.scene.beginDirectAnimation(pivot, [swing, reach], 0, BAT_SWING_KEYS[BAT_SWING_KEYS.length - 1][0] * 60, false, 1, () => {
         successCallback();
       });
     } else {
@@ -1128,9 +1164,13 @@ export class GameScene {
       let progress = elapsed / duration;
       
       const contactProgress = delivery ? batterContactProgress(delivery) : 1;
-      if (progress >= contactProgress) {
-        progress = contactProgress;
+      const hit = this.deliverySwing?.contact;
+      const hitProgress = hit ? hit.timeSeconds * 1000 / duration : Infinity;
+      const stopProgress = Math.min(contactProgress, hitProgress);
+      if (progress >= stopProgress) {
+        progress = stopProgress;
         globalAutoAssistConfig.isDeliveryActive = false;
+        if (this.deliverySwing) this.swingFollowThrough = { deliveryTime: progress * duration / 1000, startedAt: gameNow() };
       }
       
       const targetX = globalAutoAssistConfig.currentDelivery ? globalAutoAssistConfig.currentDelivery.aimTarget.x : 0;
@@ -1138,9 +1178,10 @@ export class GameScene {
       this.notifyDeliveryBounce(progress, delivery?.type ?? 'medium', targetZ);
         
       const activeDelivery: DeliveryChoice = delivery ?? { aimTarget: { x: targetX, z: targetZ }, type: 'medium', line: 'middle', length: 'good', releaseTiming: 0.5, bowlingArm: globalAutoAssistConfig.bowlerArm };
+      if (this.deliverySwing) this.setBatSwingPose(this.deliverySwing.delivery, this.deliverySwing.shot, this.deliverySwing.assist, progress * duration / 1000);
       const pos = sampleDeliveryPath(activeDelivery, progress);
       ball.position.set(pos.x, pos.y + BALL_VISUAL_OFFSET, pos.z);
-      if (progress >= contactProgress && this.onBallArrivedCallback) this.onBallArrivedCallback();
+      if (progress >= stopProgress && this.onBallArrivedCallback) this.onBallArrivedCallback();
     }
   }
 
