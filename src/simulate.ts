@@ -1,6 +1,6 @@
 import { createBotPlayer } from './game';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { resolveMissedDelivery, checkExtraBall, resolveDeliveryExtra, deliveryContactPoint, deliveryVelocityAtCrease, battingAssistanceMultiplier, shotFlightQuality, calculateShotTrajectory, calculateShotDistance, evaluateFinalOutcome } from './formula';
+import { resolveMissedDelivery, checkExtraBall, resolveDeliveryExtra, deliveryVelocityAtCrease, battingAssistanceMultiplier, shotFlightQuality, calculateShotTrajectory, calculateShotDistance, evaluateFinalOutcome } from './formula';
 import type { DeliveryChoice, DeliveryType, FieldPreset, ShotChoice } from './types';
 import { SeededRandom } from './random';
 import { stepBall, type BallState } from './ball-physics';
@@ -46,6 +46,8 @@ export interface BotSimulationOptions {
   shotFixture?: (attempt: number) => ShotChoice;
   /** Override starting fielders for deterministic interception fixtures. */
   fieldersFixture?: readonly RatedFielder[];
+  /** Inspect a simulated launch without changing the simulated flight. */
+  onShotLaunched?: (hand: 'RHB' | 'LHB', position: { x: number; y: number; z: number }) => void;
 }
 
 /** Synthetic seeded bot scoring simulation using the production shot-flight physics. */
@@ -98,11 +100,12 @@ export function runBotSimulation(
         const dismissal = missed ? resolveMissedDelivery(delivery, hand, true) : null;
         const isWicket = dismissal !== null && !protectedDelivery;
         if (isWicket) wickets++;
-        else if (!missed) {
+        else if (batContact) {
           const quality = shotFlightQuality(shot, delivery, battingAssistanceMultiplier(batter, bowler, 'Rookie'));
           const angle = (shot.direction * Math.PI) / 4 - Math.PI / 2;
           const velocity = calculateShotTrajectory(quality, 0.5, 0.5, angle, deliveryVelocityAtCrease(delivery), { x: 0, y: 0, z: 0 }, hand === 'RHB', true, 'Rookie', shot.type, batter.stats.batting.power);
-          const contact = deliveryContactPoint(delivery);
+          const contact = batContact.ballPosition;
+          options.onShotLaunched?.(hand, { ...contact });
           const flight: BallState = {
             position: { x: contact.x, y: contact.y, z: contact.z }, velocity,
             hasBounced: false, reachedBoundary: false, stopped: false,

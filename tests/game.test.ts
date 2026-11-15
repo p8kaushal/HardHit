@@ -1264,6 +1264,34 @@ test('bot simulation recovers stopped balls and bounds unavailable fielders', ()
   assert.equal(stationary.recoveryTimeouts, 0);
 });
 
+test('simulated shot flight starts at the swept contact for each hand', () => {
+  const incoming = { ...delivery(0.5), overTheWicket: true };
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
+  const launches: Array<{ hand: 'RHB' | 'LHB'; position: { x: number; y: number; z: number } }> = [];
+  runBotSimulation(2, 'Rookie', 7, {
+    includeFielding: false,
+    deliveryFixture: () => incoming,
+    shotFixture: () => shot,
+    onShotLaunched: (hand, position) => launches.push({ hand, position }),
+  });
+  assert.equal(launches.length, 12);
+  for (const launch of launches) {
+    const expected = findBatBallContact(incoming, shot, launch.hand, 0, 'swept-blade-v3');
+    assert.ok(expected);
+    assert.deepEqual(launch.position, expected.ballPosition);
+    assert.ok(Math.abs(launch.position.z - deliveryContactPoint(incoming).z) > 1e-4);
+  }
+  assert.deepEqual(new Set(launches.map(launch => launch.hand)), new Set(['RHB', 'LHB']));
+  let missedLaunches = 0;
+  runBotSimulation(1, 'Rookie', 7, {
+    includeFielding: false,
+    deliveryFixture: () => incoming,
+    shotFixture: () => ({ ...shot, timing: 0 }),
+    onShotLaunched: () => { missedLaunches++; },
+  });
+  assert.equal(missedLaunches, 0);
+});
+
 test('fielding reachability respects reaction time, speed and earliest trajectory sample', () => {
   const trajectory = [
     { timeSeconds: 0.5, position: { x: 2, y: 0.2, z: 0 } },
