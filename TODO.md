@@ -6,6 +6,11 @@
 2. **Secondary: batting view.** Resolve keeper occlusion of the pitch from the batting camera, preserving the keeper's useful on-field/map representation.
 3. **Secondary: auto-run control.** Add a player choice, enabled by default; when disabled, expose run/continue decisions tied to the ball and return timeline. Bot decisions remain automatic.
 
+### Completed bounded increment — restore bat stance and collision alignment
+
+- **Finding:** v2 changed the bat's local Z offset as though it were a world-space X coordinate. With the batter root at x = −0.35 m and ±90° handedness rotation, this displaced the rendered bat 0.35 m from the swept collision path. Restore the stance-relative ±0.11 m hand offsets and include the root's starting X in collision-pivot conversion; retain the shared contact-time swing and v1 replay path.
+- [x] **Acceptance:** Babylon transform fixtures for both hands verify pivot, blade shoulder and toe match collision geometry at an offset stance; centered middle-line contact succeeds for both hands, with v1 geometry still available. `npm test` passed 162 tests; `npm run build` passed with the existing Babylon chunk warning; `git diff --check` passed. `node scripts/browser-match.mjs --bat-first --swing --trace-shots --verify-replay` completed both innings and replayed 13 events against scorecards (player 1/2, bot 11/0). This verifies transform and match/replay consistency, not an independent human batting playtest. Outgoing launch coefficients were unchanged.
+
 ### Completed bounded increment — swept bat/ball contact and replay versioning
 
 - **Finding:** timing-window-only contact allowed a hit without geometric overlap. Incoming visuals, wicket decisions and shot resolution therefore disagreed about whether the bat physically reached the ball.

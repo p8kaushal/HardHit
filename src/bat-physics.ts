@@ -144,13 +144,13 @@ export function findBatBallContact(
 /** Bat pivot pose matching the striking plane used by collision and rendering. */
 export function battingPivotPosition(hand: 'RHB' | 'LHB', batterPosition: { x?: number; z?: number } = {}) {
   const local = batPivotLocalPosition(hand);
-  // Match the scene's batter-root yaw (+/- 90 degrees). The batting pivot is
-  // anchored 24 cm off the crease center toward the modeled over-wicket line.
+  // Match the scene's batter-root yaw (+/- 90 degrees) and its default root
+  // offset. batterPosition contains movement relative to that starting stance.
   const stance = hand === 'RHB' ? Math.PI / 2 : -Math.PI / 2;
   const worldX = local.x * Math.cos(stance) + local.z * Math.sin(stance);
   const worldZ = -local.x * Math.sin(stance) + local.z * Math.cos(stance);
   return {
-    x: worldX + (batterPosition.x ?? 0),
+    x: -0.35 + worldX + (batterPosition.x ?? 0),
     y: local.y,
     z: BATTER_CREASE_Z + worldZ + (batterPosition.z ?? 0),
     contactPlaneZ: BATTER_CONTACT_Z + (batterPosition.z ?? 0),
@@ -160,6 +160,6 @@ export function battingPivotPosition(hand: 'RHB' | 'LHB', batterPosition: { x?: 
 /** Local bat-pivot coordinates below the handed batter root. */
 export function batPivotLocalPosition(hand: 'RHB' | 'LHB') {
   return hand === 'RHB'
-    ? { x: -0.2, y: 0.91, z: -0.24 }
-    : { x: 0.2, y: 0.91, z: 0.24 };
+    ? { x: -0.2, y: 0.91, z: 0.11 }
+    : { x: 0.2, y: 0.91, z: -0.11 };
 }

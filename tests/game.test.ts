@@ -2205,7 +2205,7 @@ test('v2 collision pivot matches the Babylon batter transform for both hands', (
     for (const hand of ['RHB', 'LHB'] as const) {
       const batterPosition = { x: -0.3, z: 0.4 };
       const root = new TransformNode(`batter-${hand}`, scene);
-      root.position.set(batterPosition.x, 0, BATTER_CREASE_Z + batterPosition.z);
+      root.position.set(-0.35 + batterPosition.x, 0, BATTER_CREASE_Z + batterPosition.z);
       root.rotation.y = hand === 'RHB' ? Math.PI / 2 : -Math.PI / 2;
       const pivot = new TransformNode(`pivot-${hand}`, scene);
       pivot.parent = root;
@@ -2220,6 +2220,10 @@ test('v2 collision pivot matches the Babylon batter transform for both hands', (
       pivot.computeWorldMatrix(true);
       const actual = pivot.getAbsolutePosition();
       const modeled = battingPivotPosition(hand, batterPosition);
+      assert.ok(Math.abs(modeled.x - (-0.24 + batterPosition.x)) < 1e-9,
+        `${hand} pivot should stay aligned with the centered delivery line and rendered stance`);
+      assert.ok(Math.abs(modeled.z - (BATTER_CREASE_Z + 0.2 + batterPosition.z)) < 1e-9,
+        `${hand} grip should remain on the bowler-facing side of the crease`);
       assert.ok(Math.abs(actual.x - modeled.x) < 1e-6, `${hand} pivot X: ${actual.x} vs ${modeled.x}`);
       assert.ok(Math.abs(actual.y - modeled.y) < 1e-6, `${hand} pivot Y: ${actual.y} vs ${modeled.y}`);
       assert.ok(Math.abs(actual.z - modeled.z) < 1e-6, `${hand} pivot Z: ${actual.z} vs ${modeled.z}`);
