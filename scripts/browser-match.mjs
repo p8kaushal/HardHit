@@ -67,7 +67,7 @@ try {
     const { globalAutoAssistConfig } = await import('/src/game.ts');
     const { MatchController } = await import('/src/game.ts');
     const { gameNow, setGamePaused, isGamePaused } = await import('/src/game-clock.ts');
-    const { deliveryContactPoint, BALL_RADIUS_METERS } = await import('/src/formula.ts');
+    const { deliveryContactPoint, deliveryIncomingVelocityAtTime, deliveryVelocityAtCrease, battingAssistanceMultiplier, shotFlightQuality, calculateShotTrajectory, BALL_RADIUS_METERS } = await import('/src/formula.ts');
     const { fieldRadarPoint } = await import('/src/field-radar.ts');
     const { sampleAutomatedRunners, sampleAutomatedReturn } = await import('/src/fielding.ts');
     if (fieldPresetFixture) {
@@ -231,7 +231,14 @@ try {
       playerBatting = this.getCurrentInnings().batter.id === this.state.player.id;
       if (traceShots && playerBatting) {
         playerController = this;
-        window.__playerShotTrace.push({ delivery: structuredClone(delivery), shot: structuredClone(shot), batContact: structuredClone(this.state.events.at(-1)?.batContact ?? null), missed: result.missed, wicket: result.isWicket, reason: result.wicketReason, extra: result.extraType, freeHit: result.isFreeHit, pendingDistance: result.distance });
+        const batContact = this.state.events.at(-1)?.batContact ?? null;
+        const innings = this.getCurrentInnings();
+        const assist = battingAssistanceMultiplier(innings.batter, innings.bowler, this.botDifficulty);
+        const incoming = batContact ? deliveryIncomingVelocityAtTime(delivery, batContact.timeSeconds) : deliveryVelocityAtCrease(delivery);
+        const expectedLaunch = shot && !result.missed && !result.isWicket && result.extraType !== 'wide'
+          ? calculateShotTrajectory(shotFlightQuality(shot, delivery, assist), 0.5, 0.5, shot.direction * Math.PI / 4 - Math.PI / 2, incoming, { x: 0, y: 0, z: 0 }, true, false, 'Medium', shot.type, innings.batter.stats.batting.power)
+          : null;
+        window.__playerShotTrace.push({ delivery: structuredClone(delivery), shot: structuredClone(shot), batContact: structuredClone(batContact), expectedLaunch, missed: result.missed, wicket: result.isWicket, reason: result.wicketReason, extra: result.extraType, freeHit: result.isFreeHit, pendingDistance: result.distance });
       }
       if (contact && !contact.recorded) {
         contact.recorded = true;
@@ -617,6 +624,10 @@ try {
         if (shot.launchPosition && shot.batContact) {
           const p = shot.launchPosition, c = shot.batContact.ballPosition;
           if (Math.hypot(p.x - c.x, p.y - c.y, p.z - c.z) > 1e-6) throw new Error(`Shot launch does not match recorded bat contact: ${JSON.stringify({ p, c })}`);
+        }
+        if (shot.launchVelocity && shot.expectedLaunch) {
+          const v = shot.launchVelocity, e = shot.expectedLaunch;
+          if (Math.hypot(v.x - e.x, v.y - e.y, v.z - e.z) > 1e-9) throw new Error(`Shot velocity does not use impact-time incoming velocity: ${JSON.stringify({ v, e })}`);
         }
       }
       const summarized = trace.map(({ flightSamples, ...shot }) => {

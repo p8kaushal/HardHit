@@ -2,7 +2,7 @@ import { MatchController, globalAutoAssistConfig, initBattingDelivery, inningsBa
 import { GameScene } from './scene';
 import { BallOutcome, DeliveryChoice, FieldPreset, MatchState, Player, ShotChoice, ShotType } from './types';
 import { botChooseDelivery, botChooseShot } from './bot';
-import { BATTER_CONTACT_Z, batterContactProgress, battingAssistanceMultiplier, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryHitsPad, deliveryPitchPoint, deliveryVelocityAtCrease, shotFlightQuality, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, calculateBounceTarget, sampleFrontFootLanding } from './formula';
+import { BATTER_CONTACT_Z, batterContactProgress, battingAssistanceMultiplier, battingContactZone, bowlingExecutionTarget, bowlingReleaseTiming, bowlingTargetFromScreen, deliveryDurationMs, deliveryHitsPad, deliveryPitchPoint, deliveryIncomingVelocityAtTime, deliveryVelocityAtCrease, shotFlightQuality, getLineTypeFromAimX, calculateShotTrajectory, getDirectionName, calculateBounceTarget, sampleFrontFootLanding } from './formula';
 import { moveBatter, type BatterPosition } from './batter-position';
 import { battingTimingFeedback } from './batting-timing';
 import { KeyboardInputManager } from './input';
@@ -968,7 +968,9 @@ export class UIManager {
       const assist = battingAssistanceMultiplier(innings.batter, innings.bowler, this.controller.botDifficulty);
       const quality = shotFlightQuality(outcome.shot, outcome.delivery, assist);
       const batterPower = innings.batter.stats.batting.power;
-      const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, deliveryVelocityAtCrease(outcome.delivery), {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower);
+      const contact = this.controller.state.events[this.controller.state.events.length - 1]?.batContact;
+      const incoming = contact ? deliveryIncomingVelocityAtTime(outcome.delivery, contact.timeSeconds) : deliveryVelocityAtCrease(outcome.delivery);
+      const vOut = calculateShotTrajectory(quality, 0.5, 0.5, theta_shot, incoming, {x:0, y:0, z:0}, true, false, 'Medium', outcome.shot.type, batterPower);
       const fielding = innings.bowler.stats.fielding ?? { agility: 50, reaction: 50, catching: 50, throwing: 50 };
       this.gameScene.setFieldingRatings(fielding.agility, fielding.reaction, fielding.catching ?? 50, fielding.throwing ?? 50);
       this.gameScene.animateHitPath(outcome.distance, outcome.shot.direction, vOut);

@@ -19,7 +19,7 @@ import { SoundManager } from '../src/sound';
 import { UIManager, opponentBadgeText } from '../src/ui';
 import { GameScene } from '../src/scene';
 import { battingTimingFeedback } from '../src/batting-timing';
-import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryBatterImpactPoint, deliveryBounceProgress, deliveryContactPoint, deliveryHitsPad, deliveryProgressAtZ, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
+import { BATTER_STUMPS_Z, battingAssistanceMultiplier, deliveryBatterImpactPoint, deliveryBounceProgress, deliveryContactPoint, deliveryHitsPad, deliveryIncomingVelocityAtProgress, deliveryIncomingVelocityAtTime, deliveryProgressAtZ, sampleDeliveryPath, shotFlightQuality } from '../src/formula';
 import { fieldRadarPoint } from '../src/field-radar';
 import { deflectFromReferencePad, PAD_P2_REBOUND_DATA } from '../src/pad-impact';
 import { moveBatter } from '../src/batter-position';
@@ -1267,12 +1267,12 @@ test('bot simulation recovers stopped balls and bounds unavailable fielders', ()
 test('simulated shot flight starts at the swept contact for each hand', () => {
   const incoming = { ...delivery(0.5), overTheWicket: true };
   const shot = { direction: 0, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
-  const launches: Array<{ hand: 'RHB' | 'LHB'; position: { x: number; y: number; z: number } }> = [];
+  const launches: Array<{ hand: 'RHB' | 'LHB'; position: { x: number; y: number; z: number }; velocity: { x: number; y: number; z: number } }> = [];
   runBotSimulation(2, 'Rookie', 7, {
     includeFielding: false,
     deliveryFixture: () => incoming,
     shotFixture: () => shot,
-    onShotLaunched: (hand, position) => launches.push({ hand, position }),
+    onShotLaunched: (hand, position, velocity) => launches.push({ hand, position, velocity }),
   });
   assert.equal(launches.length, 12);
   for (const launch of launches) {
@@ -1280,6 +1280,10 @@ test('simulated shot flight starts at the swept contact for each hand', () => {
     assert.ok(expected);
     assert.deepEqual(launch.position, expected.ballPosition);
     assert.ok(Math.abs(launch.position.z - deliveryContactPoint(incoming).z) > 1e-4);
+    const quality = shotFlightQuality(shot, incoming, 0);
+    const velocity = calculateShotTrajectory(quality, 0.5, 0.5, -Math.PI / 2,
+      deliveryIncomingVelocityAtTime(incoming, expected.timeSeconds), { x: 0, y: 0, z: 0 }, launch.hand === 'RHB', true, 'Rookie', shot.type, createBotPlayer('Rookie').stats.batting.power);
+    assert.deepEqual(launch.velocity, velocity);
   }
   assert.deepEqual(new Set(launches.map(launch => launch.hand)), new Set(['RHB', 'LHB']));
   let missedLaunches = 0;
@@ -2623,6 +2627,22 @@ test('delivery variations affect pace and turn only after pitching', () => {
   const spinner = { ...delivery(0.5, -0.8), type: 'offspin' as const };
   assert.equal(checkExtraBall(spinner).type, 'wide');
   assert.equal(checkExtraBall({ ...spinner, turn: 0 }).isExtra, false);
+});
+
+test('incoming velocity sampling stays on the appropriate side of a pitch bounce', () => {
+  for (const type of ['fast', 'offspin'] as const) {
+    const ball = { ...delivery(0.5, 0.2), type, pace: 0.7, turn: 0.5, swing: 0.4, overTheWicket: true };
+    const bounce = deliveryBounceProgress(type, ball.aimTarget.z);
+    const duration = deliveryDurationMs(type, ball.pace) / 1000;
+    const before = deliveryIncomingVelocityAtProgress(ball, bounce);
+    const after = deliveryIncomingVelocityAtProgress(ball, bounce + 0.0001 / duration);
+    assert.ok(before.y < 0, `${type} should be descending immediately before the bounce`);
+    assert.ok(after.y > 0, `${type} should be rising immediately after the bounce`);
+    const p0 = sampleDeliveryPath(ball, bounce);
+    const p1 = sampleDeliveryPath(ball, bounce + 0.0001 / duration);
+    assert.ok(Math.abs(after.y - (p1.y - p0.y) / 0.0001) < 1e-7);
+    assert.ok(Object.values(before).every(Number.isFinite) && Object.values(after).every(Number.isFinite));
+  }
 });
 
 test('pace swing develops in the air and spin turn only after the bounce', () => {

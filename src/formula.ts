@@ -158,6 +158,25 @@ export function deliveryVelocityAtCrease(delivery: DeliveryChoice): { x: number;
   return deliveryVelocityAtProgress(delivery, batterContactProgress(delivery));
 }
 
+/** Incoming velocity immediately before a sample, without averaging across the pitch bounce. */
+export function deliveryIncomingVelocityAtProgress(delivery: DeliveryChoice, progress: number): { x: number; y: number; z: number } {
+  const durationSeconds = deliveryDurationMs(delivery.type, delivery.pace) / 1000;
+  const at = Math.max(0, Math.min(1, progress));
+  const bounce = deliveryBounceProgress(delivery.type, delivery.aimTarget.z);
+  const lowerBound = at > bounce ? bounce : 0;
+  const before = Math.max(lowerBound, at - 0.001 / durationSeconds);
+  const elapsed = (at - before) * durationSeconds;
+  if (elapsed <= 0) return { x: 0, y: 0, z: 0 };
+  const a = sampleDeliveryPath(delivery, before);
+  const b = sampleDeliveryPath(delivery, at);
+  return { x: (b.x - a.x) / elapsed, y: (b.y - a.y) / elapsed, z: (b.z - a.z) / elapsed };
+}
+
+/** Incoming velocity at an impact time on the shared delivery clock. */
+export function deliveryIncomingVelocityAtTime(delivery: DeliveryChoice, timeSeconds: number): { x: number; y: number; z: number } {
+  return deliveryIncomingVelocityAtProgress(delivery, timeSeconds * 1000 / deliveryDurationMs(delivery.type, delivery.pace));
+}
+
 export function deliveryVelocityAtProgress(delivery: DeliveryChoice, progress: number): { x: number; y: number; z: number } {
   const deltaProgress = 0.001;
   const beforeProgress = Math.max(0, progress - deltaProgress);
