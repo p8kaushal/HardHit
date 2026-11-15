@@ -313,7 +313,7 @@ export class MatchController {
     globalAutoAssistConfig.bowlerArm = innings.bowler.bowlingArm || 'Right';
   }
 
-  public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null, fieldPreset?: FieldPreset, contactModel: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' | 'swept-blade-v4' | 'legacy-timing' = 'swept-blade-v4'): BallOutcome {
+  public recordBall(inputDelivery: DeliveryChoice, inputShot: ShotChoice | null, fieldPreset?: FieldPreset, contactModel: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' | 'swept-blade-v4' | 'swept-blade-v5' | 'legacy-timing' = 'swept-blade-v5'): BallOutcome {
     const innings = this.getCurrentInnings();
     if (this.state.status !== 'playing' || !innings || innings.finished) {
       throw new Error('Cannot record a delivery after the innings has finished');

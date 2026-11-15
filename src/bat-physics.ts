@@ -15,6 +15,7 @@ export const BAT_REACH_KEYS: ReadonlyArray<readonly [number, number]> = [
 ];
 const BAT_BLADE_SHOULDER_METERS = 0.11;
 const SWEEP_STEP_SECONDS = 1 / 1200;
+const V5_SWEEP_STEP_SECONDS = 1 / 19200;
 /** Swing rotation keys in seconds/radians; scene animation uses these same values. */
 const BAT_SWING_KEYS_V1: ReadonlyArray<readonly [number, number]> = [[0, -0.2], [4 / 60, -1.4], [10 / 60, 1.1], [18 / 60, -0.2]];
 /** V2 preserves the contact pose while matching published distal bat speed at impact. */
@@ -50,7 +51,7 @@ export function batSwingStartSeconds(delivery: DeliveryChoice, timing: number, a
   return causal ? Math.max(start, contactTime - 0.15 + (input - 0.5) * 0.5) : start;
 }
 
-export function interpolateSwingAngle(elapsedSeconds: number, hand: 'RHB' | 'LHB', model: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' | 'swept-blade-v4'): number {
+export function interpolateSwingAngle(elapsedSeconds: number, hand: 'RHB' | 'LHB', model: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' | 'swept-blade-v4' | 'swept-blade-v5'): number {
   const time = Math.max(0, Math.min(BAT_SWING_DURATION_SECONDS, elapsedSeconds));
   const keys = model === 'swept-blade-v1' ? BAT_SWING_KEYS_V1 : BAT_SWING_KEYS;
   let angle = keys[keys.length - 1][1];
@@ -127,18 +128,19 @@ export function closestPointOnBladeBox(
  * Sweep the modeled bat blade against the same incoming path used for rendering.
  * Timing is the existing swing-start input; assistance explicitly compresses
  * its offset before collision detection. The return is the earliest sphere/blade
- * overlap, sampled at 1,200 Hz to avoid tunnelling at delivery speeds.
+ * overlap. V1–v4 retain 1,200 Hz sampling; v5 uses 19,200 Hz and includes
+ * the end boundary. These sampled sweeps do not guarantee continuous contact.
  */
 export function findBatBallContact(
   delivery: DeliveryChoice,
   shot: ShotChoice,
   hand: 'RHB' | 'LHB',
   assistMultiplier = 0,
-  contactModel: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' | 'swept-blade-v4' = 'swept-blade-v2',
+  contactModel: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' | 'swept-blade-v4' | 'swept-blade-v5' = 'swept-blade-v2',
 ): BatBallContactEvent | null {
   const durationSeconds = deliveryDurationMs(delivery.type, delivery.pace) / 1000;
   const contactTimeSeconds = durationSeconds * batterContactProgress(delivery);
-  const swingStartSeconds = batSwingStartSeconds(delivery, shot.timing, assistMultiplier, contactModel === 'swept-blade-v3' || contactModel === 'swept-blade-v4');
+  const swingStartSeconds = batSwingStartSeconds(delivery, shot.timing, assistMultiplier, contactModel === 'swept-blade-v3' || contactModel === 'swept-blade-v4' || contactModel === 'swept-blade-v5');
   const startSeconds = Math.max(0, swingStartSeconds);
   const endSeconds = Math.min(contactTimeSeconds, swingStartSeconds + BAT_SWING_DURATION_SECONDS);
   if (endSeconds < startSeconds) return null;
@@ -149,7 +151,7 @@ export function findBatBallContact(
       ? { ...battingPivotPosition(hand, delivery.batterPosition), x: deliveryContactPoint(delivery).x + (delivery.batterPosition?.x ?? 0) }
       : battingPivotPosition(hand, delivery.batterPosition);
   let timeSeconds = startSeconds;
-  const reachTarget = contactModel === 'swept-blade-v3' || contactModel === 'swept-blade-v4' ? batReachTarget(delivery, hand) : 0;
+  const reachTarget = contactModel === 'swept-blade-v3' || contactModel === 'swept-blade-v4' || contactModel === 'swept-blade-v5' ? batReachTarget(delivery, hand) : 0;
   const pivotAt = (time: number) => ({ ...pivot, x: pivot.x + batReachAtTime(reachTarget, time - swingStartSeconds) });
   while (timeSeconds <= endSeconds + 1e-10) {
     const progress = Math.min(1, timeSeconds / durationSeconds);
@@ -158,7 +160,7 @@ export function findBatBallContact(
     const currentPivot = pivotAt(timeSeconds);
     const shoulder = batBladeWorldPoint(currentPivot, 0, angle, hand);
     const toe = batBladeWorldPoint(currentPivot, BAT_BLADE_LENGTH_METERS, angle, hand);
-    const boxPoint = contactModel === 'swept-blade-v4' ? closestPointOnBladeBox(ballPosition, shoulder, toe) : null;
+    const boxPoint = contactModel === 'swept-blade-v4' || contactModel === 'swept-blade-v5' ? closestPointOnBladeBox(ballPosition, shoulder, toe) : null;
     const closest = boxPoint ?? closestPointOnSegment(ballPosition, shoulder, toe);
     if (closest.distance <= BALL_RADIUS_METERS + (boxPoint ? 0 : BAT_BLADE_HALF_WIDTH_METERS)) {
       const velocityStep = 0.001;
@@ -210,7 +212,12 @@ export function findBatBallContact(
         } : {}),
       };
     }
-    timeSeconds += SWEEP_STEP_SECONDS;
+    if (contactModel === 'swept-blade-v5') {
+      if (timeSeconds >= endSeconds) break;
+      timeSeconds = Math.min(endSeconds, timeSeconds + V5_SWEEP_STEP_SECONDS);
+    } else {
+      timeSeconds += SWEEP_STEP_SECONDS;
+    }
   }
   return null;
 }

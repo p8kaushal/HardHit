@@ -159,6 +159,14 @@ try {
       return deliverBall3D.apply(this, args);
     };
     window.__matchContacts = [];
+    window.__sweepTiming = { scene: [], record: [] };
+    const setDeliverySwing = GameScene.prototype.setDeliverySwing;
+    GameScene.prototype.setDeliverySwing = function (...args) {
+      const started = performance.now();
+      const result = setDeliverySwing.apply(this, args);
+      window.__sweepTiming.scene.push(performance.now() - started);
+      return result;
+    };
     window.__playerShotTrace = [];
     window.__matchReplay = [];
     window.__fielderSceneChecks = [];
@@ -214,7 +222,9 @@ try {
       if (window.__replayingMatch) return recordBall.call(this, delivery, shot, fieldPreset, contactModel);
       window.__liveMatchController = this;
       const contact = window.__matchContacts.at(-1);
+      const started = performance.now();
       const result = recordBall.call(this, delivery, shot, fieldPreset, contactModel);
+      window.__sweepTiming.record.push(performance.now() - started);
       window.__matchReplay.push({
         batter: this.getCurrentInnings().batter.id,
         delivery: structuredClone(delivery),
@@ -551,6 +561,14 @@ try {
     console.log(`Wide delivery recorded as WD without consuming a legal ball (bot score ${wide.score}).`);
   }
   const contacts = await page.evaluate(() => window.__matchContacts);
+  if (process.argv.includes('--trace-shots')) {
+    const timing = await page.evaluate(() => window.__sweepTiming);
+    const summarize = samples => {
+      const sorted = [...samples].sort((a, b) => a - b);
+      return { count: sorted.length, medianMs: sorted[Math.floor(sorted.length / 2)] ?? null, maxMs: sorted.at(-1) ?? null };
+    };
+    console.log(`Desktop browser contact-path timing (includes controller work; not a device budget): ${JSON.stringify({ scene: summarize(timing.scene), record: summarize(timing.record) })}`);
+  }
   const fielders = await page.evaluate(() => window.__fielderSceneCheck);
   if (!fielders || fielders.positions.length !== 10 || fielders.meshes.length !== 40 || fielders.meshes.some(mesh => mesh.pickable || !mesh.visible) || fielders.positions.some(fielder => Math.hypot(fielder.position.x, fielder.position.z) >= 65)) {
     throw new Error(`Visible default fielder setup is incomplete: ${JSON.stringify(fielders)}`);

@@ -1276,7 +1276,7 @@ test('simulated shot flight starts at the swept contact for each hand', () => {
   });
   assert.equal(launches.length, 12);
   for (const launch of launches) {
-    const expected = findBatBallContact(incoming, shot, launch.hand, 0, 'swept-blade-v4');
+    const expected = findBatBallContact(incoming, shot, launch.hand, 0, 'swept-blade-v5');
     assert.ok(expected);
     assert.deepEqual(launch.position, expected.ballPosition);
     assert.ok(Math.abs(launch.position.z - deliveryContactPoint(incoming).z) > 1e-4);
@@ -1643,7 +1643,7 @@ test('match event log copies delivery inputs and records final flight outcome', 
   const event = game.state.events[0];
   assert.equal(event.resolved, false);
   assert.ok(event.batContact, 'a recorded batting contact includes its swept point and incoming velocity');
-  assert.equal(event.contactModel, 'swept-blade-v4');
+  assert.equal(event.contactModel, 'swept-blade-v5');
   assert.ok(event.batContact!.faceCoordinates && event.batContact!.batVelocity);
   assert.ok(event.batContact!.timeSeconds >= 0);
   assert.ok(Math.hypot(...Object.values(event.batContact!.incomingVelocity)) > 0);
@@ -2332,6 +2332,37 @@ test('v4 contact-point velocity matches the rendered blade material point', () =
     scene.dispose();
     engine.dispose();
   }
+});
+
+test('v5 detects a brief overlap missed by v4 without changing v4 replay', () => {
+  const incoming: DeliveryChoice = {
+    aimTarget: { x: -0.1748756840825081, z: -7.1600269007030874 },
+    line: 'middle', length: 'yorker', type: 'medium', releaseTiming: 0.4959175166208297,
+    pace: 0.55, turn: 0, swing: 0.33041478623636067, frontFootHeel: -0.00362450855318458,
+    bowlingArm: 'Right', overTheWicket: true,
+  };
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.5064109839731827, contactZone: 0.5 };
+  for (const hand of ['RHB', 'LHB'] as const) {
+    assert.equal(findBatBallContact(incoming, shot, hand, 0, 'swept-blade-v4'), null);
+    const hit = findBatBallContact(incoming, shot, hand, 0, 'swept-blade-v5');
+    assert.ok(hit, `${hand} should detect the finer sampled overlap`);
+    assert.ok(Math.hypot(hit.ballPosition.x - hit.bladePosition.x, hit.ballPosition.y - hit.bladePosition.y, hit.ballPosition.z - hit.bladePosition.z) <= BALL_RADIUS_METERS + 1e-10);
+    assert.equal(findBatBallContact(incoming, { ...shot, timing: 0 }, hand, 0, 'swept-blade-v5'), null);
+  }
+});
+
+test('v5 samples the final delivery contact boundary', () => {
+  const incoming: DeliveryChoice = {
+    aimTarget: { x: -0.4378522893879563, z: -3.3987393948016686 },
+    line: 'off', length: 'good', type: 'fast', releaseTiming: 0.5105879047419876,
+    pace: 0.72, turn: 0, swing: 0, bowlingArm: 'Right', overTheWicket: false,
+  };
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.5215286866337944, contactZone: 0.5 };
+  const hit = findBatBallContact(incoming, shot, 'LHB', 0, 'swept-blade-v5');
+  const end = deliveryDurationMs(incoming.type, incoming.pace) / 1000 * batterContactProgress(incoming);
+  assert.ok(hit);
+  assert.equal(hit.timeSeconds, end, 'the last partial interval must include the exact boundary');
+  assert.equal(findBatBallContact(incoming, shot, 'LHB', 0, 'swept-blade-v4'), null);
 });
 
 test('swept bat collision uses the incoming path and mirrors swing handedness', () => {
