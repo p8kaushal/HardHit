@@ -50,7 +50,7 @@ export function batSwingStartSeconds(delivery: DeliveryChoice, timing: number, a
   return causal ? Math.max(start, contactTime - 0.15 + (input - 0.5) * 0.5) : start;
 }
 
-export function interpolateSwingAngle(elapsedSeconds: number, hand: 'RHB' | 'LHB', model: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3'): number {
+export function interpolateSwingAngle(elapsedSeconds: number, hand: 'RHB' | 'LHB', model: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' | 'swept-blade-v4'): number {
   const time = Math.max(0, Math.min(BAT_SWING_DURATION_SECONDS, elapsedSeconds));
   const keys = model === 'swept-blade-v1' ? BAT_SWING_KEYS_V1 : BAT_SWING_KEYS;
   let angle = keys[keys.length - 1][1];
@@ -105,7 +105,7 @@ function closestPointOnSegment(point: { x: number; y: number; z: number }, start
   return { closest, fraction, distance };
 }
 
-/** Closest point on a candidate blade box with width along world X. Diagnostic only. */
+/** Closest point on the modeled blade box with width along world X. */
 export function closestPointOnBladeBox(
   point: { x: number; y: number; z: number },
   shoulder: { x: number; y: number; z: number },
@@ -120,7 +120,7 @@ export function closestPointOnBladeBox(
   const normal = Math.max(-BAT_BLADE_HALF_THICKNESS_METERS, Math.min(BAT_BLADE_HALF_THICKNESS_METERS, -dy * axisZ + dz * axisY));
   const across = Math.max(-BAT_BLADE_HALF_WIDTH_METERS, Math.min(BAT_BLADE_HALF_WIDTH_METERS, point.x - shoulder.x));
   const closest = { x: shoulder.x + across, y: shoulder.y + along * axisY - normal * axisZ, z: shoulder.z + along * axisZ + normal * axisY };
-  return { closest, fraction: along / length, distance: Math.hypot(point.x - closest.x, point.y - closest.y, point.z - closest.z) };
+  return { closest, fraction: along / length, across, normal, distance: Math.hypot(point.x - closest.x, point.y - closest.y, point.z - closest.z) };
 }
 
 /**
@@ -134,11 +134,11 @@ export function findBatBallContact(
   shot: ShotChoice,
   hand: 'RHB' | 'LHB',
   assistMultiplier = 0,
-  contactModel: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' = 'swept-blade-v2',
+  contactModel: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' | 'swept-blade-v4' = 'swept-blade-v2',
 ): BatBallContactEvent | null {
   const durationSeconds = deliveryDurationMs(delivery.type, delivery.pace) / 1000;
   const contactTimeSeconds = durationSeconds * batterContactProgress(delivery);
-  const swingStartSeconds = batSwingStartSeconds(delivery, shot.timing, assistMultiplier, contactModel === 'swept-blade-v3');
+  const swingStartSeconds = batSwingStartSeconds(delivery, shot.timing, assistMultiplier, contactModel === 'swept-blade-v3' || contactModel === 'swept-blade-v4');
   const startSeconds = Math.max(0, swingStartSeconds);
   const endSeconds = Math.min(contactTimeSeconds, swingStartSeconds + BAT_SWING_DURATION_SECONDS);
   if (endSeconds < startSeconds) return null;
@@ -149,7 +149,7 @@ export function findBatBallContact(
       ? { ...battingPivotPosition(hand, delivery.batterPosition), x: deliveryContactPoint(delivery).x + (delivery.batterPosition?.x ?? 0) }
       : battingPivotPosition(hand, delivery.batterPosition);
   let timeSeconds = startSeconds;
-  const reachTarget = contactModel === 'swept-blade-v3' ? batReachTarget(delivery, hand) : 0;
+  const reachTarget = contactModel === 'swept-blade-v3' || contactModel === 'swept-blade-v4' ? batReachTarget(delivery, hand) : 0;
   const pivotAt = (time: number) => ({ ...pivot, x: pivot.x + batReachAtTime(reachTarget, time - swingStartSeconds) });
   while (timeSeconds <= endSeconds + 1e-10) {
     const progress = Math.min(1, timeSeconds / durationSeconds);
@@ -158,8 +158,9 @@ export function findBatBallContact(
     const currentPivot = pivotAt(timeSeconds);
     const shoulder = batBladeWorldPoint(currentPivot, 0, angle, hand);
     const toe = batBladeWorldPoint(currentPivot, BAT_BLADE_LENGTH_METERS, angle, hand);
-    const closest = closestPointOnSegment(ballPosition, shoulder, toe);
-    if (closest.distance <= BALL_RADIUS_METERS + BAT_BLADE_HALF_WIDTH_METERS) {
+    const boxPoint = contactModel === 'swept-blade-v4' ? closestPointOnBladeBox(ballPosition, shoulder, toe) : null;
+    const closest = boxPoint ?? closestPointOnSegment(ballPosition, shoulder, toe);
+    if (closest.distance <= BALL_RADIUS_METERS + (boxPoint ? 0 : BAT_BLADE_HALF_WIDTH_METERS)) {
       const velocityStep = 0.001;
       const beforeTime = Math.max(0, timeSeconds - velocityStep);
       const afterTime = Math.min(durationSeconds, timeSeconds + velocityStep);
@@ -171,8 +172,17 @@ export function findBatBallContact(
       const velocityBeforeTime = Math.max(swingStartSeconds, timeSeconds - velocityStep);
       const velocityElapsed = timeSeconds - velocityBeforeTime;
       const priorAngle = interpolateSwingAngle(velocityBeforeTime - swingStartSeconds, hand, contactModel);
-      const priorBladePoint = batBladeWorldPoint(pivotAt(velocityBeforeTime), impactAlongBlade, priorAngle, hand);
-      const currentBladePoint = batBladeWorldPoint(currentPivot, impactAlongBlade, impactAngle, hand);
+      const materialPoint = (pointPivot: typeof pivot, pointAngle: number) => {
+        const center = batBladeWorldPoint(pointPivot, impactAlongBlade, pointAngle, hand);
+        if (!boxPoint) return center;
+        const start = batBladeWorldPoint(pointPivot, 0, pointAngle, hand);
+        const end = batBladeWorldPoint(pointPivot, BAT_BLADE_LENGTH_METERS, pointAngle, hand);
+        const axisY = (end.y - start.y) / BAT_BLADE_LENGTH_METERS;
+        const axisZ = (end.z - start.z) / BAT_BLADE_LENGTH_METERS;
+        return { x: center.x + boxPoint.across, y: center.y - boxPoint.normal * axisZ, z: center.z + boxPoint.normal * axisY };
+      };
+      const priorBladePoint = materialPoint(pivotAt(velocityBeforeTime), priorAngle);
+      const currentBladePoint = materialPoint(currentPivot, impactAngle);
       const priorTip = batBladeWorldPoint(pivotAt(velocityBeforeTime), BAT_BLADE_LENGTH_METERS, priorAngle, hand);
       const currentTip = batBladeWorldPoint(currentPivot, BAT_BLADE_LENGTH_METERS, impactAngle, hand);
       return {

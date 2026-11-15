@@ -1004,7 +1004,7 @@ export class GameScene {
 
   /** Set the rendered bat from the same delivery-clock pose as swept contact. */
   public setDeliverySwing(delivery: DeliveryChoice, shot: ShotChoice, assist: number): void {
-    const candidate = findBatBallContact(delivery, shot, this.batterHand, assist, 'swept-blade-v3');
+    const candidate = findBatBallContact(delivery, shot, this.batterHand, assist, 'swept-blade-v4');
     const relativeLine = deliveryBatterImpactPoint(delivery).x - (delivery.batterPosition?.x ?? 0);
     this.deliverySwing = { delivery, shot, assist, contact: Math.abs(relativeLine) <= 1.25 ? candidate : null };
     this.swingFollowThrough = null;

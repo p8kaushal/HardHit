@@ -1276,7 +1276,7 @@ test('simulated shot flight starts at the swept contact for each hand', () => {
   });
   assert.equal(launches.length, 12);
   for (const launch of launches) {
-    const expected = findBatBallContact(incoming, shot, launch.hand, 0, 'swept-blade-v3');
+    const expected = findBatBallContact(incoming, shot, launch.hand, 0, 'swept-blade-v4');
     assert.ok(expected);
     assert.deepEqual(launch.position, expected.ballPosition);
     assert.ok(Math.abs(launch.position.z - deliveryContactPoint(incoming).z) > 1e-4);
@@ -1643,7 +1643,7 @@ test('match event log copies delivery inputs and records final flight outcome', 
   const event = game.state.events[0];
   assert.equal(event.resolved, false);
   assert.ok(event.batContact, 'a recorded batting contact includes its swept point and incoming velocity');
-  assert.equal(event.contactModel, 'swept-blade-v3');
+  assert.equal(event.contactModel, 'swept-blade-v4');
   assert.ok(event.batContact!.faceCoordinates && event.batContact!.batVelocity);
   assert.ok(event.batContact!.timeSeconds >= 0);
   assert.ok(Math.hypot(...Object.values(event.batContact!.incomingVelocity)) > 0);
@@ -1688,7 +1688,8 @@ test('saved regular match events replay through controller adjudication', () => 
   game.setTossResult(game.state.player.id, 'bat');
   game.startMatch();
   for (let ball = 0; ball < 6; ball++) {
-    const result = game.recordBall(delivery(0.5), { direction: 2, type: ball === 0 ? 'lofted' : 'grounded', timing: 0.5, contactZone: 0.5 }, ball === 0 ? 'deep' : undefined, ball === 0 ? 'swept-blade-v1' : ball === 1 ? 'swept-blade-v3' : undefined);
+    const model = ball === 0 ? 'swept-blade-v1' : ball === 1 ? 'swept-blade-v3' : ball === 2 ? 'swept-blade-v4' : ball === 3 ? 'swept-blade-v2' : undefined;
+    const result = game.recordBall(delivery(0.5), { direction: 2, type: ball === 0 ? 'lofted' : 'grounded', timing: 0.5, contactZone: 0.5 }, ball === 0 ? 'deep' : undefined, model);
     assert.equal(result.isWicket, false);
     if (ball === 0) game.finalizeBallOutcome(8, false, false, 'point');
     else if (ball === 1) game.finalizeBallOutcome(21, true, false, null, 0, 'point');
@@ -2225,6 +2226,8 @@ test('blade-box distance respects width, thickness and finite toe', () => {
   assert.ok(0.08 < BALL_RADIUS_METERS + 0.054);
   const edge = closestPointOnBladeBox({ x: 0.07, y: 0.5, z: 0 }, shoulder, toe);
   assert.ok(Math.abs(edge.distance - 0.016) < 1e-12);
+  const corner = closestPointOnBladeBox({ x: 0.07, y: 0.5, z: 0.04 }, shoulder, toe);
+  assert.ok(Math.abs(corner.distance - Math.hypot(0.016, 0.0195)) < 1e-12);
   const beyondToe = closestPointOnBladeBox({ x: 0, y: 0.1, z: 0 }, shoulder, toe);
   assert.ok(Math.abs(beyondToe.distance - 0.06) < 1e-12);
   assert.equal(beyondToe.fraction, 1);
@@ -2267,6 +2270,67 @@ test('v3 reach can contact an off-line ball while keeping timing and reach limit
     assert.ok(Math.hypot(point.x - contact.bladePosition.x, point.y - contact.bladePosition.y, point.z - contact.bladePosition.z) < 1e-9);
     assert.equal(findBatBallContact(incoming, { ...shot, timing: 0 }, hand, 0, 'swept-blade-v3'), null);
     assert.equal(findBatBallContact({ ...incoming, aimTarget: { ...incoming.aimTarget, x: 2 } }, shot, hand, 0, 'swept-blade-v3'), null);
+  }
+});
+
+test('v4 sweeps a ball against the finite blade box for both hands', () => {
+  const incoming = { ...delivery(0.5, 0.15), overTheWicket: true };
+  const shot = { direction: 0, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
+  const duration = deliveryDurationMs(incoming.type, incoming.pace) / 1000;
+  for (const hand of ['RHB', 'LHB'] as const) {
+    const hit = findBatBallContact(incoming, shot, hand, 0, 'swept-blade-v4');
+    assert.ok(hit, `${hand} should reach the delivery`);
+    assert.ok(Math.hypot(hit.ballPosition.x - hit.bladePosition.x, hit.ballPosition.y - hit.bladePosition.y, hit.ballPosition.z - hit.bladePosition.z) <= BALL_RADIUS_METERS + 1e-10);
+    const beforeTime = hit.timeSeconds - 1 / 1200;
+    const pose = batSwingPose(incoming, shot, hand, 0, beforeTime);
+    const pivot = battingPivotPosition(hand);
+    pivot.x += pose.reachWorldX;
+    const before = closestPointOnBladeBox(sampleDeliveryPath(incoming, beforeTime / duration), batBladeWorldPoint(pivot, 0, pose.angle, hand), batBladeWorldPoint(pivot, BAT_BLADE_LENGTH_METERS, pose.angle, hand));
+    assert.ok(before.distance > BALL_RADIUS_METERS, `${hand} contact should be the first sampled box overlap`);
+    assert.ok(hit.batVelocity && Object.values(hit.batVelocity).every(Number.isFinite));
+    assert.equal(findBatBallContact(incoming, { ...shot, timing: 0 }, hand, 0, 'swept-blade-v4'), null);
+  }
+});
+
+test('v4 contact-point velocity matches the rendered blade material point', () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  try {
+    const incoming = { ...delivery(0.5, 0.15), overTheWicket: true };
+    const shot = { direction: 0, type: 'grounded' as const, timing: 0.5, contactZone: 0.5 };
+    for (const hand of ['RHB', 'LHB'] as const) {
+      const hit = findBatBallContact(incoming, shot, hand, 0, 'swept-blade-v4');
+      assert.ok(hit?.batVelocity);
+      const root = new TransformNode(`root-v4-${hand}`, scene);
+      root.position.set(-0.35, 0, BATTER_CREASE_Z);
+      root.rotation.y = hand === 'RHB' ? Math.PI / 2 : -Math.PI / 2;
+      const pivot = new TransformNode(`pivot-v4-${hand}`, scene);
+      pivot.parent = root;
+      const local = batPivotLocalPosition(hand);
+      pivot.position.set(local.x, local.y, local.z);
+      const bat = MeshBuilder.CreateBox(`bat-v4-${hand}`, { width: 0.041, height: 0.64, depth: 0.108 }, scene);
+      bat.parent = pivot;
+      bat.position.y = -0.43;
+      const applyPose = (time: number) => {
+        GameScene.prototype.setBatSwingPose.call({ batPivot: pivot, batterHand: hand } as unknown as GameScene, incoming, shot, 0, time);
+        pivot.computeWorldMatrix(true);
+        bat.computeWorldMatrix(true);
+      };
+      applyPose(hit.timeSeconds);
+      const point = new Vector3(hit.bladePosition.x, hit.bladePosition.y, hit.bladePosition.z);
+      const localPoint = Vector3.TransformCoordinates(point, bat.getWorldMatrix().clone().invert());
+      assert.ok(Math.abs(localPoint.x) <= 0.0205 + 1e-6 && Math.abs(localPoint.y) <= 0.32 + 1e-6 && Math.abs(localPoint.z) <= 0.054 + 1e-6,
+        `${hand} contact point must lie on the rendered blade box`);
+      applyPose(hit.timeSeconds - 0.001);
+      const previous = Vector3.TransformCoordinates(localPoint, bat.getWorldMatrix());
+      const actual = point.subtract(previous).scale(1000);
+      assert.ok(Vector3.Distance(actual, new Vector3(hit.batVelocity.x, hit.batVelocity.y, hit.batVelocity.z)) < 0.002,
+        `${hand} material-point velocity differs from the rendered transform`);
+      root.dispose();
+    }
+  } finally {
+    scene.dispose();
+    engine.dispose();
   }
 });
 

@@ -180,7 +180,7 @@ export interface MatchEvent {
   delivery: DeliveryChoice;
   shot: ShotChoice | null;
   /** Absent on historical records; present to select the deterministic contact adjudicator. */
-  contactModel?: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3';
+  contactModel?: 'swept-blade-v1' | 'swept-blade-v2' | 'swept-blade-v3' | 'swept-blade-v4';
   batContact?: BatBallContactEvent;
   missed: boolean;
   isWicket: boolean;

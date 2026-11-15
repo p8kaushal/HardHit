@@ -64,7 +64,7 @@ export function replayMatchRecord(record: MatchHistoryRecord): MatchController {
     const replayedContact = expectedContact && actualContact
       ? Object.fromEntries(Object.keys(expectedContact).map(key => [key, (actualContact as unknown as Record<string, unknown>)[key]]))
       : actualContact;
-    const usesSweptContact = contactModel === 'swept-blade-v1' || contactModel === 'swept-blade-v2' || contactModel === 'swept-blade-v3';
+    const usesSweptContact = contactModel === 'swept-blade-v1' || contactModel === 'swept-blade-v2' || contactModel === 'swept-blade-v3' || contactModel === 'swept-blade-v4';
     assertSame({ missed: outcome.missed ?? false, isWicket: outcome.isWicket, wicketReason: outcome.wicketReason, isFreeHit: outcome.isFreeHit, isExtra: outcome.isExtra, extraType: outcome.extraType, ...(usesSweptContact ? { batContact: replayedContact } : {}) },
       { missed: event.missed, isWicket: event.caughtBy || event.runOutBy ? false : event.isWicket, wicketReason: expectedDecisionReason, isFreeHit: event.isFreeHit, isExtra: event.isExtra, extraType: event.extraType, ...(usesSweptContact ? { batContact: event.batContact } : {}) }, `decision ${event.sequence}`);
     if (event.flight) {
